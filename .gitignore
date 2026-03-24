@@ -1,0 +1,31 @@
+# ── Dépendances ────────────────────────────────────────────
+node/
+electron-app/node_modules/
+electron-app/dist/
+
+# ── Python embarqué & OCR (téléchargés par le .bat) ────────
+electron-app/python-embed/
+python-embed/
+tesseract/
+
+# ── Build / cache Python ────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ── Logs & données runtime ──────────────────────────────────
+*.log
+app.log
+
+# ── Fichiers utilisateur (ne pas écraser) ──────────────────
+macros.json
+license.json
+
+# ── OS / IDE ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+*.suo
+*.user

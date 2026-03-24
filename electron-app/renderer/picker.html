@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+<title>Picker</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  body {
+    cursor: crosshair;
+    -webkit-app-region: no-drag;
+  }
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.15);
+  }
+  #info {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); color: #fff; padding: 10px 24px;
+    border-radius: 8px; font: 600 14px/1.4 'Segoe UI', sans-serif;
+    pointer-events: none; z-index: 999;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  #coords {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); color: #0ff; padding: 8px 18px;
+    border-radius: 6px; font: 13px 'Consolas', monospace;
+    pointer-events: none; z-index: 999;
+  }
+  #selection {
+    position: fixed;
+    border: 2px solid #0ff;
+    background: rgba(0,255,255,0.08);
+    pointer-events: none;
+    display: none;
+    z-index: 100;
+  }
+  #crosshair-h, #crosshair-v {
+    position: fixed;
+    background: rgba(0,255,255,0.3);
+    pointer-events: none;
+    z-index: 50;
+  }
+  #crosshair-h { left: 0; right: 0; height: 1px; }
+  #crosshair-v { top: 0; bottom: 0; width: 1px; }
+</style>
+</head>
+<body>
+  <div id="overlay"></div>
+  <div id="crosshair-h"></div>
+  <div id="crosshair-v"></div>
+  <div id="selection"></div>
+  <div id="info">Cliquez pour sélectionner un point — Échap pour annuler</div>
+  <div id="coords">X: 0, Y: 0</div>
+
+  <script>
+    let mode = 'point';
+    let offsetX = 0, offsetY = 0;
+    let dragging = false;
+    let startX = 0, startY = 0;
+    let startScreenX = 0, startScreenY = 0;
+    const sel = document.getElementById('selection');
+    const coordsEl = document.getElementById('coords');
+    const infoEl = document.getElementById('info');
+    const chH = document.getElementById('crosshair-h');
+    const chV = document.getElementById('crosshair-v');
+
+    window.pickerApi.onInit(data => {
+      mode = data.mode || 'point';
+      offsetX = data.offsetX || 0;
+      offsetY = data.offsetY || 0;
+      if (mode === 'region') {
+        infoEl.textContent = 'Cliquez et glissez pour sélectionner une zone — Échap pour annuler';
+      }
+    });
+
+    document.addEventListener('mousemove', e => {
+      const rx = e.screenX;
+      const ry = e.screenY;
+      coordsEl.textContent = `X: ${rx}, Y: ${ry}`;
+      chH.style.top = e.clientY + 'px';
+      chV.style.left = e.clientX + 'px';
+
+      if (dragging && mode === 'region') {
+        const x = Math.min(startX, e.clientX);
+        const y = Math.min(startY, e.clientY);
+        const w = Math.abs(e.clientX - startX);
+        const h = Math.abs(e.clientY - startY);
+        sel.style.left = x + 'px';
+        sel.style.top = y + 'px';
+        sel.style.width = w + 'px';
+        sel.style.height = h + 'px';
+        sel.style.display = 'block';
+
+        const sx = Math.min(e.screenX, startScreenX);
+        const sy = Math.min(e.screenY, startScreenY);
+        coordsEl.textContent = `X: ${sx}, Y: ${sy}, W: ${w}, H: ${h}`;
+      }
+    });
+
+    document.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      if (mode === 'point') {
+        window.pickerApi.sendResult({ x: e.screenX, y: e.screenY });
+      } else {
+        dragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startScreenX = e.screenX;
+        startScreenY = e.screenY;
+      }
+    });
+
+    document.addEventListener('mouseup', e => {
+      if (dragging && mode === 'region') {
+        dragging = false;
+        const x = Math.min(e.screenX, startScreenX);
+        const y = Math.min(e.screenY, startScreenY);
+        const w = Math.abs(e.screenX - startScreenX);
+        const h = Math.abs(e.screenY - startScreenY);
+        if (w > 2 && h > 2) {
+          window.pickerApi.sendResult({ x, y, w, h });
+        } else {
+          // Too small — treat as point
+          window.pickerApi.sendResult({ x: e.screenX, y: e.screenY });
+        }
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        window.pickerApi.sendResult(null);
+      }
+    });
+  </script>
+</body>
+</html>

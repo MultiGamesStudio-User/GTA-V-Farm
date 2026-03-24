@@ -1,0 +1,78 @@
+{
+  "name": "macro-engine",
+  "version": "2.0.0",
+  "description": "MacroEngine — Système d'automatisation par macros",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --inspect",
+    "prepare-python": "node scripts/prepare-python.js",
+    "build": "npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win portable",
+    "build-installer": "npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win nsis"
+  },
+  "keywords": [
+    "macro",
+    "automation",
+    "electron"
+  ],
+  "license": "MIT",
+  "build": {
+    "appId": "com.macroengine.app",
+    "productName": "MacroEngine",
+    "compression": "normal",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "picker-preload.js",
+      "config_parser.py",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../",
+        "to": "bot",
+        "filter": [
+          "config.py",
+          "main.py",
+          "requirements.txt",
+          "modules/**/*",
+          "templates/**/*"
+        ]
+      },
+      {
+        "from": "python-embed",
+        "to": "python-embed"
+      },
+      {
+        "from": "../tesseract",
+        "to": "bot/tesseract"
+      }
+    ],
+    "win": {
+      "icon": null,
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "MacroEngine-Portable.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": null,
+      "artifactName": "MacroEngine-Setup.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  }
+}

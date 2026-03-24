@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+  <title>MacroEngine Overlay</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        rgba(7, 7, 10, 0.90);
+      --border:    rgba(255,255,255,.08);
+      --border-2:  rgba(255,255,255,.13);
+      --accent:    #e8352a;
+      --green:     #3ddc84;
+      --orange:    #ff9500;
+      --text:      #f0f0f4;
+      --text-2:    #7070a0;
+      --text-3:    #3a3a50;
+      --radius:    13px;
+      --font:      'Segoe UI', system-ui, sans-serif;
+      --mono:      'Consolas', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: transparent;
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #root {
+      background: var(--bg);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      box-shadow:
+        0 12px 48px rgba(0,0,0,.8),
+        0 0 0 1px rgba(255,255,255,.04) inset;
+    }
+
+    /* ── Titlebar ──────────────────────────────────────── */
+    #titlebar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 10px 7px;
+      border-bottom: 1px solid var(--border);
+      -webkit-app-region: drag;
+      flex-shrink: 0;
+      background: rgba(255,255,255,.02);
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .title-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--text-3);
+      flex-shrink: 0;
+      transition: background .4s, box-shadow .4s;
+    }
+    .title-dot.running {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0   rgba(61,220,132,.6); }
+      60%  { box-shadow: 0 0 0 6px rgba(61,220,132,0); }
+      100% { box-shadow: 0 0 0 0   rgba(61,220,132,0); }
+    }
+
+    .title-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--text-2);
+      flex: 1;
+    }
+
+    .title-btns {
+      display: flex;
+      gap: 3px;
+      -webkit-app-region: no-drag;
+    }
+    .title-btn {
+      width: 18px; height: 18px;
+      border-radius: 5px;
+      border: none;
+      background: rgba(255,255,255,.05);
+      color: var(--text-3);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .14s, color .14s;
+      padding: 0;
+    }
+    .title-btn:hover           { background: rgba(255,255,255,.12); color: var(--text-2); }
+    .title-btn-close:hover     { background: rgba(232,53,42,.28);   color: #ff7070; }
+
+    /* ── Macros list ───────────────────────────────────── */
+    #body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+    #macros-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 7px 8px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .no-macros {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--text-3);
+      padding: 14px;
+    }
+
+    .macro-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 9px;
+      border-radius: 8px;
+      background: rgba(61,220,132,.06);
+      border: 1px solid rgba(61,220,132,.14);
+      transition: background .2s;
+    }
+    .macro-row:hover { background: rgba(61,220,132,.1); }
+
+    .macro-pulse {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      flex-shrink: 0;
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+
+    .macro-name {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .macro-time {
+      font-size: 10px;
+      color: var(--green);
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      flex-shrink: 0;
+      font-family: var(--mono);
+      opacity: .8;
+    }
+
+    /* ── Last log line ─────────────────────────────────── */
+    #last-log {
+      padding: 4px 10px 5px;
+      font-size: 9.5px;
+      color: var(--text-3);
+      border-top: 1px solid var(--border);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: var(--mono);
+      flex-shrink: 0;
+      min-height: 22px;
+      display: flex;
+      align-items: center;
+    }
+    #last-log.level-ERROR, #last-log.level-FATAL   { color: #ff6060; }
+    #last-log.level-WARNING, #last-log.level-PYERR { color: var(--orange); }
+    #last-log.level-INFO                           { color: var(--text-2); }
+
+    /* ── Footer ────────────────────────────────────────── */
+    #footer {
+      padding: 6px 8px 8px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      gap: 5px;
+    }
+
+    #btn-stop {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(232,53,42,.12);
+      border: 1px solid rgba(232,53,42,.25);
+      color: #ff6060;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      transition: background .14s, border-color .14s, transform 80ms;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      font-family: var(--font);
+    }
+    #btn-stop:hover  { background: rgba(232,53,42,.26); border-color: rgba(232,53,42,.45); }
+    #btn-stop:active { transform: scale(.97); }
+
+    /* ── Scrollbar ─────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<div id="root">
+
+  <!-- Titlebar (draggable) -->
+  <div id="titlebar">
+    <div class="title-dot" id="title-dot"></div>
+    <span class="title-label">Macro Engine</span>
+    <div class="title-btns">
+      <button class="title-btn" onclick="window.overlay.hide()" title="Masquer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <button class="title-btn title-btn-close" onclick="window.overlay.close()" title="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div id="body">
+    <div id="macros-list">
+      <div class="no-macros">Aucune macro active</div>
+    </div>
+    <div id="last-log"></div>
+  </div>
+
+  <!-- Footer -->
+  <div id="footer">
+    <button id="btn-stop" onclick="window.overlay.stopAll()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+      </svg>
+      Tout arrêter
+    </button>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+const titleDot  = document.getElementById('title-dot');
+const macroList = document.getElementById('macros-list');
+const lastLogEl = document.getElementById('last-log');
+
+// name → { startTime: timestamp }
+const running = new Map();
+
+// Update elapsed times every second
+setInterval(() => {
+  document.querySelectorAll('.macro-time[data-start]').forEach(el => {
+    el.textContent = formatElapsed(Date.now() - parseInt(el.dataset.start, 10));
+  });
+}, 1000);
+
+function formatElapsed(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}h${String(m % 60).padStart(2,'0')}m`;
+  return `${String(m).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderMacros() {
+  if (running.size === 0) {
+    macroList.innerHTML = '<div class="no-macros">Aucune macro active</div>';
+    titleDot.classList.remove('running');
+    return;
+  }
+  titleDot.classList.add('running');
+  macroList.innerHTML = [...running.entries()].map(([name, { startTime }]) => `
+    <div class="macro-row">
+      <div class="macro-pulse"></div>
+      <div class="macro-name" title="${esc(name)}">${esc(name)}</div>
+      <div class="macro-time" data-start="${startTime}">${formatElapsed(Date.now() - startTime)}</div>
+    </div>
+  `).join('');
+}
+
+// Receive engine status updates
+window.overlay.onStatus((d) => {
+  const runningNames = new Set(d.running || []);
+  for (const name of [...running.keys()]) {
+    if (!runningNames.has(name)) running.delete(name);
+  }
+  for (const name of runningNames) {
+    if (!running.has(name)) running.set(name, { startTime: Date.now() });
+  }
+  renderMacros();
+});
+
+// Receive log messages → show last line
+window.overlay.onLog((d) => {
+  if (!d || !d.msg) return;
+  const msg = d.msg.trim();
+  lastLogEl.textContent = msg.length > 58 ? msg.slice(0, 58) + '…' : msg;
+  lastLogEl.className = 'level-' + (d.level || 'INFO');
+});
+
+// Engine stopped
+window.overlay.onStopped(() => {
+  running.clear();
+  renderMacros();
+  lastLogEl.textContent = '';
+  lastLogEl.className = '';
+});
+</script>
+
+</body>
+</html>
