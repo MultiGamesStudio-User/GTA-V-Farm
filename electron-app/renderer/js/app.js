@@ -410,4 +410,31 @@ async function refreshMonitors() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+/* ── Updater ──────────────────────────────────────────────── */
+function _setupUpdater() {
+  if (!window.api.onUpdaterDone) return;
+
+  window.api.onUpdaterChecking(() => {
+    // silencieux au démarrage
+  });
+
+  window.api.onUpdaterDone((d) => {
+    const n = d.updated ? d.updated.length : 0;
+    if (n === 0) return;
+    showToast(`✓ ${n} fichier${n > 1 ? 's mis à jour' : ' mis à jour'} — v${d.version}`, 'success', 6000);
+    appendLog('INFO', `Mise à jour appliquée (v${d.version}) : ${d.updated.join(', ')}`);
+    if (d.errors && d.errors.length) {
+      d.errors.forEach(e => appendLog('WARNING', `Updater: erreur sur ${e.file} — ${e.error}`));
+    }
+  });
+
+  window.api.onUpdaterError((d) => {
+    // Pas de toast — juste un log discret (pas de connexion = normal)
+    appendLog('WARNING', 'Updater: ' + (d.error || 'Erreur inconnue'));
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  _setupUpdater();
+  init();
+});

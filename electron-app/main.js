@@ -5,6 +5,7 @@ const path    = require('path');
 const fs      = require('fs');
 const https   = require('https');
 const { spawn, execSync } = require('child_process');
+const { checkForUpdates } = require('./updater');
 
 // ── Logger fichier ────────────────────────────────────────────────────────────
 // Écrit dans <dossier du .bat>/app.log  (accessible même si la fenêtre ne s'ouvre pas)
@@ -230,6 +231,41 @@ function createWindow () {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+// ── Mise à jour automatique ───────────────────────────────────────────────────
+async function _runAutoUpdate() {
+  writeLog('INFO', 'Updater: vérification des mises à jour…');
+  mainWindow?.webContents.send('updater:checking');
+  try {
+    const result = await checkForUpdates(BOT_DIR, (file) => {
+      writeLog('INFO', 'Updater: ↓', file);
+      mainWindow?.webContents.send('updater:progress', { file });
+    });
+
+    if (result.upToDate) {
+      writeLog('INFO', `Updater: à jour (v${result.version})`);
+      mainWindow?.webContents.send('updater:up-to-date', { version: result.version });
+    } else {
+      writeLog('INFO', `Updater: ${result.updated.length} fichier(s) mis à jour → v${result.version}`);
+      if (result.errors.length) {
+        for (const e of result.errors) writeLog('WARN', `Updater: erreur sur ${e.file} — ${e.error}`);
+      }
+      mainWindow?.webContents.send('updater:done', {
+        version : result.version,
+        updated : result.updated,
+        errors  : result.errors,
+      });
+    }
+  } catch (err) {
+    writeLog('WARN', 'Updater: impossible de vérifier les mises à jour —', err.message);
+    mainWindow?.webContents.send('updater:error', { error: err.message });
+  }
+}
+
+ipcMain.handle('updater:check', () => {
+  _runAutoUpdate();
+  return { ok: true };
+});
+
 app.whenReady().then(() => {
   writeLog('INFO', 'app ready');
   createWindow();
@@ -245,6 +281,9 @@ app.whenReady().then(() => {
     }
     writeLog('INFO', 'Python OK →', PYTHON_EXE);
     mainWindow?.webContents.send('setup:done');
+
+    // ── Vérification automatique des mises à jour ──────────────
+    _runAutoUpdate();
   });
 }).catch(err => {
   writeLog('FATAL', 'app.whenReady() rejeté:', err.stack || err.message);

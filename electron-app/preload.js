@@ -109,4 +109,12 @@ contextBridge.exposeInMainWorld('api', {
   openLog:   ()  => ipcRenderer.invoke('log:open'),
   clearLog:  ()  => ipcRenderer.invoke('log:clear'),
 
+  // ── Updater ───────────────────────────────────────────────
+  checkUpdates:     ()   => ipcRenderer.invoke('updater:check'),
+  onUpdaterChecking:  (cb) => ipcRenderer.on('updater:checking',   ()      => cb()),
+  onUpdaterProgress:  (cb) => ipcRenderer.on('updater:progress',   (_, d)  => cb(d)),
+  onUpdaterDone:      (cb) => ipcRenderer.on('updater:done',       (_, d)  => cb(d)),
+  onUpdaterUpToDate:  (cb) => ipcRenderer.on('updater:up-to-date', (_, d)  => cb(d)),
+  onUpdaterError:     (cb) => ipcRenderer.on('updater:error',      (_, d)  => cb(d)),
+
 });
