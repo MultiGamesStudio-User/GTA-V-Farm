@@ -538,16 +538,20 @@ function createOverlayWindow() {
   const s   = readSettings();
   const pos = s.overlayBounds || { x: 24, y: 80 };
 
+  const savedSize = s.overlaySize || {};
   overlayWindow = new BrowserWindow({
     x:           pos.x,
     y:           pos.y,
-    width:       280,
-    height:      196,
+    width:       300,
+    height:      savedSize.height || 360,
+    minWidth:    260,
+    minHeight:   200,
+    maxWidth:    400,
     frame:       false,
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
-    resizable:   false,
+    resizable:   true,
     focusable:   true,
     show:        false,
     webPreferences: {
@@ -570,6 +574,14 @@ function createOverlayWindow() {
     const [x, y] = overlayWindow.getPosition();
     const s = readSettings();
     s.overlayBounds = { x, y };
+    saveSettings(s);
+  });
+
+  overlayWindow.on('resize', () => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) return;
+    const [width, height] = overlayWindow.getSize();
+    const s = readSettings();
+    s.overlaySize = { width, height };
     saveSettings(s);
   });
 
@@ -612,6 +624,29 @@ ipcMain.on('overlay:minimize', () => {
   mainWindow?.webContents.send('overlay:closed');
 });
 
+ipcMain.on('overlay:macro-start', async (_, { name }) => {
+  try { await engineCmd({ cmd: 'macro_start', name }); } catch (_) {}
+});
+
+ipcMain.on('overlay:macro-stop', async (_, { name }) => {
+  try { await engineCmd({ cmd: 'macro_stop', name }); } catch (_) {}
+});
+
+ipcMain.handle('overlay:get-macros', () => {
+  try {
+    if (!fs.existsSync(MACROS_PATH)) return { macros: [] };
+    const data = JSON.parse(fs.readFileSync(MACROS_PATH, 'utf-8'));
+    return { macros: Array.isArray(data) ? data.map(m => m.name) : [] };
+  } catch (_) { return { macros: [] }; }
+});
+
+ipcMain.on('overlay:focus-main', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
 // ── IPC: macros file (save/load JSON) ────────────────────────────────────────
 ipcMain.handle('macros:read', () => {
   try {
@@ -627,6 +662,7 @@ ipcMain.handle('macros:write', (_evt, macros) => {
   try {
     fs.mkdirSync(path.dirname(MACROS_PATH), { recursive: true });
     fs.writeFileSync(MACROS_PATH, JSON.stringify(macros, null, 2), 'utf-8');
+    _sendToOverlay('overlay:macros-updated', {});
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
