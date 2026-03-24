@@ -8,10 +8,33 @@ OUT (stdout): {"type": "response", "id": "uid", "ok": true/false, ...}
               {"type": "status",   "running": ["macro_id", ...]}
 """
 from __future__ import annotations
-import sys, os, json, threading, logging, urllib.request, time
+import sys, os, json, threading, logging, urllib.request, time, gc
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
+
+# ── RAM monitor ───────────────────────────────────────────────────────────────
+_max_ram_mb: float = 0.0   # 0 = illimité
+
+def _ram_monitor():
+    """Thread de fond : gc.collect() toutes les 30 s + alerte si RAM > limite."""
+    try:
+        import psutil
+        _proc = psutil.Process(os.getpid())
+    except ImportError:
+        _proc = None
+    while True:
+        time.sleep(30)
+        gc.collect()
+        if _proc and _max_ram_mb > 0:
+            try:
+                rss_mb = _proc.memory_info().rss / (1024 * 1024)
+                if rss_mb > _max_ram_mb:
+                    _send({'type': 'log', 'level': 'WARNING',
+                           'msg': f'RAM {rss_mb:.0f} Mo > limite {_max_ram_mb:.0f} Mo — gc.collect() déclenché'})
+                    gc.collect()
+            except Exception:
+                pass
 
 # ── JSON log handler ──────────────────────────────────────────────────────────
 _send_lock = threading.Lock()
@@ -489,11 +512,15 @@ def _cmd_get_variables(cmd, rid):
 
 def _cmd_set_variable(cmd, rid):
     """Définit une variable depuis l'UI."""
+    global _max_ram_mb
     from modules.engine import state
     name  = cmd.get('name', '')
     value = cmd.get('value')
     if not name:
         _reply(rid, False, error='Champ "name" requis'); return
+    if name == '__max_ram_mb':
+        _max_ram_mb = float(value or 0)
+        _reply(rid, True, name=name, value=_max_ram_mb); return
     state.var_set(name, value)
     _reply(rid, True, name=name, value=value)
 
@@ -648,6 +675,7 @@ def _handle(cmd: dict):
 # ── Main loop ─────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     _init_condition_registry()   # donne aux conditions l'accès aux runners
+    threading.Thread(target=_ram_monitor, daemon=True, name='ram-monitor').start()
     _send({'type': 'log', 'level': 'INFO', 'msg': 'MacroEngine ready'})
     for raw in sys.stdin:
         raw = raw.strip()

@@ -63,6 +63,10 @@ function renderMacroEditor() {
   document.getElementById('me-name').value = macro.name || '';
   document.getElementById('me-loop').checked = macro.loop !== false;
   document.getElementById('me-loop-delay').value = macro.loop_delay != null ? macro.loop_delay : 0.1;
+  document.getElementById('me-max-iter').value = macro.max_iterations != null ? macro.max_iterations : 0;
+  document.getElementById('me-timeout').value = macro.timeout_s != null ? macro.timeout_s : 0;
+  document.getElementById('me-humanize').checked = !!macro.humanize;
+  document.getElementById('me-humanize-factor').value = macro.humanize_factor != null ? macro.humanize_factor : 0.12;
   // Window scope — populate asynchronously with all windows
   const scopeEl = document.getElementById('me-target-window');
   if (scopeEl) {
@@ -106,9 +110,13 @@ async function _populateWindowScopeDropdown(scopeEl, selectedHwnd) {
 function macroFieldChanged() {
   if (currentMacroIdx < 0) return;
   const m = macros[currentMacroIdx];
-  m.name       = document.getElementById('me-name').value;
-  m.loop       = document.getElementById('me-loop').checked;
-  m.loop_delay = parseFloat(document.getElementById('me-loop-delay').value) || 0.1;
+  m.name             = document.getElementById('me-name').value;
+  m.loop             = document.getElementById('me-loop').checked;
+  m.loop_delay       = parseFloat(document.getElementById('me-loop-delay').value) || 0.1;
+  m.max_iterations   = parseInt(document.getElementById('me-max-iter').value, 10) || 0;
+  m.timeout_s        = parseFloat(document.getElementById('me-timeout').value) || 0;
+  m.humanize         = document.getElementById('me-humanize').checked;
+  m.humanize_factor  = parseFloat(document.getElementById('me-humanize-factor').value) || 0.12;
   const scopeEl = document.getElementById('me-target-window');
   if (scopeEl) {
     const val = scopeEl.value;
@@ -342,6 +350,85 @@ function renderConditionInlineFields(c) {
       <span>Seuil</span><input type="number" class="cf threshold" value="${c.threshold || 0.8}" min="0" max="1" step="0.05" onchange="syncCondField(this,'threshold',true)">
     </div>`;
   }
+  if (t === 'pixel_changed' || t === 'pixel_not_changed') {
+    return coordFields + `<div class="fields-row">
+      <span>Tol.</span><input type="number" class="cf tolerance" value="${c.tolerance != null ? c.tolerance : 10}" min="0" max="255" onchange="syncCondField(this,'tolerance',true)">
+    </div>`;
+  }
+  if (t === 'window_focused' || t === 'window_not_focused' ||
+      t === 'window_exists'  || t === 'window_not_exists') {
+    return `<div class="fields-row">
+      <span>Titre fenêtre</span>
+      <input type="text" class="cf title" style="flex:1" value="${escHtml(c.title || '')}" placeholder="FiveM" onchange="syncCondField(this,'title',false)">
+    </div>`;
+  }
+  if (t === 'process_running' || t === 'process_not_running') {
+    return `<div class="fields-row">
+      <span>Processus (.exe)</span>
+      <input type="text" class="cf exe" style="flex:1" value="${escHtml(c.exe || '')}" placeholder="GTA5.exe" onchange="syncCondField(this,'exe',false)">
+    </div>`;
+  }
+  if (t === 'macro_is_running' || t === 'macro_not_running') {
+    return `<div class="fields-row">
+      <span>Nom macro</span>
+      <input type="text" class="cf name" style="flex:1" value="${escHtml(c.name || '')}" placeholder="Nom de la macro" onchange="syncCondField(this,'name',false)">
+    </div>`;
+  }
+  if (t === 'counter_eq' || t === 'counter_not_eq' || t === 'counter_gte' ||
+      t === 'counter_lte' || t === 'counter_gt'    || t === 'counter_lt') {
+    return `<div class="fields-row">
+      <span>Compteur</span>
+      <input type="text" class="cf name" style="width:120px" value="${escHtml(c.name || '')}" placeholder="score" onchange="syncCondField(this,'name',false)">
+      <span>Valeur</span>
+      <input type="number" class="cf value" value="${c.value != null ? c.value : 0}" onchange="syncCondField(this,'value',true)">
+    </div>`;
+  }
+  if (t === 'counter_between') {
+    return `<div class="fields-row">
+      <span>Compteur</span>
+      <input type="text" class="cf name" style="width:100px" value="${escHtml(c.name || '')}" placeholder="score" onchange="syncCondField(this,'name',false)">
+      <span>Min</span>
+      <input type="number" class="cf min" value="${c.min != null ? c.min : 0}" onchange="syncCondField(this,'min',true)">
+      <span>Max</span>
+      <input type="number" class="cf max" value="${c.max != null ? c.max : 10}" onchange="syncCondField(this,'max',true)">
+    </div>`;
+  }
+  if (t === 'variable_equals' || t === 'variable_contains') {
+    return `<div class="fields-row">
+      <span>Variable</span>
+      <input type="text" class="cf name" style="width:120px" value="${escHtml(c.name || '')}" placeholder="ma_var" onchange="syncCondField(this,'name',false)">
+      <span>Valeur</span>
+      <input type="text" class="cf value" style="flex:1" value="${escHtml(String(c.value != null ? c.value : ''))}" onchange="syncCondField(this,'value',false)">
+    </div>`;
+  }
+  if (t === 'time_between') {
+    return `<div class="fields-row">
+      <span>De</span>
+      <input type="time" class="cf start" value="${c.start || '08:00'}" onchange="syncCondField(this,'start',false)">
+      <span>À</span>
+      <input type="time" class="cf end" value="${c.end || '22:00'}" onchange="syncCondField(this,'end',false)">
+    </div>`;
+  }
+  if (t === 'random_chance') {
+    const _pct = Math.round((c.probability != null ? c.probability : 0.5) * 100);
+    return `<div class="fields-row">
+      <span>Probabilité</span>
+      <input type="number" class="cf probability" value="${_pct}" min="0" max="100" step="1" onchange="syncCondProbability(this)">
+      <span>%</span>
+    </div>`;
+  }
+  if (t === 'key_is_held' || t === 'key_not_held') {
+    return `<div class="fields-row">
+      <span>Touche</span>
+      <input type="text" class="cf key key-capture" value="${escHtml(c.key || 'f')}" placeholder="Cliquez puis appuyez" readonly onfocus="startKeyCaptureCond(this,'key')" data-field="key">
+    </div>`;
+  }
+  if (t === 'clipboard_contains') {
+    return `<div class="fields-row">
+      <span>Texte</span>
+      <input type="text" class="cf text" style="flex:1" value="${escHtml(c.text || '')}" placeholder="texte recherché" onchange="syncCondField(this,'text',false)">
+    </div>`;
+  }
   return '';
 }
 
@@ -355,6 +442,39 @@ function syncCondField(inputEl, field, isNum, inputType) {
   if (inputType === 'color') c[field] = hexToRgb(inputEl.value);
   else if (isNum) c[field] = parseFloat(inputEl.value);
   else c[field] = inputEl.value;
+}
+
+function syncCondProbability(inputEl) {
+  const row = inputEl.closest('.item-row');
+  if (!row) return;
+  const [, ri, ci] = row.id.split('-').map(Number);
+  if (currentMacroIdx < 0) return;
+  const c = macros[currentMacroIdx]?.rules[ri]?.conditions[ci];
+  if (!c) return;
+  c.probability = Math.max(0, Math.min(100, parseFloat(inputEl.value) || 0)) / 100;
+}
+
+function startKeyCaptureCond(input, field) {
+  input.value = '⌨ Appuyez…';
+  input.classList.add('capturing');
+  const handler = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    input.value = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    input.classList.remove('capturing');
+    input.removeEventListener('keydown', handler);
+    input.removeEventListener('blur', blurHandler);
+    input.blur();
+    syncCondField(input, field, false);
+  };
+  const blurHandler = () => {
+    if (input.classList.contains('capturing')) {
+      input.value = '';
+      input.classList.remove('capturing');
+      input.removeEventListener('keydown', handler);
+    }
+  };
+  input.addEventListener('keydown', handler);
+  input.addEventListener('blur', blurHandler, { once: true });
 }
 
 // Default fields injected when switching to a condition type that needs them

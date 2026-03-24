@@ -251,6 +251,26 @@
                   </select>
                 </div>
               </div>
+              <div class="form-row" style="margin-top:.4rem">
+                <div class="form-group">
+                  <label title="0 = boucle infinie">Itérations max <small style="color:var(--text-3)">(0=∞)</small></label>
+                  <input type="number" id="me-max-iter" value="0" min="0" step="1" oninput="macroFieldChanged()">
+                </div>
+                <div class="form-group">
+                  <label title="0 = pas de limite">Timeout (s) <small style="color:var(--text-3)">(0=∞)</small></label>
+                  <input type="number" id="me-timeout" value="0" min="0" step="1" oninput="macroFieldChanged()">
+                </div>
+                <div class="form-group form-group-check">
+                  <label class="check-label">
+                    <input type="checkbox" id="me-humanize" onchange="macroFieldChanged()">
+                    Humaniser
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label title="Variabilité aléatoire des timings">Facteur (0.01–0.5)</label>
+                  <input type="number" id="me-humanize-factor" value="0.12" min="0.01" max="0.5" step="0.01" oninput="macroFieldChanged()">
+                </div>
+              </div>
               <div class="form-row" style="margin-top:.5rem">
                 <div class="macro-run-controls">
                   <button class="btn btn-success" id="btn-run-macro" onclick="runCurrentMacro()">
@@ -633,6 +653,19 @@
           <button class="btn btn-secondary btn-sm" onclick="refreshMonitors()">Détecter les écrans</button>
         </div>
         <div id="monitors-result" style="margin-top:.5rem"></div>
+      </div>
+
+      <!-- Performances -->
+      <div class="settings-card">
+        <div class="settings-card-header">⚡ Performances</div>
+        <div class="form-group">
+          <label>RAM max. (Mo) <small style="color:var(--text-3)">0 = illimité</small></label>
+          <input type="number" id="set-max-ram" value="0" min="0" step="64" placeholder="ex: 512">
+        </div>
+        <div class="form-row" style="margin-top:.5rem">
+          <button class="btn btn-primary btn-sm" onclick="saveRamSettings()">Appliquer</button>
+          <span id="ram-status" style="font-size:12px;margin-left:8px"></span>
+        </div>
       </div>
     </section>
 

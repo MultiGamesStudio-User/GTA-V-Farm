@@ -29,7 +29,7 @@ function updateMacroCounters() {
 
 function addMacro() {
   if (currentMacroIdx >= 0) flushEditorToMacro();
-  macros.push({ name: 'Nouvelle macro', loop: true, loop_delay: 0.1, rules: [] });
+  macros.push({ name: 'Nouvelle macro', loop: true, loop_delay: 0.1, max_iterations: 0, timeout_s: 0, humanize: false, humanize_factor: 0.12, rules: [] });
   currentMacroIdx = macros.length - 1;
   renderMacroList();
   renderMacroEditor();

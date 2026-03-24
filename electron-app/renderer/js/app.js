@@ -300,6 +300,10 @@ async function loadAppSettings() {
       if (filterEl) filterEl.value = s.consoleFilter;
     }
 
+    // RAM limit
+    const ramEl = document.getElementById('set-max-ram');
+    if (ramEl && s.maxRamMb != null) ramEl.value = s.maxRamMb;
+
     // Last macro selection
     if (typeof s.lastMacroIdx === 'number' && s.lastMacroIdx >= 0) {
       currentMacroIdx = s.lastMacroIdx;
@@ -383,6 +387,24 @@ async function saveShortcutSettings() {
     if (pauseKey) map.pause = keyToAccelerator(pauseKey);
     await window.api.registerShortcuts(map);
     statusEl.textContent = '✅ Raccourcis activés';
+    statusEl.style.color = 'var(--success)';
+  } catch (e) {
+    statusEl.textContent = '❌ ' + e.message;
+    statusEl.style.color = 'var(--accent)';
+  }
+}
+
+async function saveRamSettings() {
+  const ramEl = document.getElementById('set-max-ram');
+  const statusEl = document.getElementById('ram-status');
+  const maxRam = parseInt(ramEl.value, 10) || 0;
+  try {
+    const s = (await window.api.readSettings()) || {};
+    s.maxRamMb = maxRam;
+    await window.api.writeSettings(s);
+    // Forward to Python engine
+    try { await window.api.setVariable({ name: '__max_ram_mb', value: maxRam }); } catch (_) {}
+    statusEl.textContent = maxRam > 0 ? `✅ Limite : ${maxRam} Mo` : '✅ Illimité';
     statusEl.style.color = 'var(--success)';
   } catch (e) {
     statusEl.textContent = '❌ ' + e.message;
