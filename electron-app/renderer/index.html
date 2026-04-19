@@ -231,7 +231,7 @@
           <span class="badge" id="macro-count-badge" style="margin-left:8px;font-size:11px">0</span>
         </div>
         <input type="file" id="macro-import-input" accept=".json" style="display:none" onchange="handleImportMacros(event)">
-        <div id="macro-list" class="macro-list macro-list-full"></div>
+        <div id="macro-list" class="macro-grid"></div>
       </div>
     </section>
 
@@ -639,135 +639,155 @@
         </div>
       </div>
 
-      <!-- Modal body = the full editor form -->
-      <div class="macro-modal-body" id="macro-modal-body">
-        <div id="macro-editor-form" style="display:none">
+      <!-- Modal body: n8n canvas + properties panel -->
+      <div class="macro-modal-body n8n-layout" id="macro-modal-body">
 
-          <!-- Macro settings -->
-          <div class="editor-section">
-            <div class="form-row">
-              <div class="form-group flex-2">
-                <label>Nom de la macro</label>
-                <input type="text" id="me-name" placeholder="Ma macro" oninput="macroFieldChanged()">
-              </div>
-              <div class="form-group">
-                <label>Délai de boucle (s)</label>
-                <input type="number" id="me-loop-delay" value="0.1" min="0.01" step="0.01" oninput="macroFieldChanged()">
-              </div>
-              <div class="form-group form-group-check">
-                <label class="check-label">
-                  <input type="checkbox" id="me-loop" checked onchange="macroFieldChanged()">
-                  Boucle infinie
-                </label>
-              </div>
-              <div class="form-group">
-                <label>Fenêtre cible</label>
-                <select id="me-target-window" onchange="macroFieldChanged()">
-                  <option value="">Toutes</option>
-                </select>
-              </div>
+        <!-- LEFT ─ workflow canvas (dot grid) -->
+        <div class="n8n-canvas-wrap" id="n8n-canvas-wrap">
+          <div class="n8n-canvas" id="n8n-canvas"></div>
+        </div>
+
+        <!-- RIGHT ─ properties panel -->
+        <div class="n8n-panel" id="n8n-panel">
+
+          <!-- Default state: macro settings -->
+          <div id="n8n-macro-props">
+            <div id="macro-editor-empty" style="display:none" class="n8n-empty-panel">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36" style="opacity:.2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              <span>Aucune macro sélectionnée</span>
             </div>
-            <div class="form-row" style="margin-top:.4rem">
-              <div class="form-group">
-                <label title="0 = boucle infinie">Itérations max <small style="color:var(--text-3)">(0=∞)</small></label>
-                <input type="number" id="me-max-iter" value="0" min="0" step="1" oninput="macroFieldChanged()">
+            <div id="macro-editor-form" style="display:none">
+
+              <!-- Panel title -->
+              <div class="n8n-panel-header">
+                <div class="n8n-panel-icon n8n-icon-config">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                </div>
+                <span id="n8n-panel-macro-name">Paramètres</span>
               </div>
-              <div class="form-group">
-                <label title="0 = pas de limite">Timeout (s) <small style="color:var(--text-3)">(0=∞)</small></label>
-                <input type="number" id="me-timeout" value="0" min="0" step="1" oninput="macroFieldChanged()">
+
+              <!-- Run controls -->
+              <div class="n8n-panel-section" style="padding:10px 14px">
+                <div class="macro-run-controls">
+                  <button class="btn btn-success btn-sm" id="btn-run-macro" onclick="runCurrentMacro()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Démarrer
+                  </button>
+                  <button class="btn btn-warning btn-sm" id="btn-pause-macro" onclick="pauseCurrentMacro()" style="display:none">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    Pause
+                  </button>
+                  <button class="btn btn-danger btn-sm" id="btn-stop-macro" onclick="stopCurrentMacro()" style="display:none">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                    Arrêter
+                  </button>
+                  <button class="btn btn-record btn-sm" id="btn-record-macro" onclick="toggleRecording()">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="12"><circle cx="12" cy="12" r="8"/></svg>
+                    Enregistrer
+                  </button>
+                  <button class="btn btn-danger btn-sm" id="btn-stop-record" onclick="toggleRecording()" style="display:none">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                    Stop Rec
+                  </button>
+                  <span class="macro-status-badge" id="macro-running-badge" style="display:none">EN COURS</span>
+                  <span class="macro-status-badge recording-badge" id="macro-recording-badge" style="display:none">● REC</span>
+                </div>
               </div>
-              <div class="form-group form-group-check">
-                <label class="check-label">
-                  <input type="checkbox" id="me-humanize" onchange="macroFieldChanged()">
-                  Humaniser
-                </label>
+
+              <!-- Settings fields -->
+              <div class="n8n-panel-section n8n-fields">
+                <div class="form-group">
+                  <label>Nom de la macro</label>
+                  <input type="text" id="me-name" placeholder="Ma macro" oninput="macroFieldChanged()">
+                </div>
+                <div class="form-row" style="gap:8px">
+                  <div class="form-group">
+                    <label>Délai boucle (s)</label>
+                    <input type="number" id="me-loop-delay" value="0.1" min="0.01" step="0.01" oninput="macroFieldChanged()">
+                  </div>
+                  <div class="form-group form-group-check" style="padding-top:20px">
+                    <label class="check-label">
+                      <input type="checkbox" id="me-loop" checked onchange="macroFieldChanged()">
+                      Boucle infinie
+                    </label>
+                  </div>
+                </div>
+                <div class="form-row" style="gap:8px">
+                  <div class="form-group">
+                    <label>Itérations max <small style="color:var(--text-3)">(0=∞)</small></label>
+                    <input type="number" id="me-max-iter" value="0" min="0" step="1" oninput="macroFieldChanged()">
+                  </div>
+                  <div class="form-group">
+                    <label>Timeout (s) <small style="color:var(--text-3)">(0=∞)</small></label>
+                    <input type="number" id="me-timeout" value="0" min="0" step="1" oninput="macroFieldChanged()">
+                  </div>
+                </div>
+                <div class="form-row" style="gap:8px">
+                  <div class="form-group form-group-check" style="padding-top:20px">
+                    <label class="check-label">
+                      <input type="checkbox" id="me-humanize" onchange="macroFieldChanged()">
+                      Humaniser
+                    </label>
+                  </div>
+                  <div class="form-group">
+                    <label>Facteur (0.01–0.5)</label>
+                    <input type="number" id="me-humanize-factor" value="0.12" min="0.01" max="0.5" step="0.01" oninput="macroFieldChanged()">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Fenêtre cible</label>
+                  <select id="me-target-window" onchange="macroFieldChanged()">
+                    <option value="">Toutes les fenêtres</option>
+                  </select>
+                </div>
               </div>
-              <div class="form-group">
-                <label title="Variabilité aléatoire des timings">Facteur (0.01–0.5)</label>
-                <input type="number" id="me-humanize-factor" value="0.12" min="0.01" max="0.5" step="0.01" oninput="macroFieldChanged()">
+
+              <!-- Start Guard -->
+              <div class="n8n-adv-section">
+                <div class="n8n-adv-header">
+                  <span>🛡️ Start Guard</span>
+                  <button class="btn btn-xs btn-secondary" onclick="addSectionCond('start_guard')">+ Condition</button>
+                </div>
+                <div class="n8n-adv-hint">Toutes doivent être vraies avant chaque itération</div>
+                <div id="guard-conditions-list" class="cond-list" style="padding:4px 14px 10px"></div>
               </div>
-            </div>
-            <div class="form-row" style="margin-top:.5rem">
-              <div class="macro-run-controls">
-                <button class="btn btn-success" id="btn-run-macro" onclick="runCurrentMacro()">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                  Démarrer
-                </button>
-                <button class="btn btn-warning" id="btn-pause-macro" onclick="pauseCurrentMacro()" style="display:none">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                  Pause
-                </button>
-                <button class="btn btn-danger" id="btn-stop-macro" onclick="stopCurrentMacro()" style="display:none">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                  Arrêter
-                </button>
-                <button class="btn btn-record" id="btn-record-macro" onclick="toggleRecording()">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="13"><circle cx="12" cy="12" r="8"/></svg>
-                  Enregistrer
-                </button>
-                <button class="btn btn-danger" id="btn-stop-record" onclick="toggleRecording()" style="display:none">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                  Stop Record
-                </button>
-                <span class="macro-status-badge" id="macro-running-badge" style="display:none">EN COURS</span>
-                <span class="macro-status-badge recording-badge" id="macro-recording-badge" style="display:none">● REC</span>
+
+              <!-- Stop Conditions -->
+              <div class="n8n-adv-section">
+                <div class="n8n-adv-header">
+                  <span>🛑 Stop Conditions</span>
+                  <button class="btn btn-xs btn-secondary" onclick="addSectionCond('stop_conditions')">+ Condition</button>
+                </div>
+                <div class="n8n-adv-hint">Dès qu'une est vraie → arrêt automatique</div>
+                <div id="stop-conditions-list" class="cond-list" style="padding:4px 14px 10px"></div>
               </div>
+
+              <!-- Cleanup -->
+              <div class="n8n-adv-section" style="border-bottom:none">
+                <div class="n8n-adv-header">
+                  <span>🧹 Cleanup</span>
+                  <button class="btn btn-xs btn-secondary" onclick="addSectionAct('pre_stop_actions')">+ Action</button>
+                </div>
+                <div class="n8n-adv-hint">Actions exécutées juste avant l'arrêt</div>
+                <div id="pre-stop-actions-list" class="act-list" style="padding:4px 14px 10px"></div>
+              </div>
+
             </div>
           </div>
 
-          <!-- Rules list -->
-          <div class="editor-section">
-            <div class="editor-section-header">
-              <span>Règles</span>
-              <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
-                <button class="btn btn-xs" onclick="collapseAllRules()" title="Tout réduire">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="18 15 12 9 6 15"/></svg>
-                  Réduire
-                </button>
-                <button class="btn btn-xs" onclick="expandAllRules()" title="Tout développer">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="6 9 12 15 18 9"/></svg>
-                  Développer
-                </button>
-                <button class="btn btn-xs btn-secondary" onclick="addRule()">+ Règle</button>
-              </div>
+          <!-- Rule editor (shown when a rule node is clicked) -->
+          <div id="n8n-rule-props" style="display:none">
+            <div class="n8n-rule-back-bar">
+              <button class="btn btn-xs" onclick="closeRulePanel()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10"><polyline points="15 18 9 12 15 6"/></svg>
+                Macro
+              </button>
+              <span id="n8n-rule-panel-title" class="n8n-rule-panel-title">Règle</span>
+              <button class="icon-btn btn-danger-icon" onclick="deleteSelectedRule()" title="Supprimer cette règle" style="flex-shrink:0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              </button>
             </div>
-            <div id="rules-container" class="rules-container"></div>
-          </div>
-
-          <!-- Advanced: start_guard -->
-          <div class="editor-section advanced-macro-section">
-            <div class="editor-section-header">
-              <span>🛡️ Conditions de garde (Start Guard)</span>
-              <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
-                <button class="btn btn-xs btn-secondary" onclick="addSectionCond('start_guard')">+ Condition</button>
-              </div>
-            </div>
-            <div class="advanced-section-hint">Toutes doivent être vraies avant chaque itération de boucle</div>
-            <div id="guard-conditions-list" class="cond-list"></div>
-          </div>
-
-          <!-- Advanced: stop_conditions -->
-          <div class="editor-section advanced-macro-section">
-            <div class="editor-section-header">
-              <span>🛑 Conditions d'arrêt auto (Stop Conditions)</span>
-              <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
-                <button class="btn btn-xs btn-secondary" onclick="addSectionCond('stop_conditions')">+ Condition</button>
-              </div>
-            </div>
-            <div class="advanced-section-hint">Dès qu'une est vraie → arrêt automatique de la macro</div>
-            <div id="stop-conditions-list" class="cond-list"></div>
-          </div>
-
-          <!-- Advanced: pre_stop_actions -->
-          <div class="editor-section advanced-macro-section">
-            <div class="editor-section-header">
-              <span>🧹 Actions pré-arrêt (Cleanup)</span>
-              <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
-                <button class="btn btn-xs btn-secondary" onclick="addSectionAct('pre_stop_actions')">+ Action</button>
-              </div>
-            </div>
-            <div class="advanced-section-hint">Actions exécutées juste avant l'arrêt de la macro</div>
-            <div id="pre-stop-actions-list" class="act-list"></div>
+            <div id="n8n-rule-content" class="n8n-rule-content"></div>
           </div>
 
         </div>

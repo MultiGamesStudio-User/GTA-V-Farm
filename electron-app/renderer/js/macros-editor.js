@@ -40,6 +40,162 @@ async function saveMacroFromModal() {
   await saveMacros();
 }
 
+/* ── N8N canvas ─────────────────────────────────────────────── */
+let _selectedRuleIdx = -1;
+
+function renderN8nCanvas() {
+  const canvas = document.getElementById('n8n-canvas');
+  const macro  = macros[currentMacroIdx];
+  if (!canvas || !macro) return;
+  const rules = macro.rules || [];
+  let html = '';
+
+  // START / CONFIG node
+  html += `<div class="n8n-node n8n-start-node${_selectedRuleIdx === -1 ? ' n8n-selected' : ''}"
+      onclick="n8nSelectMacroSettings()" title="Paramètres de la macro" id="n8n-node-config">
+    <div class="n8n-node-header">
+      <div class="n8n-node-icon n8n-icon-config">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+        </svg>
+      </div>
+      <div class="n8n-node-label">
+        <div class="n8n-node-type">Configuration</div>
+        <div class="n8n-node-name">${escHtml(macro.name || 'Sans nom')}</div>
+      </div>
+    </div>
+    <div class="n8n-node-body">
+      <div class="n8n-node-pills">
+        <span class="n8n-node-pill">${macro.loop !== false ? '∞ boucle' : '1×'}</span>
+        <span class="n8n-node-pill">${macro.loop_delay ?? 0.1}s</span>
+        ${macro.humanize ? '<span class="n8n-node-pill">humanisé</span>' : ''}
+      </div>
+    </div>
+  </div>`;
+
+  // Connector after config node
+  html += _n8nConnectorHTML(0);
+
+  rules.forEach((rule, ri) => {
+    const condCount = (rule.conditions || []).length;
+    const actCount  = (rule.actions  || []).length;
+    const isDisabled = rule.enabled === false;
+    html += `<div class="n8n-node n8n-rule-node${isDisabled ? ' n8n-node-disabled' : ''}${_selectedRuleIdx === ri ? ' n8n-selected' : ''}"
+        onclick="n8nSelectRule(${ri})" id="n8n-node-${ri}">
+      <div class="n8n-node-header">
+        <div class="n8n-node-icon${isDisabled ? ' n8n-icon-disabled' : ' n8n-icon-rule'}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </div>
+        <div class="n8n-node-label">
+          <div class="n8n-node-type">Règle ${ri + 1}</div>
+          <div class="n8n-node-name" id="n8n-node-name-${ri}">${escHtml(rule.label || 'Sans nom')}</div>
+        </div>
+      </div>
+      <div class="n8n-node-body">
+        <div class="n8n-node-pills">
+          <span class="n8n-node-pill">${condCount} cond.</span>
+          <span class="n8n-node-pill">${actCount} action${actCount !== 1 ? 's' : ''}</span>
+          ${rule.stop_on_match ? '<span class="n8n-node-pill">stop on match</span>' : ''}
+        </div>
+        <div class="n8n-node-btns" onclick="event.stopPropagation()">
+          <button class="icon-btn" title="Monter" onclick="moveRuleUp(${ri})" ${ri === 0 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10"><polyline points="18 15 12 9 6 15"/></svg>
+          </button>
+          <button class="icon-btn" title="Descendre" onclick="moveRuleDown(${ri})" ${ri === rules.length - 1 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <button class="icon-btn" title="Dupliquer" onclick="duplicateRule(${ri})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>`;
+    html += _n8nConnectorHTML(ri + 1);
+  });
+
+  canvas.innerHTML = html;
+}
+
+function _n8nConnectorHTML(insertIdx) {
+  return `<div class="n8n-connector">
+    <div class="n8n-conn-line"></div>
+    <button class="n8n-add-btn" title="Ajouter une règle ici" onclick="addRuleAt(${insertIdx})">+</button>
+    <div class="n8n-conn-line"></div>
+  </div>`;
+}
+
+function n8nSelectMacroSettings() {
+  _selectedRuleIdx = -1;
+  const ruleProps  = document.getElementById('n8n-rule-props');
+  const macroProps = document.getElementById('n8n-macro-props');
+  if (ruleProps)  ruleProps.style.display = 'none';
+  if (macroProps) macroProps.style.display = '';
+  renderN8nCanvas();
+}
+
+function n8nSelectRule(ri) {
+  _selectedRuleIdx = ri;
+  const ruleProps  = document.getElementById('n8n-rule-props');
+  const macroProps = document.getElementById('n8n-macro-props');
+  if (macroProps) macroProps.style.display = 'none';
+  if (ruleProps)  ruleProps.style.display  = '';
+  const macro = macros[currentMacroIdx];
+  const rule  = macro?.rules[ri];
+  const titleEl = document.getElementById('n8n-rule-panel-title');
+  if (titleEl) titleEl.textContent = rule?.label || `Règle ${ri + 1}`;
+  const content = document.getElementById('n8n-rule-content');
+  if (content && rule) {
+    content.innerHTML = renderRuleHTML(rule, ri);
+    _initRulesDnD();
+    _initItemsDnD();
+  }
+  renderN8nCanvas();
+}
+
+function closeRulePanel() {
+  n8nSelectMacroSettings();
+}
+
+function deleteSelectedRule() {
+  if (_selectedRuleIdx < 0) return;
+  const ri = _selectedRuleIdx;
+  closeRulePanel();
+  deleteRule(ri);
+}
+
+function addRuleAt(idx) {
+  if (currentMacroIdx < 0) return;
+  macros[currentMacroIdx].rules.splice(idx, 0, {
+    id: 'rule_' + Date.now(),
+    label: 'Règle ' + (idx + 1),
+    enabled: true, condition_mode: 'all', conditions: [], actions: [], stop_on_match: false,
+  });
+  if (_selectedRuleIdx >= idx) _selectedRuleIdx++;
+  n8nSelectRule(idx);
+}
+
+function moveRuleUp(ri) {
+  if (currentMacroIdx < 0 || ri <= 0) return;
+  const rules = macros[currentMacroIdx].rules;
+  [rules[ri - 1], rules[ri]] = [rules[ri], rules[ri - 1]];
+  if (_selectedRuleIdx === ri) _selectedRuleIdx = ri - 1;
+  else if (_selectedRuleIdx === ri - 1) _selectedRuleIdx = ri;
+  renderRules();
+}
+
+function moveRuleDown(ri) {
+  if (currentMacroIdx < 0) return;
+  const rules = macros[currentMacroIdx].rules;
+  if (ri >= rules.length - 1) return;
+  [rules[ri], rules[ri + 1]] = [rules[ri + 1], rules[ri]];
+  if (_selectedRuleIdx === ri) _selectedRuleIdx = ri + 1;
+  else if (_selectedRuleIdx === ri + 1) _selectedRuleIdx = ri;
+  renderRules();
+}
+
 const COND_LABELS = {
   // Vision
   pixel_color: 'Pixel couleur', pixel_color_not: 'Pixel couleur ≠',
@@ -117,7 +273,15 @@ function renderMacroEditor() {
     // Fetch all windows and populate
     _populateWindowScopeDropdown(scopeEl, macro.target_hwnd);
   }
-  renderRules();
+  // N8N: reset to macro settings panel
+  _selectedRuleIdx = -1;
+  const ruleProps  = document.getElementById('n8n-rule-props');
+  const macroProps = document.getElementById('n8n-macro-props');
+  if (ruleProps)  ruleProps.style.display  = 'none';
+  if (macroProps) macroProps.style.display = '';
+  const panelName = document.getElementById('n8n-panel-macro-name');
+  if (panelName) panelName.textContent = macro.name || 'Paramètres';
+  renderN8nCanvas();
   renderAdvancedSections();
   updateMacroRunButtons();
 }
@@ -162,14 +326,19 @@ function macroFieldChanged() {
     const val = scopeEl.value;
     m.target_hwnd = val || null;
   }
-  const items = document.querySelectorAll('.macro-list-item');
+  const items = document.querySelectorAll('.macro-list-item, .wf-card');
   if (items[currentMacroIdx]) {
-    const nameEl = items[currentMacroIdx].querySelector('.macro-list-name');
+    const nameEl = items[currentMacroIdx].querySelector('.macro-list-name, .wf-card-name');
     if (nameEl) nameEl.textContent = m.name || 'Sans nom';
   }
   // Update modal title live
   const titleEl = document.getElementById('macro-modal-title-text');
   if (titleEl) titleEl.textContent = m.name || 'Sans nom';
+  // Update n8n panel header + start node
+  const panelName = document.getElementById('n8n-panel-macro-name');
+  if (panelName) panelName.textContent = m.name || 'Paramètres';
+  const startName = document.querySelector('#n8n-node-config .n8n-node-name');
+  if (startName) startName.textContent = m.name || 'Sans nom';
 }
 
 function flushEditorToMacro() {
@@ -212,6 +381,23 @@ function expandAllRules() {
 
 /* ── Rules ────────────────────────────────────────────────── */
 function renderRules() {
+  // N8N-aware: if the canvas is present we use it instead of the legacy rules-container
+  if (document.getElementById('n8n-canvas')) {
+    renderN8nCanvas();
+    if (_selectedRuleIdx >= 0) {
+      const rule = macros[currentMacroIdx]?.rules[_selectedRuleIdx];
+      const content = document.getElementById('n8n-rule-content');
+      if (content && rule) {
+        content.innerHTML = renderRuleHTML(rule, _selectedRuleIdx);
+        _initRulesDnD();
+        _initItemsDnD();
+        const titleEl = document.getElementById('n8n-rule-panel-title');
+        if (titleEl) titleEl.textContent = rule.label || `Règle ${_selectedRuleIdx + 1}`;
+      }
+    }
+    return;
+  }
+  // Legacy (non-n8n) fallback
   const macro = macros[currentMacroIdx];
   const container = document.getElementById('rules-container');
   if (!macro || !container) return;
@@ -314,21 +500,36 @@ function renderRuleHTML(rule, ri) {
 function setRuleField(ri, field, value) {
   if (currentMacroIdx < 0) return;
   macros[currentMacroIdx].rules[ri][field] = value;
+  // Live update canvas without full re-render
+  if (field === 'label') {
+    const nodeNameEl = document.getElementById(`n8n-node-name-${ri}`);
+    if (nodeNameEl) nodeNameEl.textContent = value || `Règle ${ri + 1}`;
+    if (ri === _selectedRuleIdx) {
+      const titleEl = document.getElementById('n8n-rule-panel-title');
+      if (titleEl) titleEl.textContent = value || `Règle ${ri + 1}`;
+    }
+  }
+  if (field === 'enabled') renderN8nCanvas();
 }
 
 function addRule() {
   if (currentMacroIdx < 0) return;
-  macros[currentMacroIdx].rules.push({
+  const rules = macros[currentMacroIdx].rules;
+  const newIdx = rules.length;
+  rules.push({
     id: 'rule_' + Date.now(),
-    label: 'Règle ' + (macros[currentMacroIdx].rules.length + 1),
+    label: 'Règle ' + (newIdx + 1),
     enabled: true, condition_mode: 'all', conditions: [], actions: [], stop_on_match: false,
   });
+  if (document.getElementById('n8n-canvas')) { n8nSelectRule(newIdx); return; }
   renderRules();
 }
 
 function deleteRule(ri) {
   if (currentMacroIdx < 0) return;
   macros[currentMacroIdx].rules.splice(ri, 1);
+  if (_selectedRuleIdx === ri) { _selectedRuleIdx = -1; n8nSelectMacroSettings(); return; }
+  if (_selectedRuleIdx > ri)  { _selectedRuleIdx--; }
   renderRules();
 }
 
@@ -338,6 +539,8 @@ function duplicateRule(ri) {
   copy.id    = 'rule_' + Date.now();
   copy.label = (copy.label || 'Règle') + ' (copie)';
   macros[currentMacroIdx].rules.splice(ri + 1, 0, copy);
+  if (_selectedRuleIdx > ri) _selectedRuleIdx++;
+  if (document.getElementById('n8n-canvas')) { n8nSelectRule(ri + 1); return; }
   renderRules();
 }
 

@@ -99,9 +99,9 @@ function filterMacroList() {
   _applyMacroFilter();
 }
 function _applyMacroFilter() {
-  const items = document.querySelectorAll('#macro-list .macro-list-item');
+  const items = document.querySelectorAll('#macro-list .wf-card, #macro-list .macro-list-item');
   items.forEach(item => {
-    const name = (item.querySelector('.macro-list-name')?.textContent || '').toLowerCase();
+    const name = (item.querySelector('.wf-card-name, .macro-list-name')?.textContent || '').toLowerCase();
     item.style.display = (!_macroSearchQuery || name.includes(_macroSearchQuery)) ? '' : 'none';
   });
 }
@@ -191,54 +191,39 @@ function renderMacroList() {
     const ruleCount = (m.rules || []).length;
     const actCount  = (m.rules || []).reduce((s, r) => s + (r.actions || []).length, 0);
     const loopLabel = m.loop !== false ? '∞ boucle' : '1×';
-    const delayLabel = `${m.loop_delay ?? 0.1}s`;
-    const isActive = i === currentMacroIdx;
+    const delay     = `${m.loop_delay ?? 0.1}s`;
+    const isActive  = i === currentMacroIdx;
     return `
-    <div class="macro-list-item ${isActive ? 'active' : ''}" data-idx="${i}" draggable="true">
-      <div class="macro-drag-handle" title="Glisser pour réorganiser">
-        <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10">
-          <circle cx="5" cy="3.5" r="1.2"/><circle cx="11" cy="3.5" r="1.2"/>
-          <circle cx="5" cy="8"   r="1.2"/><circle cx="11" cy="8"   r="1.2"/>
-          <circle cx="5" cy="12.5" r="1.2"/><circle cx="11" cy="12.5" r="1.2"/>
-        </svg>
-      </div>
-      <div class="macro-card-info" onclick="selectMacro(${i})">
-        <span class="macro-list-name">${escHtml(m.name || 'Sans nom')}</span>
-        <div class="macro-card-meta">
-          <span class="meta-pill">${ruleCount} règle${ruleCount !== 1 ? 's' : ''}</span>
-          <span class="meta-pill">${actCount} action${actCount !== 1 ? 's' : ''}</span>
-          <span class="meta-pill">${loopLabel}</span>
-          <span class="meta-pill">${delayLabel}</span>
+    <div class="wf-card${isActive ? ' wf-selected' : ''}" data-idx="${i}">
+      <div class="wf-card-accent-bar"></div>
+      <div class="wf-card-body" onclick="selectMacro(${i})">
+        <div class="wf-card-name">${escHtml(m.name || 'Sans nom')}</div>
+        <div class="wf-card-pills">
+          <span class="wf-pill">${ruleCount} règle${ruleCount !== 1 ? 's' : ''}</span>
+          <span class="wf-pill">${actCount} action${actCount !== 1 ? 's' : ''}</span>
+          <span class="wf-pill">${loopLabel}</span>
+          <span class="wf-pill">${delay}</span>
         </div>
       </div>
-      <div class="macro-card-actions">
-        <button class="btn btn-xs btn-success" title="Démarrer" onclick="event.stopPropagation();startMacro(${i})">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="11"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <div class="wf-card-footer">
+        <button class="btn btn-xs btn-success" onclick="event.stopPropagation();startMacro(${i})">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="10"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           Démarrer
         </button>
-        <button class="btn btn-xs" title="Éditer" onclick="event.stopPropagation();selectMacro(${i})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Éditer
-        </button>
-        <button class="icon-btn" title="Monter" onclick="event.stopPropagation();moveMacroUp(${i})" ${i === 0 ? 'disabled' : ''}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="18 15 12 9 6 15"/></svg>
-        </button>
-        <button class="icon-btn" title="Descendre" onclick="event.stopPropagation();moveMacroDown(${i})" ${i === macros.length - 1 ? 'disabled' : ''}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <button class="icon-btn" title="Dupliquer" onclick="event.stopPropagation();duplicateMacro(${i})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        </button>
-        <button class="icon-btn" title="Exporter" onclick="event.stopPropagation();exportCurrentMacroByIdx(${i})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </button>
-        <button class="icon-btn btn-danger-icon" title="Supprimer" onclick="event.stopPropagation();deleteMacro(${i})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-        </button>
+        <div class="wf-card-footer-right">
+          <button class="icon-btn" title="Dupliquer" onclick="event.stopPropagation();duplicateMacro(${i})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="icon-btn" title="Exporter" onclick="event.stopPropagation();exportCurrentMacroByIdx(${i})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+          <button class="icon-btn btn-danger-icon" title="Supprimer" onclick="event.stopPropagation();deleteMacro(${i})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
       </div>
     </div>`;
   }).join('');
-  _initMacroListDnD();
   _applyMacroFilter();
 }
 
