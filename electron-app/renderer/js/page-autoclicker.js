@@ -21,8 +21,8 @@ const _ACP_FIELDS = [
   { id: 'acp-x',           type: 'int',   def: 0   },
   { id: 'acp-y',           type: 'int',   def: 0   },
   { id: 'acp-start-delay', type: 'int',   def: 3   },
-  { id: 'acp-key-start',   type: 'str',   def: ''  },
-  { id: 'acp-key-stop',    type: 'str',   def: ''  },
+  { id: 'acp-key-start',   type: 'str',   def: 'F6' },
+  { id: 'acp-key-stop',    type: 'str',   def: 'F7' },
 ];
 
 function _acpSave() {
@@ -46,8 +46,8 @@ function _acpLoad() {
     else                   { el.value = val; }
   });
   // Restore hotkey map
-  _acpHotkeys['acp-key-start'] = data['acp-key-start'] || '';
-  _acpHotkeys['acp-key-stop']  = data['acp-key-stop']  || '';
+  _acpHotkeys['acp-key-start'] = data['acp-key-start'] || 'F6';
+  _acpHotkeys['acp-key-stop']  = data['acp-key-stop']  || 'F7';
   /* restore toggle states after loading */
   const offChk = document.getElementById('acp-rand-offset');
   if (offChk) _acpToggleOffset(offChk);
