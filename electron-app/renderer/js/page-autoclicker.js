@@ -1,5 +1,6 @@
 /* ── Auto Clicker page ───────────────────────────────────── */
-let _acpRunning = false;
+let _acpRunning      = false;
+let _acpStatusPoller = null;
 
 const _ACP_STORAGE_KEY = 'acp_settings';
 
@@ -61,6 +62,41 @@ function initAutoClicker() {
   _acpBindAutoSave();
 }
 
+/* Build a synthetic macro object for macroStart() */
+function _acpBuildMacro() {
+  const f = _acpReadFields();
+
+  // Interval in seconds
+  const intervalS = f.interval_h * 3600 + f.interval_m * 60 + f.interval_s + f.interval_ms / 1000;
+  const randS     = f.random_offset_ms / 1000;
+  const safeInterval = Math.max(0.001, intervalS);
+
+  // Wait action
+  const waitAction = f.random_offset
+    ? { type: 'random_wait', min: Math.max(0.001, safeInterval - randS), max: safeInterval + randS }
+    : { type: 'wait', duration: safeInterval };
+
+  // Click action — position_mode 'current' = no coords, 'pick'/'pick_app' = absolute coords
+  const coords = (f.position_mode !== 'current') ? { x: f.x, y: f.y } : {};
+  let clickAction;
+  switch (f.click_type) {
+    case 'double': clickAction = { type: 'mouse_double_click', button: f.button, ...coords }; break;
+    case 'triple': clickAction = { type: 'mouse_click',        button: f.button, count: 3, ...coords }; break;
+    default:       clickAction = { type: 'mouse_click',        button: f.button, count: 1, ...coords };
+  }
+
+  const ruleActions = (f.repeat_mode === 'count')
+    ? [{ type: 'repeat', count: Math.max(1, f.repeat_count), actions: [clickAction, waitAction] }]
+    : [clickAction, waitAction];
+
+  return {
+    name:       '__auto_clicker__',
+    loop:       f.repeat_mode !== 'count',
+    loop_delay: 0,
+    rules: [{ enabled: true, label: 'click', conditions: [], actions: ruleActions }]
+  };
+}
+
 /* Read all UI fields and return an action object */
 function _acpReadFields() {
   const h  = parseInt(document.getElementById('acp-h').value)  || 0;
@@ -98,18 +134,30 @@ function _acpSetRunning(running) {
 
 async function startAutoClicker() {
   if (_acpRunning) return;
-  const action = _acpReadFields();
-  _acpSetRunning(true);
+  const macro = _acpBuildMacro();
   try {
-    await window.api.execAction(action);
+    await window.api.macroStart({ macro, macro_id: '__auto_clicker__' });
+    _acpSetRunning(true);
+    // Poll to detect when the macro finishes naturally (count mode)
+    _acpStatusPoller = setInterval(async () => {
+      try {
+        const st = await window.api.engineStatus();
+        if (!st?.running?.includes('__auto_clicker__')) {
+          _acpSetRunning(false);
+          clearInterval(_acpStatusPoller);
+          _acpStatusPoller = null;
+        }
+      } catch (_) {}
+    }, 600);
   } catch (e) {
     appendLog('ERROR', 'Auto Clicker: ' + e.message);
+    _acpSetRunning(false);
   }
-  _acpSetRunning(false);
 }
 
 function stopAutoClicker() {
-  window.api.stopAll();
+  if (_acpStatusPoller) { clearInterval(_acpStatusPoller); _acpStatusPoller = null; }
+  window.api.macroStop({ macro_id: '__auto_clicker__' }).catch(() => {});
   _acpSetRunning(false);
 }
 
