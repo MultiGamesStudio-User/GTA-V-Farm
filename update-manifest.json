@@ -1,6 +1,6 @@
 {
-  "version": "2.3.0",
-  "date": "2026-03-24",
+  "version": "2.3.1",
+  "date": "2026-04-19",
   "files": {
     "modules/engine/actions.py": "bb4e77e5c351fe488d5032d0107ad50145eb7cfc7dec14bc213662418d6a5b20",
     "modules/engine/conditions.py": "1eeb7b7caa751ccc2106a9f5acdcc7de09ae85e2fb2dd0e9ee4b8eec05eeac3e",
