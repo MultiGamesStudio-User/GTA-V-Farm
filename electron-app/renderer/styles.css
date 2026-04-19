@@ -153,7 +153,7 @@ body::before {
 /* ── License overlay ─────────────────────────────────────────── */
 .license-overlay {
   position: fixed; inset: 0; z-index: 300000;
-  display: flex; align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center;
   background: rgba(0,0,0,.94);
   backdrop-filter: blur(20px);
   -webkit-app-region: drag;
