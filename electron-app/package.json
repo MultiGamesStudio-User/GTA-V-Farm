@@ -30,6 +30,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "overlay-preload.js",
       "picker-preload.js",
       "updater.js",
       "app.config.json",
