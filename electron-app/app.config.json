@@ -1,0 +1,11 @@
+{
+  "appName": "MacroEngine",
+  "appSubtitle": "GTA V Farm Control",
+  "licenseApiBase": "https://api.licensegate.io/license",
+  "licenseApiId": "a252d",
+  "github": {
+    "user": "MultiGamesStudio-User",
+    "repo": "GTA-V-Farm",
+    "branch": "main"
+  }
+}

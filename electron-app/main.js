@@ -7,6 +7,9 @@ const https   = require('https');
 const { spawn, execSync } = require('child_process');
 const { checkForUpdates } = require('./updater');
 
+// ── Config centralisée ────────────────────────────────────────────────────────
+const APP_CONFIG = require('./app.config.json');
+
 // ── Logger fichier ────────────────────────────────────────────────────────────
 // Écrit dans <dossier du .bat>/app.log  (accessible même si la fenêtre ne s'ouvre pas)
 const LOG_PATH = path.join(__dirname, '..', 'app.log');
@@ -30,7 +33,7 @@ try {
       fs.writeFileSync(LOG_PATH, lines.slice(-500).join('\n') + '\n', 'utf-8');
     }
   }
-  writeLog('INFO', '═══ MacroEngine démarrage ═══');
+  writeLog('INFO', `═══ ${APP_CONFIG.appName} démarrage ═══`);
 } catch (_) {}
 
 // Capture globale des exceptions non gérées
@@ -137,8 +140,8 @@ function saveLicense(key) {
 function verifyLicenseOnline(key) {
   return new Promise((resolve) => {
     const safeKey = encodeURIComponent(key);
-    const url = `https://api.licensegate.io/license/a252d/${safeKey}/verify`;
-    https.get(url, { headers: { 'User-Agent': 'MacroEngine/1.0' } }, (res) => {
+    const url = `${APP_CONFIG.licenseApiBase}/${APP_CONFIG.licenseApiId}/${safeKey}/verify`;
+    https.get(url, { headers: { 'User-Agent': `${APP_CONFIG.appName}/${app.getVersion()}` } }, (res) => {
       let body = '';
       res.on('data', (chunk) => { body += chunk; });
       res.on('end', () => {
@@ -236,7 +239,7 @@ async function _runAutoUpdate() {
   writeLog('INFO', 'Updater: vérification des mises à jour…');
   mainWindow?.webContents.send('updater:checking');
   try {
-    const result = await checkForUpdates(BOT_DIR, (file) => {
+    const result = await checkForUpdates(BOT_DIR, APP_CONFIG.github, (file) => {
       writeLog('INFO', 'Updater: ↓', file);
       mainWindow?.webContents.send('updater:progress', { file });
     });
@@ -668,6 +671,12 @@ ipcMain.handle('macros:write', (_evt, macros) => {
     return { ok: false, error: e.message };
   }
 });
+
+// ── IPC: app config ───────────────────────────────────────────────────────────
+ipcMain.handle('app:getConfig', () => ({
+  ...APP_CONFIG,
+  version: app.getVersion(),
+}));
 
 // ── IPC: license ─────────────────────────────────────────────────────────────
 ipcMain.handle('license:check', async () => {

@@ -100,6 +100,9 @@ contextBridge.exposeInMainWorld('api', {
   toggleOverlay:   ()  => ipcRenderer.invoke('overlay:toggle'),
   onOverlayClosed: (cb) => ipcRenderer.on('overlay:closed', () => cb()),
 
+  // ── App config ────────────────────────────────────────────
+  getConfig: () => ipcRenderer.invoke('app:getConfig'),
+
   // ── License ───────────────────────────────────────────────
   checkLicense:  ()    => ipcRenderer.invoke('license:check'),
   verifyLicense: (key) => ipcRenderer.invoke('license:verify', key),

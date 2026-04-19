@@ -12,8 +12,9 @@ const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
 
-const MANIFEST_URL = 'https://raw.githubusercontent.com/MultiGamesStudio-User/GTA-V-Farm/main/update-manifest.json';
-const BASE_URL     = 'https://raw.githubusercontent.com/MultiGamesStudio-User/GTA-V-Farm/main/';
+// URLs construites depuis le config (injecté par main.js via checkForUpdates)
+let MANIFEST_URL = '';
+let BASE_URL     = '';
 
 // ── Helpers réseau ────────────────────────────────────────────────────────────
 function _get(url, asBuffer = false) {
@@ -62,14 +63,18 @@ function fileHash(filePath) {
 
 // ── API principale ────────────────────────────────────────────────────────────
 /**
- * checkForUpdates(botDir, onProgress?)
+ * checkForUpdates(botDir, github, onProgress?)
  *
  * botDir      — dossier racine du bot (resources/bot/ en prod, ../ en dev)
+ * github      — { user, repo, branch } depuis app.config.json
  * onProgress  — callback(relPath) appelé pour chaque fichier téléchargé
  *
  * Retourne : { upToDate, version, updated[], errors[] }
  */
-async function checkForUpdates(botDir, onProgress) {
+async function checkForUpdates(botDir, github, onProgress) {
+  const base = `https://raw.githubusercontent.com/${github.user}/${github.repo}/${github.branch}`;
+  MANIFEST_URL = `${base}/update-manifest.json`;
+  BASE_URL     = `${base}/`;
   const manifest = await fetchManifest();
   const { version, files } = manifest;
 

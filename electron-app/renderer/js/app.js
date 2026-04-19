@@ -194,6 +194,15 @@ async function init() {
   /* Show splash for a minimum time so it feels polished */
   const splashStart = Date.now();
 
+  /* Load app config and set version strings dynamically */
+  try {
+    const appCfg = await window.api.getConfig();
+    const splashSub = document.querySelector('.splash-sub');
+    const titleVer  = document.querySelector('.titlebar-version');
+    if (splashSub) splashSub.textContent = `${appCfg.appSubtitle} \u00a0\u2022\u00a0 v${appCfg.version}`;
+    if (titleVer)  titleVer.textContent  = `v${appCfg.version}`;
+  } catch (_) { /* fallback: laisse le texte HTML tel quel */ }
+
   setSplashMsg('Vérification de la licence...');
   /* License check — block everything until valid */
   await checkLicense();

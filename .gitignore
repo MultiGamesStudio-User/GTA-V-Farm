@@ -29,6 +29,7 @@ models/
 app.log
 logs/
 *.pid
+license.json
 
 # ── Fichiers temporaires ────────────────────────────────────
 *.tmp
