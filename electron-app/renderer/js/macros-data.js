@@ -49,6 +49,26 @@ function duplicateMacro(idx) {
   updateMacroCounters();
 }
 
+function moveMacroUp(idx) {
+  if (idx <= 0) return;
+  if (currentMacroIdx >= 0) flushEditorToMacro();
+  [macros[idx - 1], macros[idx]] = [macros[idx], macros[idx - 1]];
+  if (currentMacroIdx === idx) currentMacroIdx = idx - 1;
+  else if (currentMacroIdx === idx - 1) currentMacroIdx = idx;
+  renderMacroList();
+  renderDashboard();
+}
+
+function moveMacroDown(idx) {
+  if (idx >= macros.length - 1) return;
+  if (currentMacroIdx >= 0) flushEditorToMacro();
+  [macros[idx], macros[idx + 1]] = [macros[idx + 1], macros[idx]];
+  if (currentMacroIdx === idx) currentMacroIdx = idx + 1;
+  else if (currentMacroIdx === idx + 1) currentMacroIdx = idx;
+  renderMacroList();
+  renderDashboard();
+}
+
 function deleteMacro(idx) {
   macros.splice(idx, 1);
   if (currentMacroIdx === idx) currentMacroIdx = -1;
@@ -169,6 +189,12 @@ function renderMacroList() {
       </div>
       <span class="macro-list-name">${escHtml(m.name || 'Sans nom')}</span>
       <div class="macro-list-actions">
+        <button class="icon-btn" title="Monter" onclick="event.stopPropagation();moveMacroUp(${i})" ${i === 0 ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+        <button class="icon-btn" title="Descendre" onclick="event.stopPropagation();moveMacroDown(${i})" ${i === macros.length - 1 ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
         <button class="icon-btn" title="Exporter cette macro" onclick="event.stopPropagation();exportCurrentMacroByIdx(${i})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </button>
