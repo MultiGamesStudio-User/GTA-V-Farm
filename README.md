@@ -185,3 +185,5 @@ Found a bug? Have ideas?
 ---
 
 Made with ❤️ for GTA V fans
+
+**Build Status:** Automated via GitHub Actions ✨
