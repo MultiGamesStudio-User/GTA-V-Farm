@@ -493,6 +493,19 @@
         <!-- ── Séparateur ── -->
         <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
 
+        <!-- ── Délai de démarrage ── -->
+        <div style="margin-bottom:16px">
+          <div class="ac-section-lbl" style="margin-bottom:10px">⏳ Délai avant démarrage</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" id="acp-start-delay" class="ac-narrow" value="3" min="0" max="60" placeholder="0">
+            <span class="ac-unit">s</span>
+            <span style="font-size:11px;color:var(--text-3)">Temps pour positionner la souris avant le 1er clic (0 = immédiat)</span>
+          </div>
+        </div>
+
+        <!-- ── Séparateur ── -->
+        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
+
         <!-- ── Intervalle ── -->
         <div style="margin-bottom:16px">
           <div class="ac-section-lbl" style="margin-bottom:10px">⏱ Intervalle de clic</div>
@@ -576,6 +589,28 @@
               <span style="font-size:11px;color:var(--text-3)">Y</span>
               <input type="number" id="acp-y" value="0" style="width:68px">
               <button class="btn btn-secondary btn-sm" onclick="_acpPickPoint()" title="Choisir un point à l'écran">🎯</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Séparateur ── -->
+        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
+
+        <!-- ── Raccourcis clavier ── -->
+        <div>
+          <div class="ac-section-lbl" style="margin-bottom:10px">⌨️ Raccourcis clavier</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div>
+              <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Touche Démarrer</label>
+              <input type="text" id="acp-key-start" readonly placeholder="Cliquer puis appuyer…"
+                style="width:100%;cursor:pointer;text-align:center"
+                onfocus="_acpCapKey(this,'acp-key-start')" value="">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Touche Arrêter</label>
+              <input type="text" id="acp-key-stop" readonly placeholder="Cliquer puis appuyer…"
+                style="width:100%;cursor:pointer;text-align:center"
+                onfocus="_acpCapKey(this,'acp-key-stop')" value="">
             </div>
           </div>
         </div>

@@ -1,6 +1,8 @@
 /* ── Auto Clicker page ───────────────────────────────────── */
 let _acpRunning      = false;
 let _acpStatusPoller = null;
+let _acpCountdown    = null;   // setInterval handle for start-delay countdown
+let _acpHotkeys      = {};     // { 'acp-key-start': 'F6', 'acp-key-stop': 'F7' }
 
 const _ACP_STORAGE_KEY = 'acp_settings';
 
@@ -18,6 +20,9 @@ const _ACP_FIELDS = [
   { id: 'acp-pos-mode',    type: 'str',   def: 'current' },
   { id: 'acp-x',           type: 'int',   def: 0   },
   { id: 'acp-y',           type: 'int',   def: 0   },
+  { id: 'acp-start-delay', type: 'int',   def: 3   },
+  { id: 'acp-key-start',   type: 'str',   def: ''  },
+  { id: 'acp-key-stop',    type: 'str',   def: ''  },
 ];
 
 function _acpSave() {
@@ -40,6 +45,9 @@ function _acpLoad() {
     if (f.type === 'bool') { el.checked = val === true || val === 'true'; }
     else                   { el.value = val; }
   });
+  // Restore hotkey map
+  _acpHotkeys['acp-key-start'] = data['acp-key-start'] || '';
+  _acpHotkeys['acp-key-stop']  = data['acp-key-stop']  || '';
   /* restore toggle states after loading */
   const offChk = document.getElementById('acp-rand-offset');
   if (offChk) _acpToggleOffset(offChk);
@@ -60,6 +68,7 @@ function _acpBindAutoSave() {
 function initAutoClicker() {
   _acpLoad();
   _acpBindAutoSave();
+  _acpRegisterHotkeys();
 }
 
 /* Build a synthetic macro object for macroStart() */
@@ -134,11 +143,39 @@ function _acpSetRunning(running) {
 
 async function startAutoClicker() {
   if (_acpRunning) return;
+
+  const delay = parseInt(document.getElementById('acp-start-delay').value) || 0;
+
+  if (delay > 0) {
+    document.getElementById('acp-btn-start').disabled = true;
+    document.getElementById('acp-btn-stop').disabled  = false;
+    let remaining = delay;
+    document.getElementById('acp-status').textContent = `⏳ Démarrage dans ${remaining}s…`;
+    let cancelled = false;
+    await new Promise(resolve => {
+      _acpCountdown = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(_acpCountdown); _acpCountdown = null;
+          resolve();
+        } else {
+          const el = document.getElementById('acp-status');
+          if (el) el.textContent = `⏳ Démarrage dans ${remaining}s…`;
+        }
+      }, 1000);
+    });
+    // If stopAutoClicker() was called during countdown it clears _acpCountdown and calls _acpSetRunning(false)
+    if (_acpRunning === false && _acpCountdown === null) {
+      // already cleaned up by stopAutoClicker
+      return;
+    }
+    document.getElementById('acp-btn-start').disabled = false;
+  }
+
   const macro = _acpBuildMacro();
   try {
     await window.api.macroStart({ macro, macro_id: '__auto_clicker__' });
     _acpSetRunning(true);
-    // Poll to detect when the macro finishes naturally (count mode)
     _acpStatusPoller = setInterval(async () => {
       try {
         const st = await window.api.engineStatus();
@@ -156,6 +193,7 @@ async function startAutoClicker() {
 }
 
 function stopAutoClicker() {
+  if (_acpCountdown)    { clearInterval(_acpCountdown);    _acpCountdown    = null; }
   if (_acpStatusPoller) { clearInterval(_acpStatusPoller); _acpStatusPoller = null; }
   window.api.macroStop({ macro_id: '__auto_clicker__' }).catch(() => {});
   _acpSetRunning(false);
@@ -186,6 +224,45 @@ async function _acpPickPoint() {
       _acpSave();
     }
   } catch (e) { /* pickPoint may not be available in all builds */ }
+}
+
+/* ── Hotkey capture ──────────────────────────────────────── */
+let _acpCapturing = null;  // { el, fieldId } while waiting for key press
+
+function _acpCapKey(el, fieldId) {
+  _acpCapturing = { el, fieldId };
+  el.value = '⏳ Appuyer sur une touche…';
+  el.style.color = 'var(--accent)';
+}
+
+function _acpRegisterHotkeys() {
+  document.removeEventListener('keydown', _acpHotkeyHandler, true);
+  document.addEventListener('keydown', _acpHotkeyHandler, true);
+}
+
+function _acpHotkeyHandler(e) {
+  const key = e.key === ' ' ? 'Space' : e.key;
+
+  // Capture mode: assign key to focused field
+  if (_acpCapturing) {
+    e.preventDefault();
+    e.stopPropagation();
+    _acpCapturing.el.value      = key;
+    _acpCapturing.el.style.color = '';
+    _acpHotkeys[_acpCapturing.fieldId] = key;
+    _acpCapturing = null;
+    _acpSave();
+    return;
+  }
+
+  // Hotkey trigger
+  if (_acpHotkeys['acp-key-start'] && key === _acpHotkeys['acp-key-start']) {
+    e.preventDefault();
+    if (!_acpRunning) startAutoClicker();
+  } else if (_acpHotkeys['acp-key-stop'] && key === _acpHotkeys['acp-key-stop']) {
+    e.preventDefault();
+    stopAutoClicker();
+  }
 }
 
 /* ── Licence settings helpers ────────────────────────────── */
