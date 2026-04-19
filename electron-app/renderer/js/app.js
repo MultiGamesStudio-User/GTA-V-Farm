@@ -23,6 +23,7 @@ function navigate(page) {
   if (page === 'macros')     renderMacroList();
   if (page === 'dashboard')  renderDashboard();
   if (page === 'syslog')     refreshSyslog();
+  if (page === 'windows')    refreshWindows();
 
   // Persist last page
   _saveUiPref('lastPage', page);
@@ -265,7 +266,7 @@ async function init() {
   initWebhookAutoSave();
 
   /* Console filter persistence */
-  const filterEl = document.getElementById('log-filter');
+  const filterEl = document.getElementById('log-level-filter');
   if (filterEl) {
     filterEl.addEventListener('change', () => _saveUiPref('consoleFilter', filterEl.value));
   }
@@ -319,7 +320,7 @@ async function loadAppSettings() {
 
     // Console filter
     if (s.consoleFilter) {
-      const filterEl = document.getElementById('log-filter');
+      const filterEl = document.getElementById('log-level-filter');
       if (filterEl) filterEl.value = s.consoleFilter;
     }
 

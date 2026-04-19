@@ -4,6 +4,10 @@
 ════════════════════════════════════════════════════════════════ */
 
 function renderDashboard() {
+  /* ── Counters ─── */
+  const totalEl = document.getElementById('val-total-macros');
+  if (totalEl) totalEl.textContent = macros.length;
+
   /* ── Running macros ─── */
   const el = document.getElementById('dash-running');
   if (el) {

@@ -81,6 +81,25 @@ async function stopMacroByName(name) {
   } catch (e) { appendLog('ERROR', e.message); }
 }
 
+async function startMacro(idx) {
+  if (idx < 0 || idx >= macros.length) return;
+  currentMacroIdx = idx;
+  flushEditorToMacro();
+  const macro = macros[idx];
+  try {
+    await ensureEngine();
+    const settings = await window.api.readSettings();
+    if (settings && settings.webhookUrl) {
+      await window.api.setWebhook({ url: settings.webhookUrl });
+    }
+    await window.api.macroStart({ macro, macro_id: macro.name });
+    runningMacros.add(macro.name);
+    updateMacroRunButtons();
+    renderDashboard();
+    appendLog('INFO', 'Macro démarrée: ' + macro.name);
+  } catch (e) { appendLog('ERROR', 'Erreur démarrage: ' + e.message); }
+}
+
 /* ── Recording ─────────────────────────────────────────────── */
 async function toggleRecording() {
   if (isRecording) {
