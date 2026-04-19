@@ -108,15 +108,19 @@ function _applyMacroFilter() {
 
 /* ── Drag & Drop ──────────────────────────────────────────── */
 let _dndMacroSrc = -1;
+let _dndMacroFromHandle = false;
 function _initMacroListDnD() {
   const container = document.getElementById('macro-list');
   if (!container || container._dndReady) return;
   container._dndReady = true;
 
+  container.addEventListener('mousedown', e => {
+    _dndMacroFromHandle = !!e.target.closest('.macro-drag-handle');
+  });
+
   container.addEventListener('dragstart', e => {
-    const handle = e.target.closest('.macro-drag-handle');
-    if (!handle) { e.preventDefault(); return; }
-    const item = handle.closest('.macro-list-item');
+    if (!_dndMacroFromHandle) { e.preventDefault(); return; }
+    const item = e.target.closest('.macro-list-item');
     if (!item) { e.preventDefault(); return; }
     _dndMacroSrc = parseInt(item.dataset.idx);
     e.dataTransfer.effectAllowed = 'move';
