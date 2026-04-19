@@ -202,14 +202,22 @@
       </div>
     </section>
 
-    <!-- ═══════════════════ MACROS EDITOR ══════════════════ -->
+    <!-- ═══════════════════ MACROS ════════════════════════ -->
     <section class="page" id="page-macros">
       <div class="page-header">
-        <h1>Éditeur de Macros</h1>
+        <h1>Macros</h1>
         <div class="header-actions">
+          <button class="btn btn-secondary" onclick="exportAllMacros()" title="Exporter toutes en JSON">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export tout
+          </button>
+          <button class="btn btn-secondary" onclick="triggerImportMacros()" title="Importer depuis JSON">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import
+          </button>
           <button class="btn btn-secondary" onclick="saveMacros()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Sauvegarder
+            Sauvegarder tout
           </button>
           <button class="btn btn-primary" onclick="addMacro()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -217,167 +225,13 @@
           </button>
         </div>
       </div>
-      <div id="macros-layout" class="macros-layout">
-        <!-- Left: macro list -->
-        <div class="macros-list-panel" id="macros-list-panel">
-          <div class="panel-header">
-            <span>Macros</span>
-            <span class="badge" id="macro-count-badge">0</span>
-          </div>
-          <div class="macro-list-search-row">
-            <input type="text" id="macro-search" placeholder="🔍 Rechercher…" oninput="filterMacroList()">
-          </div>
-          <div class="macro-list-toolbar">
-            <button class="btn btn-xs btn-secondary" onclick="exportAllMacros()" title="Exporter toutes en JSON">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Export
-            </button>
-            <button class="btn btn-xs btn-secondary" onclick="triggerImportMacros()" title="Importer depuis JSON">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Import
-            </button>
-          </div>
-          <input type="file" id="macro-import-input" accept=".json" style="display:none" onchange="handleImportMacros(event)">
-          <div id="macro-list" class="macro-list"></div>
+      <div class="macros-page-body">
+        <div class="macro-list-search-row">
+          <input type="text" id="macro-search" placeholder="🔍 Rechercher une macro…" oninput="filterMacroList()">
+          <span class="badge" id="macro-count-badge" style="margin-left:8px;font-size:11px">0</span>
         </div>
-
-        <!-- Right: macro editor -->
-        <div class="macros-editor-panel" id="macro-editor-panel">
-          <div id="macro-editor-empty" class="editor-empty-state">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="40" height="40"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-            <p>Sélectionnez ou créez une macro</p>
-          </div>
-          <div id="macro-editor-form" style="display:none">
-
-            <!-- Macro header -->
-            <div class="editor-section">
-              <div class="form-row">
-                <div class="form-group flex-2">
-                  <label>Nom de la macro</label>
-                  <input type="text" id="me-name" placeholder="Ma macro" oninput="macroFieldChanged()">
-                </div>
-                <div class="form-group">
-                  <label>Délai de boucle (s)</label>
-                  <input type="number" id="me-loop-delay" value="0.1" min="0.01" step="0.01" oninput="macroFieldChanged()">
-                </div>
-                <div class="form-group form-group-check">
-                  <label class="check-label">
-                    <input type="checkbox" id="me-loop" checked onchange="macroFieldChanged()">
-                    Boucle infinie
-                  </label>
-                </div>
-                <div class="form-group">
-                  <label>Fenêtre cible</label>
-                  <select id="me-target-window" onchange="macroFieldChanged()">
-                    <option value="">Toutes</option>
-                  </select>
-                </div>
-              </div>
-              <div class="form-row" style="margin-top:.4rem">
-                <div class="form-group">
-                  <label title="0 = boucle infinie">Itérations max <small style="color:var(--text-3)">(0=∞)</small></label>
-                  <input type="number" id="me-max-iter" value="0" min="0" step="1" oninput="macroFieldChanged()">
-                </div>
-                <div class="form-group">
-                  <label title="0 = pas de limite">Timeout (s) <small style="color:var(--text-3)">(0=∞)</small></label>
-                  <input type="number" id="me-timeout" value="0" min="0" step="1" oninput="macroFieldChanged()">
-                </div>
-                <div class="form-group form-group-check">
-                  <label class="check-label">
-                    <input type="checkbox" id="me-humanize" onchange="macroFieldChanged()">
-                    Humaniser
-                  </label>
-                </div>
-                <div class="form-group">
-                  <label title="Variabilité aléatoire des timings">Facteur (0.01–0.5)</label>
-                  <input type="number" id="me-humanize-factor" value="0.12" min="0.01" max="0.5" step="0.01" oninput="macroFieldChanged()">
-                </div>
-              </div>
-              <div class="form-row" style="margin-top:.5rem">
-                <div class="macro-run-controls">
-                  <button class="btn btn-success" id="btn-run-macro" onclick="runCurrentMacro()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    Démarrer
-                  </button>
-                  <button class="btn btn-warning" id="btn-pause-macro" onclick="pauseCurrentMacro()" style="display:none">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                    Pause
-                  </button>
-                  <button class="btn btn-danger" id="btn-stop-macro" onclick="stopCurrentMacro()" style="display:none">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                    Arrêter
-                  </button>
-                  <button class="btn btn-record" id="btn-record-macro" onclick="toggleRecording()">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="13"><circle cx="12" cy="12" r="8"/></svg>
-                    Enregistrer
-                  </button>
-                  <button class="btn btn-danger" id="btn-stop-record" onclick="toggleRecording()" style="display:none">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                    Stop Record
-                  </button>
-                  <span class="macro-status-badge" id="macro-running-badge" style="display:none">EN COURS</span>
-                  <span class="macro-status-badge recording-badge" id="macro-recording-badge" style="display:none">● REC</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Rules list -->
-            <div class="editor-section">
-              <div class="editor-section-header">
-                <span>Règles</span>
-                <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
-                  <button class="btn btn-xs" onclick="collapseAllRules()" title="Tout réduire">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="18 15 12 9 6 15"/></svg>
-                    Réduire
-                  </button>
-                  <button class="btn btn-xs" onclick="expandAllRules()" title="Tout développer">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="6 9 12 15 18 9"/></svg>
-                    Développer
-                  </button>
-                  <button class="btn btn-xs btn-secondary" onclick="addRule()">+ Règle</button>
-                </div>
-              </div>
-              <div id="rules-container" class="rules-container"></div>
-            </div>
-
-            <!-- Advanced: start_guard -->
-            <div class="editor-section advanced-macro-section">
-              <div class="editor-section-header">
-                <span>🛡️ Conditions de garde (Start Guard)</span>
-                <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
-                  <button class="btn btn-xs btn-secondary" onclick="addSectionCond('start_guard')">+ Condition</button>
-                </div>
-              </div>
-              <div class="advanced-section-hint">Toutes doivent être vraies avant chaque itération de boucle</div>
-              <div id="guard-conditions-list" class="cond-list"></div>
-            </div>
-
-            <!-- Advanced: stop_conditions -->
-            <div class="editor-section advanced-macro-section">
-              <div class="editor-section-header">
-                <span>🛑 Conditions d'arrêt auto (Stop Conditions)</span>
-                <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
-                  <button class="btn btn-xs btn-secondary" onclick="addSectionCond('stop_conditions')">+ Condition</button>
-                </div>
-              </div>
-              <div class="advanced-section-hint">Dès qu'une est vraie → arrêt automatique de la macro</div>
-              <div id="stop-conditions-list" class="cond-list"></div>
-            </div>
-
-            <!-- Advanced: pre_stop_actions -->
-            <div class="editor-section advanced-macro-section">
-              <div class="editor-section-header">
-                <span>🧹 Actions pré-arrêt (Cleanup)</span>
-                <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
-                  <button class="btn btn-xs btn-secondary" onclick="addSectionAct('pre_stop_actions')">+ Action</button>
-                </div>
-              </div>
-              <div class="advanced-section-hint">Actions exécutées juste avant l'arrêt de la macro</div>
-              <div id="pre-stop-actions-list" class="act-list"></div>
-            </div>
-
-          </div>
-        </div>
+        <input type="file" id="macro-import-input" accept=".json" style="display:none" onchange="handleImportMacros(event)">
+        <div id="macro-list" class="macro-list macro-list-full"></div>
       </div>
     </section>
 
@@ -763,6 +617,165 @@
     </section>
 
   </main>
+
+  <!-- ═══════════════════ MACRO EDITOR MODAL ══════════════ -->
+  <div id="macro-modal" class="macro-modal-overlay" style="display:none" role="dialog" aria-modal="true">
+    <div class="macro-modal-dialog">
+
+      <!-- Modal header -->
+      <div class="macro-modal-header">
+        <div class="macro-modal-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span id="macro-modal-title-text">Macro</span>
+        </div>
+        <div class="macro-modal-header-actions">
+          <button class="btn btn-success" onclick="saveMacroFromModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Sauvegarder
+          </button>
+          <button class="icon-btn macro-modal-close-btn" onclick="closeMacroModal()" title="Fermer (Échap)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal body = the full editor form -->
+      <div class="macro-modal-body" id="macro-modal-body">
+        <div id="macro-editor-form" style="display:none">
+
+          <!-- Macro settings -->
+          <div class="editor-section">
+            <div class="form-row">
+              <div class="form-group flex-2">
+                <label>Nom de la macro</label>
+                <input type="text" id="me-name" placeholder="Ma macro" oninput="macroFieldChanged()">
+              </div>
+              <div class="form-group">
+                <label>Délai de boucle (s)</label>
+                <input type="number" id="me-loop-delay" value="0.1" min="0.01" step="0.01" oninput="macroFieldChanged()">
+              </div>
+              <div class="form-group form-group-check">
+                <label class="check-label">
+                  <input type="checkbox" id="me-loop" checked onchange="macroFieldChanged()">
+                  Boucle infinie
+                </label>
+              </div>
+              <div class="form-group">
+                <label>Fenêtre cible</label>
+                <select id="me-target-window" onchange="macroFieldChanged()">
+                  <option value="">Toutes</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row" style="margin-top:.4rem">
+              <div class="form-group">
+                <label title="0 = boucle infinie">Itérations max <small style="color:var(--text-3)">(0=∞)</small></label>
+                <input type="number" id="me-max-iter" value="0" min="0" step="1" oninput="macroFieldChanged()">
+              </div>
+              <div class="form-group">
+                <label title="0 = pas de limite">Timeout (s) <small style="color:var(--text-3)">(0=∞)</small></label>
+                <input type="number" id="me-timeout" value="0" min="0" step="1" oninput="macroFieldChanged()">
+              </div>
+              <div class="form-group form-group-check">
+                <label class="check-label">
+                  <input type="checkbox" id="me-humanize" onchange="macroFieldChanged()">
+                  Humaniser
+                </label>
+              </div>
+              <div class="form-group">
+                <label title="Variabilité aléatoire des timings">Facteur (0.01–0.5)</label>
+                <input type="number" id="me-humanize-factor" value="0.12" min="0.01" max="0.5" step="0.01" oninput="macroFieldChanged()">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top:.5rem">
+              <div class="macro-run-controls">
+                <button class="btn btn-success" id="btn-run-macro" onclick="runCurrentMacro()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Démarrer
+                </button>
+                <button class="btn btn-warning" id="btn-pause-macro" onclick="pauseCurrentMacro()" style="display:none">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  Pause
+                </button>
+                <button class="btn btn-danger" id="btn-stop-macro" onclick="stopCurrentMacro()" style="display:none">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                  Arrêter
+                </button>
+                <button class="btn btn-record" id="btn-record-macro" onclick="toggleRecording()">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="13"><circle cx="12" cy="12" r="8"/></svg>
+                  Enregistrer
+                </button>
+                <button class="btn btn-danger" id="btn-stop-record" onclick="toggleRecording()" style="display:none">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                  Stop Record
+                </button>
+                <span class="macro-status-badge" id="macro-running-badge" style="display:none">EN COURS</span>
+                <span class="macro-status-badge recording-badge" id="macro-recording-badge" style="display:none">● REC</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rules list -->
+          <div class="editor-section">
+            <div class="editor-section-header">
+              <span>Règles</span>
+              <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
+                <button class="btn btn-xs" onclick="collapseAllRules()" title="Tout réduire">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="18 15 12 9 6 15"/></svg>
+                  Réduire
+                </button>
+                <button class="btn btn-xs" onclick="expandAllRules()" title="Tout développer">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="6 9 12 15 18 9"/></svg>
+                  Développer
+                </button>
+                <button class="btn btn-xs btn-secondary" onclick="addRule()">+ Règle</button>
+              </div>
+            </div>
+            <div id="rules-container" class="rules-container"></div>
+          </div>
+
+          <!-- Advanced: start_guard -->
+          <div class="editor-section advanced-macro-section">
+            <div class="editor-section-header">
+              <span>🛡️ Conditions de garde (Start Guard)</span>
+              <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
+                <button class="btn btn-xs btn-secondary" onclick="addSectionCond('start_guard')">+ Condition</button>
+              </div>
+            </div>
+            <div class="advanced-section-hint">Toutes doivent être vraies avant chaque itération de boucle</div>
+            <div id="guard-conditions-list" class="cond-list"></div>
+          </div>
+
+          <!-- Advanced: stop_conditions -->
+          <div class="editor-section advanced-macro-section">
+            <div class="editor-section-header">
+              <span>🛑 Conditions d'arrêt auto (Stop Conditions)</span>
+              <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
+                <button class="btn btn-xs btn-secondary" onclick="addSectionCond('stop_conditions')">+ Condition</button>
+              </div>
+            </div>
+            <div class="advanced-section-hint">Dès qu'une est vraie → arrêt automatique de la macro</div>
+            <div id="stop-conditions-list" class="cond-list"></div>
+          </div>
+
+          <!-- Advanced: pre_stop_actions -->
+          <div class="editor-section advanced-macro-section">
+            <div class="editor-section-header">
+              <span>🧹 Actions pré-arrêt (Cleanup)</span>
+              <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
+                <button class="btn btn-xs btn-secondary" onclick="addSectionAct('pre_stop_actions')">+ Action</button>
+              </div>
+            </div>
+            <div class="advanced-section-hint">Actions exécutées juste avant l'arrêt de la macro</div>
+            <div id="pre-stop-actions-list" class="act-list"></div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 
 <!-- Split modules — load order matters (utils first, app.js last) -->

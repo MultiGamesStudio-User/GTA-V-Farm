@@ -3,6 +3,43 @@
    MACROS EDITOR — form, rules, conditions, actions inline
 ════════════════════════════════════════════════════════════════ */
 
+/* ── Modal control ──────────────────────────────────────────── */
+function openMacroModal(idx) {
+  currentMacroIdx = idx;
+  const modal   = document.getElementById('macro-modal');
+  const titleEl = document.getElementById('macro-modal-title-text');
+  if (!modal) return;
+  const macro = macros[idx];
+  if (titleEl) titleEl.textContent = macro?.name || 'Macro';
+  renderMacroEditor();
+  modal.style.display = 'flex';
+  document.addEventListener('keydown', _modalEscHandler);
+}
+
+function closeMacroModal() {
+  const modal = document.getElementById('macro-modal');
+  if (!modal || modal.style.display === 'none') return;
+  if (currentMacroIdx >= 0) flushEditorToMacro();
+  modal.style.display = 'none';
+  document.removeEventListener('keydown', _modalEscHandler);
+  renderMacroList();
+  renderDashboard();
+}
+
+function _modalEscHandler(e) {
+  if (e.key === 'Escape') closeMacroModal();
+}
+
+async function saveMacroFromModal() {
+  if (currentMacroIdx >= 0) flushEditorToMacro();
+  // Update modal title to reflect any name change
+  const macro   = macros[currentMacroIdx];
+  const titleEl = document.getElementById('macro-modal-title-text');
+  if (titleEl && macro) titleEl.textContent = macro.name || 'Macro';
+  renderMacroList();
+  await saveMacros();
+}
+
 const COND_LABELS = {
   // Vision
   pixel_color: 'Pixel couleur', pixel_color_not: 'Pixel couleur ≠',
@@ -130,6 +167,9 @@ function macroFieldChanged() {
     const nameEl = items[currentMacroIdx].querySelector('.macro-list-name');
     if (nameEl) nameEl.textContent = m.name || 'Sans nom';
   }
+  // Update modal title live
+  const titleEl = document.getElementById('macro-modal-title-text');
+  if (titleEl) titleEl.textContent = m.name || 'Sans nom';
 }
 
 function flushEditorToMacro() {

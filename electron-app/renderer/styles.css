@@ -1204,6 +1204,96 @@ select.cf, select.af {
 
 /* ── Accent color swatches ────────────────────────────────────────────────── */
 .accent-presets { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 6px; }
+
+/* ══════════════════════════════════════════════════════════════
+   MACRO LIST — full-width page
+══════════════════════════════════════════════════════════════ */
+.macros-page-body {
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0;
+  /* inherit padding from #content */
+}
+.macro-list-full { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+
+/* Override the old narrow list-item styles for full-width cards */
+.macro-list-full .macro-list-item {
+  flex-direction: row; align-items: center;
+  padding: 11px 14px; gap: 10px;
+  border-radius: var(--radius);
+  cursor: default;
+}
+.macro-card-info {
+  flex: 1; min-width: 0; cursor: pointer;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.macro-card-info .macro-list-name {
+  font-size: 13px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.macro-card-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+.meta-pill {
+  font-size: 10px; padding: 1px 7px; border-radius: 10px;
+  background: rgba(255,255,255,.06); color: var(--text-2);
+  border: 1px solid rgba(255,255,255,.05);
+}
+.macro-card-actions {
+  display: flex; align-items: center; gap: 3px; flex-shrink: 0;
+  opacity: 0; transition: opacity var(--transition);
+}
+.macro-list-full .macro-list-item:hover .macro-card-actions,
+.macro-list-full .macro-list-item.active .macro-card-actions { opacity: 1; }
+
+/* ══════════════════════════════════════════════════════════════
+   MACRO EDITOR MODAL
+══════════════════════════════════════════════════════════════ */
+.macro-modal-overlay {
+  position: fixed;
+  inset: 34px 0 0 0;   /* start below titlebar */
+  background: rgba(0, 0, 0, .68);
+  backdrop-filter: blur(3px);
+  z-index: 900;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  animation: mmFadeIn .15s ease;
+}
+@keyframes mmFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.macro-modal-dialog {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  width: 94%; max-width: 1020px;
+  max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 28px 72px rgba(0, 0, 0, .65);
+  animation: mmSlideIn .16s cubic-bezier(.4, 0, .2, 1);
+}
+@keyframes mmSlideIn {
+  from { transform: translateY(14px) scale(.99); opacity: 0; }
+  to   { transform: translateY(0) scale(1);      opacity: 1; }
+}
+
+.macro-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, .02);
+  flex-shrink: 0;
+}
+.macro-modal-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; color: var(--text-1);
+  min-width: 0;
+}
+.macro-modal-title span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.macro-modal-header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.macro-modal-close-btn { width: 28px; height: 28px; flex-shrink: 0; }
+
+.macro-modal-body {
+  flex: 1; overflow-y: auto;
+}
 .accent-swatch {
   width: 26px; height: 26px; border-radius: 50%;
   border: 2px solid transparent; cursor: pointer;

@@ -83,8 +83,11 @@ async function stopMacroByName(name) {
 
 async function startMacro(idx) {
   if (idx < 0 || idx >= macros.length) return;
+  // Only flush form data if the modal is open for this exact macro
+  const modal = document.getElementById('macro-modal');
+  const modalOpen = modal && modal.style.display !== 'none';
+  if (modalOpen && currentMacroIdx === idx) flushEditorToMacro();
   currentMacroIdx = idx;
-  flushEditorToMacro();
   const macro = macros[idx];
   try {
     await ensureEngine();
