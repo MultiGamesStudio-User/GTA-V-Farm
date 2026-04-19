@@ -81,11 +81,7 @@
       "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "MacroEngine",
-      "installerIcon": "assets/installer-icon.ico",
-      "uninstallerIcon": "assets/uninstaller-icon.ico",
-      "installerHeaderIcon": "assets/installer-header.ico",
-      "include": "installer/installer.nsh"
+      "shortcutName": "MacroEngine"
     },
     "publish": {
       "provider": "github",
