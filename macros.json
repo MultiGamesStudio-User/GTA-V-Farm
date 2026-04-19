@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Nouvelle macro",
+    "loop": false,
+    "loop_delay": 0.1,
+    "rules": [
+      {
+        "id": "rule_1773928003336",
+        "label": "Règle 1",
+        "enabled": true,
+        "condition_mode": "all",
+        "conditions": [],
+        "actions": [
+          {
+            "type": "key_tap",
+            "key": "f",
+            "duration": 0.05,
+            "count": 1
+          }
+        ],
+        "stop_on_match": false
+      }
+    ],
+    "target_hwnd": null
+  }
+]

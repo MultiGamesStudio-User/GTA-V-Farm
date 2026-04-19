@@ -1,0 +1,93 @@
+name: Build & Release MacroEngine
+
+on:
+  push:
+    tags:
+      - 'v*'  # Déclenche lors d'un tag (v1.0.0, v2.2.0, etc.)
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: ✅ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'electron-app/package-lock.json'
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📥 Install Node dependencies
+        working-directory: electron-app
+        run: npm ci
+
+      - name: 📥 Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: 🎨 Check icons
+        working-directory: electron-app
+        run: npm run check-icons
+
+      - name: 🛠️ Prepare Python
+        working-directory: electron-app
+        run: npm run prepare-python
+
+      - name: 🏗️ Build NSIS Installer
+        working-directory: electron-app
+        run: npm run build-nsis
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: 🏗️ Build Portable EXE
+        working-directory: electron-app
+        run: npm run build-portable
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: 📋 Get version from tag
+        id: tag_version
+        run: |
+          $version = "${{ github.ref }}".Replace('refs/tags/v', '')
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+      - name: 📝 Generate release notes from CHANGELOG
+        id: changelog
+        run: |
+          $content = Get-Content CHANGELOG.md -Raw
+          $content = $content -match '\[.*?\].*?\n(.*?)(?=\n## \[|$)' | Out-Null
+          $notes = $matches[1].Trim()
+          $notes = $notes -replace '`n', '%0A'
+          echo "NOTES=$notes" >> $env:GITHUB_OUTPUT
+
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            electron-app/dist/MacroEngine-Setup.exe
+            electron-app/dist/MacroEngine-Portable.exe
+          body: ${{ steps.changelog.outputs.NOTES }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✅ Build successful!
+        run: |
+          Write-Host "========================================" -ForegroundColor Green
+          Write-Host "✅ Build Complete!" -ForegroundColor Green
+          Write-Host "========================================" -ForegroundColor Green
+          Write-Host "Version: v${{ steps.tag_version.outputs.VERSION }}" -ForegroundColor Cyan
+          Write-Host "Files:" -ForegroundColor Cyan
+          Write-Host "  ✓ MacroEngine-Setup.exe (Installer)" -ForegroundColor Yellow
+          Write-Host "  ✓ MacroEngine-Portable.exe (Portable)" -ForegroundColor Yellow
+          Write-Host "" -ForegroundColor White
+          Write-Host "Auto-update will be available in 24 hours" -ForegroundColor Gray

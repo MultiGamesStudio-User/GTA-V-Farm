@@ -1,0 +1,52 @@
+name: Test Build (PR)
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '*.md'
+      - 'CHANGELOG.md'
+
+jobs:
+  test-build:
+    runs-on: windows-latest
+
+    steps:
+      - name: ✅ Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'electron-app/package-lock.json'
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📥 Install Node dependencies
+        working-directory: electron-app
+        run: npm ci
+
+      - name: 📥 Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: 🎨 Check icons
+        working-directory: electron-app
+        run: npm run check-icons
+        continue-on-error: true
+
+      - name: 🏗️ Test build (Portable)
+        working-directory: electron-app
+        run: npm run build-portable
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: ✅ Build test successful!
+        run: Write-Host "✓ Build test passed - ready to merge!" -ForegroundColor Green
