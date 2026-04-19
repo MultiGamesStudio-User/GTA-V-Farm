@@ -23,6 +23,7 @@ function navigate(page) {
   if (page === 'macros')     renderMacroList();
   if (page === 'dashboard')  renderDashboard();
   if (page === 'syslog')     refreshSyslog();
+  if (page === 'settings')   refreshSyslog();
   if (page === 'windows')    refreshWindows();
 
   // Persist last page
