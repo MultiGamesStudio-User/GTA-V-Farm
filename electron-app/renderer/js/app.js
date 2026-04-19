@@ -25,6 +25,7 @@ function navigate(page) {
   if (page === 'syslog')     refreshSyslog();
   if (page === 'settings')   refreshSyslog();
   if (page === 'windows')    refreshWindows();
+  if (page === 'autoclicker') initAutoClicker();
 
   // Persist last page
   _saveUiPref('lastPage', page);
