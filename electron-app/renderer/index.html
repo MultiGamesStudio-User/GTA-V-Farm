@@ -192,6 +192,22 @@
         <div class="dash-section-title">Sortie récente</div>
         <div id="dash-console" class="console-output" style="max-height:200px"></div>
       </div>
+
+      <!-- Quick-launch grid -->
+      <div class="dash-section" style="margin-top:1.5rem">
+        <div class="dash-section-title">Lancement rapide</div>
+        <div class="dash-ql-grid" id="dash-ql-grid">
+          <div class="empty-state" style="padding:1rem;font-size:12px">Aucune macro créée</div>
+        </div>
+      </div>
+
+      <!-- Quick-launch grid -->
+      <div class="dash-section" style="margin-top:1.5rem">
+        <div class="dash-section-title">Lancement rapide</div>
+        <div class="dash-ql-grid" id="dash-ql-grid">
+          <div class="empty-state" style="padding:1rem;font-size:12px">Aucune macro créée</div>
+        </div>
+      </div>
     </section>
 
     <!-- ═══════════════════ MACROS EDITOR ══════════════════ -->
@@ -209,7 +225,21 @@
           </button>
         </div>
       </div>
-
+class="macro-list-search-row">
+            <input type="text" id="macro-search" placeholder="🔍 Rechercher…" oninput="filterMacroList()">
+          </div>
+          <div class="macro-list-toolbar">
+            <button class="btn btn-xs btn-secondary" onclick="exportAllMacros()" title="Exporter toutes en JSON">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export
+            </button>
+            <button class="btn btn-xs btn-secondary" onclick="triggerImportMacros()" title="Importer depuis JSON">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Import
+            </button>
+          </div>
+          <input type="file" id="macro-import-input" accept=".json" style="display:none" onchange="handleImportMacros(event)">
+          <div 
       <div id="macros-layout" class="macros-layout">
         <!-- Left: macro list -->
         <div class="macros-list-panel" id="macros-list-panel">
@@ -217,6 +247,20 @@
             <span>Macros</span>
             <span class="badge" id="macro-count-badge">0</span>
           </div>
+          <div class="macro-list-search-row">
+            <input type="text" id="macro-search" placeholder="🔍 Rechercher…" oninput="filterMacroList()">
+          </div>
+          <div class="macro-list-toolbar">
+            <button class="btn btn-xs btn-secondary" onclick="exportAllMacros()" title="Exporter toutes en JSON">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export
+            </button>
+            <button class="btn btn-xs btn-secondary" onclick="triggerImportMacros()" title="Importer depuis JSON">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Import
+            </button>
+          </div>
+          <input type="file" id="macro-import-input" accept=".json" style="display:none" onchange="handleImportMacros(event)">
           <div id="macro-list" class="macro-list"></div>
         </div>
 
@@ -685,6 +729,39 @@
         </div>
       </div>
 
+      <!-- Apparence -->
+      <div class="settings-card">
+        <div class="settings-card-header">🎨 Apparence</div>
+        <div class="form-group">
+          <label>Couleur d&rsquo;accent</label>
+          <div class="accent-presets" id="accent-presets">
+            <button class="accent-swatch" data-color="#e8352a" style="background:#e8352a" onclick="applyAccentColor('#e8352a',true)" title="Rouge (défaut)"></button>
+            <button class="accent-swatch" data-color="#3ddc84" style="background:#3ddc84" onclick="applyAccentColor('#3ddc84',true)" title="Vert"></button>
+            <button class="accent-swatch" data-color="#00d4ff" style="background:#00d4ff" onclick="applyAccentColor('#00d4ff',true)" title="Cyan"></button>
+            <button class="accent-swatch" data-color="#a78bfa" style="background:#a78bfa" onclick="applyAccentColor('#a78bfa',true)" title="Violet"></button>
+            <button class="accent-swatch" data-color="#ff9500" style="background:#ff9500" onclick="applyAccentColor('#ff9500',true)" title="Orange"></button>
+            <button class="accent-swatch" data-color="#f5c842" style="background:#f5c842" onclick="applyAccentColor('#f5c842',true)" title="Or"></button>
+            <input type="color" id="set-accent-color" value="#e8352a" title="Couleur personnalisée" oninput="applyAccentColor(this.value,false)" onchange="applyAccentColor(this.value,true)">
+          </div>
+          <div id="accent-status" style="font-size:11px;color:var(--text-3);min-height:16px;margin-top:6px"></div>
+        </div>
+      </div>
+
+      <!-- OCR -->
+      <div class="settings-card">
+        <div class="settings-card-header">🔍 OCR</div>
+        <div class="form-group">
+          <label>Moteur OCR préféré</label>
+          <select id="set-ocr-engine" onchange="saveOcrEngine()">
+            <option value="auto">Auto (recommandé)</option>
+            <option value="easyocr">EasyOCR</option>
+            <option value="tesseract">Tesseract</option>
+            <option value="winrt">WinRT (Windows)</option>
+          </select>
+          <div id="ocr-status" style="font-size:11px;color:var(--text-3);min-height:16px;margin-top:4px"></div>
+        </div>
+      </div>
+
       <!-- Multi-écran -->
       <div class="settings-card">
         <div class="settings-card-header">🖥 Multi-écran</div>
@@ -704,6 +781,39 @@
         <div class="form-row" style="margin-top:.5rem">
           <button class="btn btn-primary btn-sm" onclick="saveRamSettings()">Appliquer</button>
           <span id="ram-status" style="font-size:12px;margin-left:8px"></span>
+        </div>
+      </div>
+
+      <!-- Apparence -->
+      <div class="settings-card">
+        <div class="settings-card-header">🎨 Apparence</div>
+        <div class="form-group">
+          <label>Couleur d&rsquo;accent</label>
+          <div class="accent-presets" id="accent-presets">
+            <button class="accent-swatch" data-color="#e8352a" style="background:#e8352a" onclick="applyAccentColor('#e8352a',true)" title="Rouge (défaut)"></button>
+            <button class="accent-swatch" data-color="#3ddc84" style="background:#3ddc84" onclick="applyAccentColor('#3ddc84',true)" title="Vert"></button>
+            <button class="accent-swatch" data-color="#00d4ff" style="background:#00d4ff" onclick="applyAccentColor('#00d4ff',true)" title="Cyan"></button>
+            <button class="accent-swatch" data-color="#a78bfa" style="background:#a78bfa" onclick="applyAccentColor('#a78bfa',true)" title="Violet"></button>
+            <button class="accent-swatch" data-color="#ff9500" style="background:#ff9500" onclick="applyAccentColor('#ff9500',true)" title="Orange"></button>
+            <button class="accent-swatch" data-color="#f5c842" style="background:#f5c842" onclick="applyAccentColor('#f5c842',true)" title="Or"></button>
+            <input type="color" id="set-accent-color" value="#e8352a" title="Couleur personnalisée" oninput="applyAccentColor(this.value,false)" onchange="applyAccentColor(this.value,true)">
+          </div>
+          <div id="accent-status" style="font-size:11px;color:var(--text-3);min-height:16px;margin-top:6px"></div>
+        </div>
+      </div>
+
+      <!-- OCR -->
+      <div class="settings-card">
+        <div class="settings-card-header">🔍 OCR</div>
+        <div class="form-group">
+          <label>Moteur OCR préféré</label>
+          <select id="set-ocr-engine" onchange="saveOcrEngine()">
+            <option value="auto">Auto (recommandé)</option>
+            <option value="easyocr">EasyOCR</option>
+            <option value="tesseract">Tesseract</option>
+            <option value="winrt">WinRT (Windows)</option>
+          </select>
+          <div id="ocr-status" style="font-size:11px;color:var(--text-3);min-height:16px;margin-top:4px"></div>
         </div>
       </div>
     </section>

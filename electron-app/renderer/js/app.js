@@ -332,6 +332,11 @@ async function loadAppSettings() {
       currentMacroIdx = s.lastMacroIdx;
     }
 
+    // Accent color
+    if (s.accentColor) applyAccentColor(s.accentColor, false);
+    const ocrEl = document.getElementById('set-ocr-engine');
+    if (ocrEl && s.ocrEngine) ocrEl.value = s.ocrEngine;
+
     // Last page — navigate after short delay so DOM is ready
     if (s.lastPage) {
       setTimeout(() => navigate(s.lastPage), 50);
@@ -452,6 +457,46 @@ async function refreshMonitors() {
     </div>`).join('');
   } catch (e) {
     container.innerHTML = `<span style="color:var(--accent)">Erreur: ${escHtml(e.message)}</span>`;
+  }
+}
+
+/* ── Accent color ──────────────────────────────────────────── */
+function applyAccentColor(color, save = true) {
+  document.documentElement.style.setProperty('--accent', color);
+  const picker = document.getElementById('set-accent-color');
+  if (picker) picker.value = color;
+  document.querySelectorAll('.accent-swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.color === color);
+  });
+  if (!save) return;
+  window.api.readSettings().then(r => {
+    const s = (r && r.settings) ? r.settings : (r || {});
+    s.accentColor = color;
+    return window.api.writeSettings(s);
+  }).catch(() => {});
+  const statusEl = document.getElementById('accent-status');
+  if (statusEl) {
+    statusEl.textContent = '✅ Couleur appliquée';
+    setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
+  }
+}
+
+/* ── OCR engine ─────────────────────────────────────────────── */
+async function saveOcrEngine() {
+  const engine = document.getElementById('set-ocr-engine')?.value || 'auto';
+  const statusEl = document.getElementById('ocr-status');
+  try {
+    const r = (await window.api.readSettings()) || {};
+    const s = (r && r.settings) ? r.settings : r;
+    s.ocrEngine = engine;
+    await window.api.writeSettings(s);
+    try { await window.api.setVariable({ name: '__ocr_engine', value: engine }); } catch (_) {}
+    if (statusEl) {
+      statusEl.textContent = '✅ Moteur OCR sauvegardé';
+      setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
+    }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '❌ ' + e.message;
   }
 }
 

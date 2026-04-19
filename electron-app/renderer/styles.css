@@ -1140,6 +1140,87 @@ select.cf, select.af {
 .toast-warn    { border-left: 3px solid var(--orange); }
 .toast-error   { border-left: 3px solid var(--accent); background: #120606; }
 
+/* ══ NEW FEATURES ════════════════════════════════════════════════════════════ */
+
+/* ── Drag & Drop ──────────────────────────────────────────────────────────── */
+.macro-drag-handle, .rule-drag-handle, .item-drag-handle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; flex-shrink: 0;
+  color: var(--text-3); cursor: grab; border-radius: var(--radius-sm);
+  transition: color var(--transition), background var(--transition);
+}
+.macro-drag-handle:hover, .rule-drag-handle:hover, .item-drag-handle:hover {
+  color: var(--text-2); background: var(--bg-hover);
+}
+.macro-drag-handle:active, .rule-drag-handle:active, .item-drag-handle:active { cursor: grabbing; }
+.rule-drag-handle { width: 20px; height: 20px; }
+
+.dnd-dragging { opacity: 0.4 !important; pointer-events: none; }
+.dnd-over-top { border-top: 2px solid var(--accent) !important; }
+.dnd-over-bot { border-bottom: 2px solid var(--accent) !important; }
+
+/* ── Macro list search + toolbar ──────────────────────────────────────────── */
+.macro-list-search-row {
+  padding: 6px 8px; border-bottom: 1px solid var(--border);
+}
+.macro-list-search-row input {
+  width: 100%; padding: 5px 10px; font-size: 12px;
+  border-radius: var(--radius-sm); background: var(--bg-input);
+  border: 1px solid var(--border); color: var(--text);
+  font-family: var(--font); outline: none; box-sizing: border-box;
+}
+.macro-list-search-row input:focus { border-color: rgba(232,53,42,.5); }
+.macro-list-toolbar {
+  display: flex; gap: 4px; padding: 5px 8px;
+  border-bottom: 1px solid var(--border); flex-wrap: wrap;
+}
+.btn-xs {
+  padding: 3px 8px; font-size: 11px; height: auto;
+  border-radius: var(--radius-sm); gap: 4px; display: inline-flex; align-items: center;
+}
+
+/* ── Quick-launch grid ────────────────────────────────────────────────────── */
+.dash-ql-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.ql-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color var(--transition-s), transform .15s ease;
+}
+.ql-card:hover { border-color: var(--border-2); transform: translateY(-2px); }
+.ql-card-running {
+  border-color: rgba(61,220,132,.45); background: rgba(61,220,132,.04);
+}
+.ql-card-name {
+  font-size: 12px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ql-card-meta { font-size: 10px; color: var(--text-3); }
+.ql-card-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+
+/* ── Accent color swatches ────────────────────────────────────────────────── */
+.accent-presets { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 6px; }
+.accent-swatch {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer;
+  transition: border-color var(--transition), transform var(--transition);
+  flex-shrink: 0; padding: 0;
+}
+.accent-swatch:hover { transform: scale(1.15); }
+.accent-swatch.active { border-color: #fff !important; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+#set-accent-color {
+  width: 28px; height: 28px; border: 2px solid var(--border-2);
+  border-radius: 50%; cursor: pointer; background: none; padding: 1px;
+  flex-shrink: 0;
+}
+
+/* ── Disabled icon button ─────────────────────────────────────────────────── */
+.icon-btn[disabled] { opacity: 0.25; cursor: default; pointer-events: none; }
+
 /* ── Misc ────────────────────────────────────────────────────── */
 .empty-state {
   padding: 32px 24px; text-align: center;

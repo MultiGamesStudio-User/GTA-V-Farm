@@ -181,6 +181,8 @@ function renderRules() {
     return;
   }
   container.innerHTML = macro.rules.map((rule, ri) => renderRuleHTML(rule, ri)).join('');
+  _initRulesDnD();
+  _initItemsDnD();
 }
 
 function renderRuleHTML(rule, ri) {
@@ -201,8 +203,15 @@ function renderRuleHTML(rule, ri) {
     : `<span class="rule-pill rule-pill-empty">∅ action</span>`;
 
   return `
-  <div class="rule-card${isCollapsed ? ' collapsed' : ''}${isDisabled ? ' rule-disabled' : ''}" id="rule-${ri}">
+  <div class="rule-card${isCollapsed ? ' collapsed' : ''}${isDisabled ? ' rule-disabled' : ''}" id="rule-${ri}" draggable="true">
     <div class="rule-header">
+      <div class="rule-drag-handle" title="Glisser pour réorganiser">
+        <svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11">
+          <circle cx="5" cy="3.5" r="1.3"/><circle cx="11" cy="3.5" r="1.3"/>
+          <circle cx="5" cy="8"   r="1.3"/><circle cx="11" cy="8"   r="1.3"/>
+          <circle cx="5" cy="12.5" r="1.3"/><circle cx="11" cy="12.5" r="1.3"/>
+        </svg>
+      </div>
       <button class="icon-btn rule-collapse-btn" title="${isCollapsed ? 'Développer' : 'Réduire'}" onclick="toggleRuleCollapse(${ri})">
         <svg class="rule-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12"
           style="transition:transform .2s cubic-bezier(.4,0,.2,1);transform:rotate(${isCollapsed ? '-90' : '0'}deg)">
@@ -229,6 +238,9 @@ function renderRuleHTML(rule, ri) {
           <input type="checkbox" ${rule.stop_on_match ? 'checked' : ''} onchange="setRuleField(${ri},'stop_on_match',this.checked)">
           Stop si match
         </label>
+        <button class="icon-btn" title="Dupliquer règle" onclick="duplicateRule(${ri})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
         <button class="icon-btn btn-danger-icon" title="Supprimer règle" onclick="deleteRule(${ri})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
         </button>
@@ -241,7 +253,7 @@ function renderRuleHTML(rule, ri) {
           <button class="btn btn-xs btn-secondary" onclick="addCondition(${ri})">+ Condition</button>
         </div>
         <div class="cond-list" id="cond-list-${ri}">
-          ${rule.conditions.map((c, ci) => renderConditionRowHTML(c, ri, ci)).join('')}
+          ${rule.conditions.map((c, ci) => renderConditionRowHTML(c, ri, ci, rule.conditions.length)).join('')}
           ${rule.conditions.length === 0 ? '<div class="empty-mini">Pas de condition — règle active si "Aucune cond."</div>' : ''}
         </div>
       </div>
@@ -251,7 +263,7 @@ function renderRuleHTML(rule, ri) {
           <button class="btn btn-xs btn-secondary" onclick="addAction(${ri})">+ Action</button>
         </div>
         <div class="act-list" id="act-list-${ri}">
-          ${rule.actions.map((a, ai) => renderActionRowHTML(a, ri, ai)).join('')}
+          ${rule.actions.map((a, ai) => renderActionRowHTML(a, ri, ai, rule.actions.length)).join('')}
           ${rule.actions.length === 0 ? '<div class="empty-mini">Aucune action configurée</div>' : ''}
         </div>
       </div>
@@ -280,18 +292,203 @@ function deleteRule(ri) {
   renderRules();
 }
 
+function duplicateRule(ri) {
+  if (currentMacroIdx < 0) return;
+  const copy = JSON.parse(JSON.stringify(macros[currentMacroIdx].rules[ri]));
+  copy.id    = 'rule_' + Date.now();
+  copy.label = (copy.label || 'Règle') + ' (copie)';
+  macros[currentMacroIdx].rules.splice(ri + 1, 0, copy);
+  renderRules();
+}
+
+function moveCondUp(ri, ci) {
+  if (currentMacroIdx < 0 || ci <= 0) return;
+  const conds = macros[currentMacroIdx].rules[ri].conditions;
+  [conds[ci - 1], conds[ci]] = [conds[ci], conds[ci - 1]];
+  renderRules();
+}
+
+function moveCondDown(ri, ci) {
+  if (currentMacroIdx < 0) return;
+  const conds = macros[currentMacroIdx].rules[ri].conditions;
+  if (ci >= conds.length - 1) return;
+  [conds[ci], conds[ci + 1]] = [conds[ci + 1], conds[ci]];
+  renderRules();
+}
+
+function moveActUp(ri, ai) {
+  if (currentMacroIdx < 0 || ai <= 0) return;
+  const acts = macros[currentMacroIdx].rules[ri].actions;
+  [acts[ai - 1], acts[ai]] = [acts[ai], acts[ai - 1]];
+  renderRules();
+}
+
+function moveActDown(ri, ai) {
+  if (currentMacroIdx < 0) return;
+  const acts = macros[currentMacroIdx].rules[ri].actions;
+  if (ai >= acts.length - 1) return;
+  [acts[ai], acts[ai + 1]] = [acts[ai + 1], acts[ai]];
+  renderRules();
+}
+
+/* ── Drag & Drop — rules ─────────────────────────────────── */
+let _dndRuleSrc = -1;
+function _initRulesDnD() {
+  const container = document.getElementById('rules-container');
+  if (!container || container._ruleDndReady) return;
+  container._ruleDndReady = true;
+
+  container.addEventListener('dragstart', e => {
+    const rh = e.target.closest('.rule-drag-handle');
+    if (!rh) return;
+    const card = rh.closest('.rule-card');
+    if (!card) return;
+    _dndRuleSrc = parseInt(card.id.split('-')[1]);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(_dndRuleSrc));
+    setTimeout(() => card.classList.add('dnd-dragging'), 0);
+  });
+
+  container.addEventListener('dragover', e => {
+    e.preventDefault();
+    const card = e.target.closest('.rule-card');
+    container.querySelectorAll('.rule-card').forEach(c => c.classList.remove('dnd-over-top', 'dnd-over-bot'));
+    if (card) {
+      const rect = card.getBoundingClientRect();
+      card.classList.add(e.clientY < rect.top + rect.height / 2 ? 'dnd-over-top' : 'dnd-over-bot');
+    }
+  });
+
+  container.addEventListener('dragleave', e => {
+    if (!container.contains(e.relatedTarget)) {
+      container.querySelectorAll('.rule-card').forEach(c => c.classList.remove('dnd-over-top', 'dnd-over-bot'));
+    }
+  });
+
+  container.addEventListener('drop', e => {
+    e.preventDefault();
+    const macro = macros[currentMacroIdx];
+    container.querySelectorAll('.rule-card').forEach(c => c.classList.remove('dnd-over-top', 'dnd-over-bot', 'dnd-dragging'));
+    const card = e.target.closest('.rule-card');
+    if (!card || !macro || _dndRuleSrc < 0) return;
+    const dropRi = parseInt(card.id.split('-')[1]);
+    if (_dndRuleSrc === dropRi) { _dndRuleSrc = -1; return; }
+    const rect = card.getBoundingClientRect();
+    const insertBefore = e.clientY < rect.top + rect.height / 2;
+    const [moved] = macro.rules.splice(_dndRuleSrc, 1);
+    let target = dropRi > _dndRuleSrc ? dropRi - 1 : dropRi;
+    if (!insertBefore) target++;
+    macro.rules.splice(target, 0, moved);
+    _dndRuleSrc = -1;
+    renderRules();
+  });
+
+  container.addEventListener('dragend', () => {
+    container.querySelectorAll('.rule-card').forEach(c => c.classList.remove('dnd-dragging', 'dnd-over-top', 'dnd-over-bot'));
+    _dndRuleSrc = -1;
+  });
+}
+
+/* ── Drag & Drop — condition / action items ──────────────── */
+let _dndItemSrc = null; // { type: 'cond'|'act', ri, idx }
+function _initItemsDnD() {
+  const container = document.getElementById('rules-container');
+  if (!container || container._itemDndReady) return;
+  container._itemDndReady = true;
+
+  container.addEventListener('dragstart', e => {
+    const ch = e.target.closest('.cond-drag-handle');
+    const ah = e.target.closest('.act-drag-handle');
+    if (!ch && !ah) return;
+    const row = (ch || ah).closest('.item-row');
+    if (!row) return;
+    const parts = row.id.split('-');
+    const ri = parseInt(parts[1]);
+    const idx = parseInt(parts[2]);
+    _dndItemSrc = { type: ch ? 'cond' : 'act', ri, idx };
+    e.dataTransfer.effectAllowed = 'move';
+    e.stopPropagation(); // prevent rule drag from triggering
+    setTimeout(() => row.classList.add('dnd-dragging'), 0);
+  }, true);
+
+  container.addEventListener('dragover', e => {
+    if (!_dndItemSrc) return;
+    const row = e.target.closest('.item-row');
+    if (!row) return;
+    const listType = _dndItemSrc.type === 'cond' ? 'cond-list' : 'act-list';
+    if (!row.closest('.' + listType)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const list = row.closest('.' + listType);
+    list.querySelectorAll('.item-row').forEach(r => r.classList.remove('dnd-over-top', 'dnd-over-bot'));
+    const rect = row.getBoundingClientRect();
+    row.classList.add(e.clientY < rect.top + rect.height / 2 ? 'dnd-over-top' : 'dnd-over-bot');
+  }, true);
+
+  container.addEventListener('dragleave', e => {
+    const row = e.target.closest('.item-row');
+    if (row) row.classList.remove('dnd-over-top', 'dnd-over-bot');
+  });
+
+  container.addEventListener('drop', e => {
+    if (!_dndItemSrc) return;
+    const row = e.target.closest('.item-row');
+    if (!row) return;
+    const listType = _dndItemSrc.type === 'cond' ? 'cond-list' : 'act-list';
+    if (!row.closest('.' + listType)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const parts = row.id.split('-');
+    const dropRi = parseInt(parts[1]);
+    const dropIdx = parseInt(parts[2]);
+    const { ri, idx } = _dndItemSrc;
+    if (ri !== dropRi) { _dndItemSrc = null; renderRules(); return; }
+    if (idx === dropIdx) { _dndItemSrc = null; renderRules(); return; }
+    const arr = _dndItemSrc.type === 'cond'
+      ? macros[currentMacroIdx]?.rules[ri]?.conditions
+      : macros[currentMacroIdx]?.rules[ri]?.actions;
+    if (!arr) { _dndItemSrc = null; return; }
+    const rect = row.getBoundingClientRect();
+    const insertBefore = e.clientY < rect.top + rect.height / 2;
+    const [moved] = arr.splice(idx, 1);
+    let target = dropIdx > idx ? dropIdx - 1 : dropIdx;
+    if (!insertBefore) target++;
+    arr.splice(target, 0, moved);
+    _dndItemSrc = null;
+    renderRules();
+  }, true);
+
+  container.addEventListener('dragend', () => {
+    container.querySelectorAll('.item-row').forEach(r => r.classList.remove('dnd-dragging', 'dnd-over-top', 'dnd-over-bot'));
+    _dndItemSrc = null;
+  });
+}
+
 /* ── Condition rows ───────────────────────────────────────── */
-function renderConditionRowHTML(c, ri, ci) {
+function renderConditionRowHTML(c, ri, ci, total) {
   const type = c.type || 'pixel_color';
   return `
-  <div class="item-row" id="crow-${ri}-${ci}">
+  <div class="item-row" id="crow-${ri}-${ci}" draggable="true">
     <div class="item-row-head">
+      <div class="item-drag-handle cond-drag-handle" title="Glisser pour réorganiser">
+        <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9">
+          <circle cx="4.5" cy="3.5" r="1.1"/><circle cx="11.5" cy="3.5" r="1.1"/>
+          <circle cx="4.5" cy="8"   r="1.1"/><circle cx="11.5" cy="8"   r="1.1"/>
+          <circle cx="4.5" cy="12.5" r="1.1"/><circle cx="11.5" cy="12.5" r="1.1"/>
+        </svg>
+      </div>
       <select class="item-type-select" onchange="setCondType(${ri},${ci},this.value)">
         ${Object.entries(COND_LABELS).map(([k, v]) => `<option value="${k}" ${type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
       </select>
       <div class="item-row-btns">
         <button class="icon-btn" title="Tester" onclick="testConditionInline(${ri},${ci})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </button>
+        <button class="icon-btn" title="Monter" onclick="moveCondUp(${ri},${ci})" ${ci === 0 ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+        <button class="icon-btn" title="Descendre" onclick="moveCondDown(${ri},${ci})" ${ci === (total||0) - 1 ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <button class="icon-btn btn-danger-icon" onclick="deleteCondition(${ri},${ci})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -575,17 +772,30 @@ async function testConditionInline(ri, ci) {
 }
 
 /* ── Action rows ──────────────────────────────────────────── */
-function renderActionRowHTML(a, ri, ai) {
+function renderActionRowHTML(a, ri, ai, total) {
   const type = a.type || 'key_tap';
   return `
-  <div class="item-row" id="arow-${ri}-${ai}">
+  <div class="item-row" id="arow-${ri}-${ai}" draggable="true">
     <div class="item-row-head">
+      <div class="item-drag-handle act-drag-handle" title="Glisser pour réorganiser">
+        <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9">
+          <circle cx="4.5" cy="3.5" r="1.1"/><circle cx="11.5" cy="3.5" r="1.1"/>
+          <circle cx="4.5" cy="8"   r="1.1"/><circle cx="11.5" cy="8"   r="1.1"/>
+          <circle cx="4.5" cy="12.5" r="1.1"/><circle cx="11.5" cy="12.5" r="1.1"/>
+        </svg>
+      </div>
       <select class="item-type-select" onchange="setActType(${ri},${ai},this.value)">
         ${Object.entries(ACT_LABELS).map(([k, v]) => `<option value="${k}" ${type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
       </select>
       <div class="item-row-btns">
         <button class="icon-btn" title="Exécuter" onclick="execActionInline(${ri},${ai})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+        <button class="icon-btn" title="Monter" onclick="moveActUp(${ri},${ai})" ${ai === 0 ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+        <button class="icon-btn" title="Descendre" onclick="moveActDown(${ri},${ai})" ${ai === (total||0) - 1 ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <button class="icon-btn btn-danger-icon" onclick="deleteAction(${ri},${ai})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
