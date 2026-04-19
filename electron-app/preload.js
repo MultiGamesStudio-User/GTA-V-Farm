@@ -107,7 +107,10 @@ contextBridge.exposeInMainWorld('api', {
   checkLicense:  ()    => ipcRenderer.invoke('license:check'),
   verifyLicense: (key) => ipcRenderer.invoke('license:verify', key),
 
-  // ── Log file ──────────────────────────────────────────────
+  // ── Shell ──────────────────────────────────────────────────────────────────
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+
+  // ── Log file ──────────────────────────────────────────────────────────────
   readLog:   ()  => ipcRenderer.invoke('log:read'),
   openLog:   ()  => ipcRenderer.invoke('log:open'),
   clearLog:  ()  => ipcRenderer.invoke('log:clear'),

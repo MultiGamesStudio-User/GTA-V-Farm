@@ -98,11 +98,20 @@ async function checkLicense() {
   const result = await window.api.checkLicense();
   if (result.valid) {
     overlay.style.display = 'none';
+    if (result.offline && result.daysLeft != null) {
+      // Avertissement discret mode hors-ligne
+      showToast(`Mode hors-ligne — licence non vérifiée (${result.daysLeft}j restants)`, 'warn', 8000);
+    }
     return true;
   }
 
   // Hide splash so the licence modal is fully visible
   hideSplash();
+
+  if (result.reason === 'grace_expired') {
+    showLicenseError('Connexion requise pour revalider la licence (délai hors-ligne expiré).');
+  }
+
   // Show modal and wait for valid key
   overlay.style.display = 'flex';
   return new Promise((resolve) => {
@@ -116,6 +125,10 @@ async function checkLicense() {
       if (res.valid) {
         overlay.style.display = 'none';
         resolve(true);
+      } else if (res.reason === 'network') {
+        showLicenseError('Impossible de contacter le serveur. Vérifiez votre connexion.');
+        btn.disabled = false;
+        btn.textContent = 'Activer';
       } else {
         showLicenseError('Clé de licence invalide. Veuillez réessayer.');
         btn.disabled = false;
@@ -468,5 +481,10 @@ function _setupUpdater() {
 
 document.addEventListener('DOMContentLoaded', () => {
   _setupUpdater();
+  // Lien "Obtenir une licence" → navigateur système (discord)
+  document.querySelector('.license-buy-link')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.api.openExternal(e.currentTarget.href);
+  });
   init();
 });

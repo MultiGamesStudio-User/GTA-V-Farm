@@ -124,36 +124,48 @@ function saveSettings(data) {
 let registeredShortcuts = {}; // { action: accelerator }
 
 // ── License helpers ──────────────────────────────────────────────────────────
-function readLicense() {
+const LICENSE_GRACE_DAYS    = 7;
+const LICENSE_TIMEOUT_MS    = 5000;
+
+function readLicenseData() {
   try {
     if (!fs.existsSync(LICENSE_PATH)) return null;
-    const data = JSON.parse(fs.readFileSync(LICENSE_PATH, 'utf-8'));
-    return data.key || null;
+    return JSON.parse(fs.readFileSync(LICENSE_PATH, 'utf-8'));
   } catch (_) { return null; }
+}
+
+function readLicense() {
+  const d = readLicenseData();
+  return d ? (d.key || null) : null;
 }
 
 function saveLicense(key) {
   fs.mkdirSync(path.dirname(LICENSE_PATH), { recursive: true });
-  fs.writeFileSync(LICENSE_PATH, JSON.stringify({ key }), 'utf-8');
+  fs.writeFileSync(LICENSE_PATH, JSON.stringify({ key, validatedAt: Date.now() }), 'utf-8');
 }
 
 function verifyLicenseOnline(key) {
   return new Promise((resolve) => {
     const safeKey = encodeURIComponent(key);
     const url = `${APP_CONFIG.licenseApiBase}/${APP_CONFIG.licenseApiId}/${safeKey}/verify`;
-    https.get(url, { headers: { 'User-Agent': `${APP_CONFIG.appName}/${app.getVersion()}` } }, (res) => {
+    const req = https.get(url, { headers: { 'User-Agent': `${APP_CONFIG.appName}/${app.getVersion()}` } }, (res) => {
       let body = '';
       res.on('data', (chunk) => { body += chunk; });
       res.on('end', () => {
         try {
           const data = JSON.parse(body);
-          resolve({ valid: !!data.valid });
+          resolve({ valid: !!data.valid, offline: false });
         } catch (_) {
-          resolve({ valid: false });
+          resolve({ valid: false, offline: false });
         }
       });
-    }).on('error', () => {
-      resolve({ valid: false });
+    });
+    req.setTimeout(LICENSE_TIMEOUT_MS, () => {
+      req.destroy();
+      resolve({ valid: false, offline: true });
+    });
+    req.on('error', () => {
+      resolve({ valid: false, offline: true });
     });
   });
 }
@@ -680,9 +692,27 @@ ipcMain.handle('app:getConfig', () => ({
 
 // ── IPC: license ─────────────────────────────────────────────────────────────
 ipcMain.handle('license:check', async () => {
-  const key = readLicense();
-  if (!key) return { valid: false, reason: 'missing' };
-  return verifyLicenseOnline(key);
+  const licData = readLicenseData();
+  if (!licData || !licData.key) return { valid: false, reason: 'missing' };
+
+  const result = await verifyLicenseOnline(licData.key);
+  if (result.valid) {
+    saveLicense(licData.key);        // Rafraîchir validatedAt
+    return { valid: true };
+  }
+
+  // Réseau injoignable → grace period
+  if (result.offline && licData.validatedAt) {
+    const daysSince = (Date.now() - licData.validatedAt) / 86400000;
+    if (daysSince <= LICENSE_GRACE_DAYS) {
+      const daysLeft = Math.ceil(LICENSE_GRACE_DAYS - daysSince);
+      writeLog('WARN', `Licence: mode hors-ligne, ${daysLeft}j restants`);
+      return { valid: true, offline: true, daysLeft };
+    }
+    return { valid: false, reason: 'grace_expired' };
+  }
+
+  return { valid: false, reason: result.offline ? 'network' : 'invalid' };
 });
 
 ipcMain.handle('license:verify', async (_evt, key) => {
@@ -691,6 +721,7 @@ ipcMain.handle('license:verify', async (_evt, key) => {
   }
   const result = await verifyLicenseOnline(key.trim());
   if (result.valid) saveLicense(key.trim());
+  if (!result.valid && result.offline) return { valid: false, reason: 'network' };
   return result;
 });
 
@@ -759,6 +790,15 @@ ipcMain.handle('log:read', () => {
 ipcMain.handle('log:open', () => {
   const { shell } = require('electron');
   if (fs.existsSync(LOG_PATH)) shell.openPath(LOG_PATH);
+  return { ok: true };
+});
+
+ipcMain.handle('shell:openExternal', (_evt, url) => {
+  const { shell } = require('electron');
+  // Whitelist des protocoles autorisés (sécurité)
+  if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+    shell.openExternal(url);
+  }
   return { ok: true };
 });
 

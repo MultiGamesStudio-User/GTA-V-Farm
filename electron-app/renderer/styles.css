@@ -205,6 +205,12 @@ body::before {
 .license-btn:hover  { opacity: .88; }
 .license-btn:active { transform: scale(.98); }
 .license-btn:disabled { opacity: .35; cursor: not-allowed; }
+.license-buy-link {
+  display: block; margin-top: 18px;
+  font-size: 12px; color: var(--text-2);
+  text-decoration: none; transition: color var(--transition);
+}
+.license-buy-link:hover { color: var(--accent); }
 
 /* ── Deps banner ─────────────────────────────────────────────── */
 .deps-banner {
