@@ -75,13 +75,17 @@
         }
       ]
     },
+    "portable": {
+      "artifactName": "${productName}-Portable.exe"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "MacroEngine"
+      "shortcutName": "MacroEngine",
+      "artifactName": "${productName}-Setup.exe"
     },
     "publish": {
       "provider": "github",
