@@ -6,6 +6,9 @@ on:
       - main   # Build + release a chaque push sur main
   workflow_dispatch:   # Lancement manuel depuis l'onglet Actions
 
+permissions:
+  contents: write   # Nécessaire pour créer/modifier les releases GitHub
+
 jobs:
   build:
     runs-on: windows-latest
