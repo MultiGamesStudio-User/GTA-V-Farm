@@ -477,88 +477,108 @@
     <section class="page" id="page-autoclicker">
       <div class="page-header">
         <h1>🖱️ Auto Clicker</h1>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
-          <span id="acp-status" style="font-size:12px;color:var(--text-3)">⚪ Arrêté</span>
-          <button class="btn btn-success" id="acp-btn-start" onclick="startAutoClicker()">▶ Démarrer</button>
-          <button class="btn btn-danger"  id="acp-btn-stop"  onclick="stopAutoClicker()" disabled>■ Arrêter</button>
-        </div>
       </div>
 
-      <!-- Intervalle -->
-      <div class="settings-card">
-        <div class="settings-card-header">⏱ Intervalle de clic</div>
-        <div class="ac-row" style="align-items:center;gap:6px;flex-wrap:wrap">
-          <input type="number" id="acp-h"  class="ac-narrow" value="0" min="0" placeholder="0">
-          <span class="ac-unit">h</span>
-          <input type="number" id="acp-m"  class="ac-narrow" value="0" min="0" max="59" placeholder="0">
-          <span class="ac-unit">m</span>
-          <input type="number" id="acp-s"  class="ac-narrow" value="0" min="0" max="59" placeholder="0">
-          <span class="ac-unit">s</span>
-          <input type="number" id="acp-ms" class="ac-mid"    value="100" min="1" max="999" placeholder="100">
-          <span class="ac-unit">ms</span>
-        </div>
-        <div class="ac-row" style="align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap">
-          <label class="ac-chk-lbl">
-            <input type="checkbox" id="acp-rand-offset" onchange="_acpToggleOffset(this)">
-            Offset aléatoire ±
-          </label>
-          <input type="number" id="acp-rand-ms" class="ac-mid" value="40" min="0" disabled>
-          <span class="ac-unit">ms</span>
-        </div>
-      </div>
+      <div class="settings-card" style="max-width:520px">
 
-      <!-- Options de clic -->
-      <div class="settings-card">
-        <div class="settings-card-header">🖱 Options de clic</div>
-        <div class="form-row" style="gap:14px;flex-wrap:wrap">
-          <div class="form-group" style="flex:1;min-width:120px">
-            <label>Bouton souris</label>
-            <select id="acp-button">
-              <option value="left">Gauche</option>
-              <option value="right">Droit</option>
-              <option value="middle">Milieu</option>
-            </select>
-          </div>
-          <div class="form-group" style="flex:1;min-width:120px">
-            <label>Type de clic</label>
-            <select id="acp-click-type">
-              <option value="single">Simple</option>
-              <option value="double">Double</option>
-              <option value="triple">Triple</option>
-            </select>
+        <!-- ── Statut + contrôles ── -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <span id="acp-status" style="font-size:13px;font-weight:600;color:var(--text-2)">⚪ Arrêté</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-success" id="acp-btn-start" onclick="startAutoClicker()">▶ Démarrer</button>
+            <button class="btn btn-danger"  id="acp-btn-stop"  onclick="stopAutoClicker()" disabled>■ Arrêter</button>
           </div>
         </div>
-      </div>
 
-      <!-- Répétition -->
-      <div class="settings-card">
-        <div class="settings-card-header">🔁 Répétition</div>
-        <div class="ac-row" style="align-items:center;gap:8px;flex-wrap:wrap">
-          <select id="acp-repeat-mode" onchange="_acpToggleRepeat()">
-            <option value="until_stopped">Jusqu&rsquo;à arrêt</option>
-            <option value="count">Nombre de fois</option>
-          </select>
-          <input type="number" id="acp-repeat-count" class="ac-mid" value="1" min="1" disabled>
-          <span class="ac-unit" id="acp-repeat-lbl">fois</span>
-        </div>
-      </div>
+        <!-- ── Séparateur ── -->
+        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
 
-      <!-- Position du curseur -->
-      <div class="settings-card">
-        <div class="settings-card-header">📍 Position du curseur</div>
-        <div class="ac-row" style="align-items:center;gap:8px;flex-wrap:wrap">
-          <select id="acp-pos-mode" onchange="_acpTogglePosition()">
-            <option value="current">Position actuelle</option>
-            <option value="pick">Point fixe</option>
-          </select>
-          <span id="acp-pos-fields" style="display:none;align-items:center;gap:6px">
-            <span class="ac-unit" style="font-size:12px">X</span>
-            <input type="number" id="acp-x" value="0" style="width:70px">
-            <span class="ac-unit" style="font-size:12px">Y</span>
-            <input type="number" id="acp-y" value="0" style="width:70px">
-            <button class="btn btn-secondary btn-sm" onclick="_acpPickPoint()" title="Choisir un point à l'écran">🎯</button>
-          </span>
+        <!-- ── Intervalle ── -->
+        <div style="margin-bottom:16px">
+          <div class="ac-section-lbl" style="margin-bottom:10px">⏱ Intervalle de clic</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap">
+            <input type="number" id="acp-h"  class="ac-narrow" value="0" min="0" placeholder="0">
+            <span class="ac-unit">h</span>
+            <input type="number" id="acp-m"  class="ac-narrow" value="0" min="0" max="59" placeholder="0">
+            <span class="ac-unit">m</span>
+            <input type="number" id="acp-s"  class="ac-narrow" value="0" min="0" max="59" placeholder="0">
+            <span class="ac-unit">s</span>
+            <input type="number" id="acp-ms" class="ac-mid"    value="100" min="1" max="999" placeholder="100">
+            <span class="ac-unit">ms</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);white-space:nowrap;cursor:pointer">
+              <input type="checkbox" id="acp-rand-offset" onchange="_acpToggleOffset(this)" style="margin:0">
+              Offset aléatoire ±
+            </label>
+            <input type="number" id="acp-rand-ms" class="ac-mid" value="40" min="0" disabled>
+            <span class="ac-unit">ms</span>
+          </div>
         </div>
+
+        <!-- ── Séparateur ── -->
+        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
+
+        <!-- ── Options de clic ── -->
+        <div style="margin-bottom:16px">
+          <div class="ac-section-lbl" style="margin-bottom:10px">🖱 Options de clic</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div>
+              <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Bouton souris</label>
+              <select id="acp-button" style="width:100%">
+                <option value="left">Gauche</option>
+                <option value="right">Droit</option>
+                <option value="middle">Milieu</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Type de clic</label>
+              <select id="acp-click-type" style="width:100%">
+                <option value="single">Simple</option>
+                <option value="double">Double</option>
+                <option value="triple">Triple</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Séparateur ── -->
+        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
+
+        <!-- ── Répétition ── -->
+        <div style="margin-bottom:16px">
+          <div class="ac-section-lbl" style="margin-bottom:10px">🔁 Répétition</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <select id="acp-repeat-mode" onchange="_acpToggleRepeat()" style="flex:1;max-width:200px">
+              <option value="until_stopped">Jusqu&rsquo;à arrêt</option>
+              <option value="count">Nombre de fois</option>
+            </select>
+            <input type="number" id="acp-repeat-count" class="ac-mid" value="1" min="1" disabled>
+            <span class="ac-unit">fois</span>
+          </div>
+        </div>
+
+        <!-- ── Séparateur ── -->
+        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
+
+        <!-- ── Position ── -->
+        <div>
+          <div class="ac-section-lbl" style="margin-bottom:10px">📍 Position du curseur</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <select id="acp-pos-mode" onchange="_acpTogglePosition()" style="max-width:200px">
+              <option value="current">Position actuelle</option>
+              <option value="pick">Point fixe</option>
+            </select>
+            <div id="acp-pos-fields" style="display:none;align-items:center;gap:8px">
+              <span style="font-size:11px;color:var(--text-3)">X</span>
+              <input type="number" id="acp-x" value="0" style="width:68px">
+              <span style="font-size:11px;color:var(--text-3)">Y</span>
+              <input type="number" id="acp-y" value="0" style="width:68px">
+              <button class="btn btn-secondary btn-sm" onclick="_acpPickPoint()" title="Choisir un point à l'écran">🎯</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 
