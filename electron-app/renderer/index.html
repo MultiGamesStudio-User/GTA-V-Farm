@@ -735,7 +735,7 @@
             <option value="tesseract">Tesseract</option>
             <option value="winrt">WinRT (Windows)</option>
           </select>
-          <div id="ocr-status" style="font-size:11px;color:var(--text-3);min-height:16px;margin-top:4px"></div>
+          <div id="set-ocr-status" style="font-size:11px;color:var(--text-3);min-height:16px;margin-top:4px"></div>
         </div>
       </div>
 
@@ -758,39 +758,6 @@
         <div class="form-row" style="margin-top:.5rem">
           <button class="btn btn-primary btn-sm" onclick="saveRamSettings()">Appliquer</button>
           <span id="ram-status" style="font-size:12px;margin-left:8px"></span>
-        </div>
-      </div>
-
-      <!-- Apparence -->
-      <div class="settings-card">
-        <div class="settings-card-header">🎨 Apparence</div>
-        <div class="form-group">
-          <label>Couleur d&rsquo;accent</label>
-          <div class="accent-presets" id="accent-presets">
-            <button class="accent-swatch" data-color="#e8352a" style="background:#e8352a" onclick="applyAccentColor('#e8352a',true)" title="Rouge (défaut)"></button>
-            <button class="accent-swatch" data-color="#3ddc84" style="background:#3ddc84" onclick="applyAccentColor('#3ddc84',true)" title="Vert"></button>
-            <button class="accent-swatch" data-color="#00d4ff" style="background:#00d4ff" onclick="applyAccentColor('#00d4ff',true)" title="Cyan"></button>
-            <button class="accent-swatch" data-color="#a78bfa" style="background:#a78bfa" onclick="applyAccentColor('#a78bfa',true)" title="Violet"></button>
-            <button class="accent-swatch" data-color="#ff9500" style="background:#ff9500" onclick="applyAccentColor('#ff9500',true)" title="Orange"></button>
-            <button class="accent-swatch" data-color="#f5c842" style="background:#f5c842" onclick="applyAccentColor('#f5c842',true)" title="Or"></button>
-            <input type="color" id="set-accent-color" value="#e8352a" title="Couleur personnalisée" oninput="applyAccentColor(this.value,false)" onchange="applyAccentColor(this.value,true)">
-          </div>
-          <div id="accent-status" style="font-size:11px;color:var(--text-3);min-height:16px;margin-top:6px"></div>
-        </div>
-      </div>
-
-      <!-- OCR -->
-      <div class="settings-card">
-        <div class="settings-card-header">🔍 OCR</div>
-        <div class="form-group">
-          <label>Moteur OCR préféré</label>
-          <select id="set-ocr-engine" onchange="saveOcrEngine()">
-            <option value="auto">Auto (recommandé)</option>
-            <option value="easyocr">EasyOCR</option>
-            <option value="tesseract">Tesseract</option>
-            <option value="winrt">WinRT (Windows)</option>
-          </select>
-          <div id="ocr-status" style="font-size:11px;color:var(--text-3);min-height:16px;margin-top:4px"></div>
         </div>
       </div>
     </section>

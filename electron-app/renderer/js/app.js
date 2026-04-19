@@ -484,7 +484,7 @@ function applyAccentColor(color, save = true) {
 /* ── OCR engine ─────────────────────────────────────────────── */
 async function saveOcrEngine() {
   const engine = document.getElementById('set-ocr-engine')?.value || 'auto';
-  const statusEl = document.getElementById('ocr-status');
+  const statusEl = document.getElementById('set-ocr-status');
   try {
     const r = (await window.api.readSettings()) || {};
     const s = (r && r.settings) ? r.settings : r;
