@@ -1640,13 +1640,14 @@ kbd {
 ══════════════════════════════════════════════════════════════ */
 
 /* Category CSS vars */
-.n8n-act-cat-kbd   { --act-color: #e87d2a; }
-.n8n-act-cat-mouse { --act-color: #2a86e8; }
-.n8n-act-cat-wait  { --act-color: #6e6e9a; }
-.n8n-act-cat-ctrl  { --act-color: #e8352a; }
-.n8n-act-cat-var   { --act-color: #9a2ae8; }
-.n8n-act-cat-notif { --act-color: #2ae890; }
-.n8n-act-cat-sys   { --act-color: #8888a0; }
+.n8n-act-cat-kbd    { --act-color: #e87d2a; }
+.n8n-act-cat-mouse  { --act-color: #2a86e8; }
+.n8n-act-cat-wait   { --act-color: #6e6e9a; }
+.n8n-act-cat-ctrl   { --act-color: #e8352a; }
+.n8n-act-cat-var    { --act-color: #9a2ae8; }
+.n8n-act-cat-notif  { --act-color: #2ae890; }
+.n8n-act-cat-sys    { --act-color: #8888a0; }
+.n8n-act-cat-autoclk { --act-color: #e8c42a; }
 
 /* Action node — no body section, compact */
 .n8n-act-node .n8n-node-header { border-bottom: none; border-left: 3px solid var(--act-color, var(--border)); }
@@ -1659,13 +1660,22 @@ kbd {
 }
 
 /* Category icon backgrounds */
-.n8n-act-icon-kbd   { background: linear-gradient(135deg, #e87d2a, #c05c0a) !important; }
-.n8n-act-icon-mouse { background: linear-gradient(135deg, #2a86e8, #1a5ab5) !important; }
-.n8n-act-icon-wait  { background: linear-gradient(135deg, #6e6e9a, #4a4a6a) !important; }
-.n8n-act-icon-ctrl  { background: linear-gradient(135deg, #e8352a, #b02018) !important; }
-.n8n-act-icon-var   { background: linear-gradient(135deg, #9a2ae8, #6a10b0) !important; }
-.n8n-act-icon-notif { background: linear-gradient(135deg, #2ae890, #10b050) !important; }
-.n8n-act-icon-sys   { background: linear-gradient(135deg, #6888a0, #3a5060) !important; }
+.n8n-act-icon-kbd    { background: linear-gradient(135deg, #e87d2a, #c05c0a) !important; }
+.n8n-act-icon-mouse  { background: linear-gradient(135deg, #2a86e8, #1a5ab5) !important; }
+.n8n-act-icon-wait   { background: linear-gradient(135deg, #6e6e9a, #4a4a6a) !important; }
+.n8n-act-icon-ctrl   { background: linear-gradient(135deg, #e8352a, #b02018) !important; }
+.n8n-act-icon-var    { background: linear-gradient(135deg, #9a2ae8, #6a10b0) !important; }
+.n8n-act-icon-notif  { background: linear-gradient(135deg, #2ae890, #10b050) !important; }
+.n8n-act-icon-sys    { background: linear-gradient(135deg, #6888a0, #3a5060) !important; }
+.n8n-act-icon-autoclk { background: linear-gradient(135deg, #e8c42a, #b08a10) !important; }
+
+/* Auto-clicker inline fields */
+.ac-row { flex-wrap: wrap; gap: 5px; }
+.ac-section-lbl { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; min-width: 60px; }
+.ac-narrow { width: 46px !important; text-align: center; padding: 2px 4px; }
+.ac-mid    { width: 62px !important; text-align: center; padding: 2px 4px; }
+.ac-unit   { font-size: 10px; color: var(--text-3); margin-left: -2px; }
+.ac-chk-lbl { display: flex; align-items: center; gap: 4px; font-size: 11px; white-space: nowrap; }
 
 /* Drag handle on action nodes */
 .n8n-act-drag-handle { cursor: grab; }

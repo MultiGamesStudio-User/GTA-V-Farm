@@ -226,6 +226,7 @@ function _actCategory(type) {
   if (['macro_start','macro_stop','stop_self','repeat'].includes(type)) return 'ctrl';
   if (['set_variable','counter_set','counter_inc','counter_dec','counter_reset'].includes(type)) return 'var';
   if (['send_webhook','log_message','notify_toast','play_sound'].includes(type)) return 'notif';
+  if (['auto_clicker'].includes(type)) return 'autoclk';
   return 'sys';
 }
 
@@ -238,7 +239,8 @@ function _actIconSVG(type) {
     ctrl:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
     var:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
     notif: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
-    sys:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>`,
+    sys:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>`,
+    autoclk: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M12 2a6 6 0 0 1 6 6v8a6 6 0 0 1-12 0V8a6 6 0 0 1 6-6z"/><line x1="12" y1="2" x2="12" y2="9"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`,
   };
   return icons[_actCategory(type)] || icons.sys;
 }
@@ -619,6 +621,8 @@ const ACT_LABELS = {
   // Système
   focus_window: 'Focus fenêtre', screenshot_save: 'Sauvegarder screenshot',
   clipboard_set: 'Copier presse-papier',
+  // Auto-clic
+  auto_clicker: '🖱️ Auto Clicker',
 };
 
 /* ── Editor form ──────────────────────────────────────────── */
@@ -1615,7 +1619,77 @@ function renderActionInlineFields(a) {
       <textarea class="af actions-json" style="width:100%;min-height:80px;font-family:monospace;font-size:11px;resize:vertical" onchange="syncRepeatActions(this)">${escHtml(actJson)}</textarea>
     </div>`;
   }
+  if (t === 'auto_clicker') {
+    const isCount    = (a.repeat_mode || 'until_stopped') === 'count';
+    const isPick     = (a.position_mode || 'current') === 'pick';
+    const hasOffset  = !!a.random_offset;
+    return `
+    <div class="fields-row ac-row">
+      <span class="ac-section-lbl">Intervalle</span>
+      <input type="number" class="af interval_h ac-narrow" value="${a.interval_h || 0}" min="0" onchange="syncActField(this,'interval_h',true)" title="Heures"><span class="ac-unit">h</span>
+      <input type="number" class="af interval_m ac-narrow" value="${a.interval_m || 0}" min="0" max="59" onchange="syncActField(this,'interval_m',true)" title="Minutes"><span class="ac-unit">m</span>
+      <input type="number" class="af interval_s ac-narrow" value="${a.interval_s || 0}" min="0" max="59" onchange="syncActField(this,'interval_s',true)" title="Secondes"><span class="ac-unit">s</span>
+      <input type="number" class="af interval_ms ac-mid" value="${a.interval_ms != null ? a.interval_ms : 100}" min="1" max="999" onchange="syncActField(this,'interval_ms',true)" title="Millisecondes"><span class="ac-unit">ms</span>
+    </div>
+    <div class="fields-row ac-row">
+      <label class="ac-chk-lbl"><input type="checkbox" class="af random_offset" ${hasOffset ? 'checked' : ''} onchange="syncActField(this,'random_offset',false,'check');_acToggleOffset(this)"> Offset aléatoire ±</label>
+      <input type="number" class="af random_offset_ms ac-mid" value="${a.random_offset_ms != null ? a.random_offset_ms : 40}" min="0" onchange="syncActField(this,'random_offset_ms',true)" ${hasOffset ? '' : 'disabled'}><span class="ac-unit">ms</span>
+    </div>
+    <div class="fields-row ac-row">
+      <span class="ac-section-lbl">Bouton</span>
+      <select class="af button" onchange="syncActField(this,'button')">
+        <option value="left"   ${(a.button || 'left') === 'left'   ? 'selected' : ''}>Gauche</option>
+        <option value="right"  ${a.button === 'right'              ? 'selected' : ''}>Droit</option>
+        <option value="middle" ${a.button === 'middle'             ? 'selected' : ''}>Milieu</option>
+      </select>
+      <span>Type</span>
+      <select class="af click_type" onchange="syncActField(this,'click_type')">
+        <option value="single" ${(a.click_type || 'single') === 'single' ? 'selected' : ''}>Simple</option>
+        <option value="double" ${a.click_type === 'double'               ? 'selected' : ''}>Double</option>
+        <option value="triple" ${a.click_type === 'triple'               ? 'selected' : ''}>Triple</option>
+      </select>
+    </div>
+    <div class="fields-row ac-row">
+      <span class="ac-section-lbl">Répétition</span>
+      <select class="af repeat_mode" onchange="syncActField(this,'repeat_mode');_acToggleRepeat(this)">
+        <option value="until_stopped" ${!isCount ? 'selected' : ''}>Jusqu'à arrêt</option>
+        <option value="count"         ${isCount  ? 'selected' : ''}>Nombre de fois</option>
+      </select>
+      <input type="number" class="af repeat_count ac-mid" value="${a.repeat_count || 1}" min="1" onchange="syncActField(this,'repeat_count',true)" ${isCount ? '' : 'disabled'} title="Répétitions">
+    </div>
+    <div class="fields-row ac-row">
+      <span class="ac-section-lbl">Position</span>
+      <select class="af position_mode" onchange="syncActField(this,'position_mode');_acTogglePosition(this)">
+        <option value="current" ${!isPick ? 'selected' : ''}>Position actuelle</option>
+        <option value="pick"    ${isPick  ? 'selected' : ''}>Point fixe</option>
+      </select>
+      <span class="ac-pos-fields" style="display:${isPick ? 'contents' : 'none'}">
+        <span>X</span><input type="number" class="af x ac-narrow" value="${a.x || 0}" onchange="syncActField(this,'x',true)">
+        <span>Y</span><input type="number" class="af y ac-narrow" value="${a.y || 0}" onchange="syncActField(this,'y',true)">
+        <button class="pick-btn" onclick="pickPointForActField(this)" title="Choisir un point">🎯</button>
+      </span>
+    </div>`;
+  }
   return '';
+}
+
+function _acToggleOffset(chk) {
+  const row = chk.closest('.ac-row');
+  if (!row) return;
+  const inp = row.querySelector('.random_offset_ms');
+  if (inp) inp.disabled = !chk.checked;
+}
+function _acToggleRepeat(sel) {
+  const row = sel.closest('.ac-row');
+  if (!row) return;
+  const inp = row.querySelector('.repeat_count');
+  if (inp) inp.disabled = sel.value !== 'count';
+}
+function _acTogglePosition(sel) {
+  const row = sel.closest('.ac-row');
+  if (!row) return;
+  const posFields = row.querySelector('.ac-pos-fields');
+  if (posFields) posFields.style.display = sel.value === 'pick' ? 'contents' : 'none';
 }
 
 function syncActField(inputEl, field, isNum, inputType) {
