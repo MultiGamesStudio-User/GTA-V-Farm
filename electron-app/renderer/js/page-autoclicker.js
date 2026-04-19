@@ -126,7 +126,7 @@ function _acpToggleRepeat() {
 function _acpTogglePosition() {
   const mode   = document.getElementById('acp-pos-mode').value;
   const fields = document.getElementById('acp-pos-fields');
-  fields.style.display = mode === 'pick' ? 'flex' : 'none';
+  fields.style.display = (mode === 'pick' || mode === 'pick_app') ? 'flex' : 'none';
 }
 
 async function _acpPickPoint() {
