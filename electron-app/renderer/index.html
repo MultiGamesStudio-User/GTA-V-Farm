@@ -99,6 +99,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         <span>Fenêtres</span>
       </a>
+      <a class="nav-item" data-page="fishing" title="Bot Pêche">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/><path d="M8 2c0 0 1 3 4 3s4-3 4-3"/></svg>
+        <span>Pêche Auto</span>
+      </a>
       <a class="nav-item" data-page="logs" title="Console">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
         <span>Console</span>
@@ -318,6 +322,42 @@
               <div id="rules-container" class="rules-container"></div>
             </div>
 
+            <!-- Advanced: start_guard -->
+            <div class="editor-section advanced-macro-section">
+              <div class="editor-section-header">
+                <span>🛡️ Conditions de garde (Start Guard)</span>
+                <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
+                  <button class="btn btn-xs btn-secondary" onclick="addSectionCond('start_guard')">+ Condition</button>
+                </div>
+              </div>
+              <div class="advanced-section-hint">Toutes doivent être vraies avant chaque itération de boucle</div>
+              <div id="guard-conditions-list" class="cond-list"></div>
+            </div>
+
+            <!-- Advanced: stop_conditions -->
+            <div class="editor-section advanced-macro-section">
+              <div class="editor-section-header">
+                <span>🛑 Conditions d'arrêt auto (Stop Conditions)</span>
+                <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
+                  <button class="btn btn-xs btn-secondary" onclick="addSectionCond('stop_conditions')">+ Condition</button>
+                </div>
+              </div>
+              <div class="advanced-section-hint">Dès qu'une est vraie → arrêt automatique de la macro</div>
+              <div id="stop-conditions-list" class="cond-list"></div>
+            </div>
+
+            <!-- Advanced: pre_stop_actions -->
+            <div class="editor-section advanced-macro-section">
+              <div class="editor-section-header">
+                <span>🧹 Actions pré-arrêt (Cleanup)</span>
+                <div style="display:flex;gap:5px;align-items:center;margin-left:auto">
+                  <button class="btn btn-xs btn-secondary" onclick="addSectionAct('pre_stop_actions')">+ Action</button>
+                </div>
+              </div>
+              <div class="advanced-section-hint">Actions exécutées juste avant l'arrêt de la macro</div>
+              <div id="pre-stop-actions-list" class="act-list"></div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -339,6 +379,7 @@
                 <option value="pixel_color">Couleur d'un pixel</option>
                 <option value="pixel_color_not">Couleur d'un pixel ≠</option>
                 <option value="pixel_changed">Pixel a changé (snapshot)</option>
+                <option value="pixel_not_changed">Pixel n'a pas changé</option>
                 <option value="region_color_avg">Couleur moyenne d'une zone</option>
                 <option value="text_contains">Texte contient (OCR)</option>
                 <option value="text_not_contains">Texte ne contient pas (OCR)</option>
@@ -475,6 +516,7 @@
                 <option value="macro_start">Lancer une macro</option>
                 <option value="macro_stop">Arrêter une macro</option>
                 <option value="stop_self">Arrêter cette macro</option>
+                <option value="repeat">Répéter un bloc d'actions</option>
               </optgroup>
               <optgroup label="─── Variables &amp; Compteurs">
                 <option value="set_variable">Définir variable</option>
@@ -669,6 +711,118 @@
       </div>
     </section>
 
+    <!-- ═══════════════════ FISHING BOT ══════════════════════ -->
+    <section class="page" id="page-fishing">
+      <div class="page-header">
+        <h1>Pêche Automatique</h1>
+        <div class="header-actions">
+          <button class="btn btn-secondary" onclick="fishingSnapshot()" id="fish-btn-snapshot" title="Tester la détection en direct">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Tester
+          </button>
+          <button class="btn btn-success" id="fish-btn-start" onclick="fishingStart()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Démarrer
+          </button>
+          <button class="btn btn-danger" id="fish-btn-stop" onclick="fishingStop()" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            Arrêter
+          </button>
+        </div>
+      </div>
+
+      <!-- Big status area -->
+      <div id="fish-status-banner" class="fish-status-banner fish-idle">
+        <div class="fish-status-dot"></div>
+        <div class="fish-status-info">
+          <span id="fish-status-text">En attente — cliquez Démarrer</span>
+          <span id="fish-ring-info" class="fish-ring-info"></span>
+        </div>
+        <span id="fish-last-key" class="fish-last-key"></span>
+      </div>
+
+      <!-- Stats cards -->
+      <div class="fish-stats-row">
+        <div class="fish-stat-card">
+          <div class="fish-stat-val" id="fish-stat-presses">0</div>
+          <div class="fish-stat-label">Appuis</div>
+        </div>
+        <div class="fish-stat-card">
+          <div class="fish-stat-val" id="fish-stat-detections">0</div>
+          <div class="fish-stat-label">Entrées zone</div>
+        </div>
+        <div class="fish-stat-card fish-stat-ring" id="fish-stat-ring-card">
+          <div class="fish-stat-val" id="fish-ring-status-icon">⬛</div>
+          <div class="fish-stat-label">Anneau détecté</div>
+        </div>
+      </div>
+
+      <!-- Snapshot result -->
+      <div id="fish-snapshot-result" class="fish-snapshot-result" style="display:none;margin-top:10px"></div>
+
+      <!-- Zone de capture -->
+      <div class="editor-section" style="margin-top:1.2rem">
+        <div class="editor-section-header"><span>Zone de capture</span></div>
+        <div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-top:.4rem">
+          <button class="btn btn-secondary btn-sm" onclick="fishingPickZone()" title="Sélectionner la zone où l'anneau apparaît">
+            🎯 Définir la zone
+          </button>
+          <button class="btn btn-secondary btn-sm" id="fish-zone-clear" onclick="fishingClearZone()" style="display:none" title="Revenir à la détection plein écran">
+            ✕ Réinitialiser
+          </button>
+          <span id="fish-zone-label" class="fish-zone-label zone-auto">Auto (centre écran)</span>
+        </div>
+        <p class="fish-zone-hint">Dessine un rectangle autour de l'anneau de pêche pour améliorer la détection. Moins de zone = moins de faux positifs.</p>
+      </div>
+
+      <!-- Options avancées (collapsible) -->
+      <div class="editor-section" style="margin-top:1.2rem">
+        <div class="editor-section-header" style="cursor:pointer" onclick="fishingToggleAdv()">
+          <span>Options avancées</span>
+          <svg id="fish-adv-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="fish-adv-body" style="display:none;margin-top:.5rem">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Polling (ms)</label>
+              <input type="number" id="fish-poll-ms" value="30" min="10" max="500" step="5" oninput="fishingSaveConfig()">
+            </div>
+            <div class="form-group">
+              <label>Cooldown (ms)</label>
+              <input type="number" id="fish-cooldown" value="600" min="100" step="50" oninput="fishingSaveConfig()">
+            </div>
+            <div class="form-group">
+              <label title="Marge en pixels autour de la zone cible">Tolérance (px)</label>
+              <input type="number" id="fish-tolerance" value="10" min="1" max="45" step="1" oninput="fishingSaveConfig()">
+            </div>
+            <div class="form-group">
+              <label title="Si l'OCR ne lit pas la touche, utilise cette lettre (ex: e, space)">Touche par défaut</label>
+              <input type="text" id="fish-default-key" value="" maxlength="5" placeholder="ex: e" style="text-transform:uppercase" oninput="fishingSaveConfig()">
+            </div>
+            <div class="form-group form-group-check">
+              <label class="check-label">
+                <input type="checkbox" id="fish-direct" checked onchange="fishingSaveConfig()">
+                DirectInput
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- How-to -->
+      <div class="editor-section" style="margin-top:.8rem">
+        <div class="editor-section-header"><span>Utilisation</span></div>
+        <div class="fish-hint">
+          <ol>
+            <li>Lance GTA V, équipe une canne à pêche et jette la ligne.</li>
+            <li>Dès que l'anneau apparaît à l'écran, clique <strong>Démarrer</strong> ici.</li>
+            <li>Le bot détecte automatiquement l'anneau, la zone cyan et la touche à appuyer.</li>
+            <li>Il appuie tout seul à chaque bonne fenêtre — tu n'as rien à faire.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -684,6 +838,7 @@
 <script src="js/page-conditions.js"></script>
 <script src="js/page-actions.js"></script>
 <script src="js/page-windows.js"></script>
+<script src="js/page-fishing.js"></script>
 </body>
 </html>
 

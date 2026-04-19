@@ -6,9 +6,13 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --inspect",
+    "check-icons": "node scripts/generate-icons.js",
     "prepare-python": "node scripts/prepare-python.js",
-    "build": "npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win portable",
-    "build-installer": "npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win nsis"
+    "build": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win --publish=never",
+    "build-nsis": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win nsis --publish=never",
+    "build-portable": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win portable --publish=never",
+    "release": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win --publish=always",
+    "release-prepare": "node scripts/release.js"
   },
   "keywords": [
     "macro",
@@ -53,26 +57,46 @@
       }
     ],
     "win": {
-      "icon": null,
+      "icon": "assets/icon.ico",
+      "certificateFile": null,
+      "certificatePassword": null,
       "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
         {
           "target": "portable",
           "arch": [
             "x64"
           ]
         }
-      ],
-      "artifactName": "MacroEngine-Portable.exe"
+      ]
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": null,
-      "artifactName": "MacroEngine-Setup.exe"
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MacroEngine",
+      "installerIcon": "assets/installer-icon.ico",
+      "uninstallerIcon": "assets/uninstaller-icon.ico",
+      "installerHeaderIcon": "assets/installer-header.ico",
+      "include": "installer/installer.nsh"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Multigames-studio",
+      "repo": "GTA-V-FARM",
+      "releaseType": "release"
     }
   },
   "devDependencies": {
     "electron": "^28.3.3",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "electron-updater": "^6.1.7"
   }
 }

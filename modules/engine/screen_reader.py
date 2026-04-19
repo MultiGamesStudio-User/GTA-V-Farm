@@ -5,18 +5,26 @@ Nouvelles fonctions :
   - get_primary_screen_size()  → (largeur, hauteur) du moniteur principal
   - get_all_monitors()         → liste complète de tous les moniteurs
 """
+import threading
 import numpy as np
 import mss
 import cv2
 from PIL import Image
 
-_sct = mss.mss()
+_tls = threading.local()
+
+
+def _get_sct():
+    """Return a per-thread mss instance (Windows DCs are thread-local)."""
+    if not hasattr(_tls, 'sct'):
+        _tls.sct = mss.mss()
+    return _tls.sct
 
 
 def capture_region(x: int, y: int, w: int, h: int) -> np.ndarray:
     """Capture a screen region and return BGR numpy array."""
     mon = {'left': x, 'top': y, 'width': w, 'height': h}
-    raw = _sct.grab(mon)
+    raw = _get_sct().grab(mon)
     img = np.frombuffer(raw.rgb, dtype=np.uint8).reshape(raw.height, raw.width, 3)
     return cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 

@@ -23,6 +23,7 @@ function navigate(page) {
   if (page === 'macros')     renderMacroList();
   if (page === 'dashboard')  renderDashboard();
   if (page === 'syslog')     refreshSyslog();
+  if (page === 'fishing' && typeof initFishingPage === 'function') initFishingPage();
 
   // Persist last page
   _saveUiPref('lastPage', page);
@@ -206,6 +207,7 @@ async function init() {
   /* Engine events */
   setupEngineEvents();
   setupRecordingEvents();
+  if (typeof setupFishingEvents === 'function') setupFishingEvents();
 
   /* Load macros */
   await loadMacros();

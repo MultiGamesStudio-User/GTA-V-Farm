@@ -73,9 +73,13 @@ async function checkForUpdates(botDir, onProgress) {
   const manifest = await fetchManifest();
   const { version, files } = manifest;
 
+  // Fichiers exclus de la mise à jour automatique (modifiés localement)
+  const SKIP_FILES = new Set(['main.py', 'modules/engine/fishing.py', 'modules/engine/screen_reader.py']);
+
   // Comparer les hashes
   const toUpdate = [];
   for (const [relPath, expectedHash] of Object.entries(files)) {
+    if (SKIP_FILES.has(relPath)) continue;
     const localPath = path.join(botDir, relPath);
     if (fileHash(localPath) !== expectedHash) {
       toUpdate.push(relPath);

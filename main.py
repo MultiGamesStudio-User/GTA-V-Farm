@@ -662,6 +662,46 @@ _DISPATCH = {
     'send_webhook':         _cmd_send_webhook,
 }
 
+# ── Fishing bot ───────────────────────────────────────────────────────────────
+_fishing_bot = None
+
+def _cmd_fishing_start(cmd, rid):
+    global _fishing_bot
+    if _fishing_bot and _fishing_bot.is_running():
+        _reply(rid, False, error='FishingBot déjà en cours'); return
+    def _on_log(msg, lvl):   _send({'type': 'log', 'level': lvl, 'msg': msg})
+    def _on_press(key):      _send({'type': 'fishing_press', 'key': key})
+    def _on_stats(stats):    _send({'type': 'fishing_stats', **stats})
+    from modules.engine.fishing import FishingBot
+    _fishing_bot = FishingBot(cmd.get('config', {}),
+                              on_log=_on_log, on_press=_on_press, on_stats=_on_stats)
+    _fishing_bot.start()
+    _reply(rid, True)
+
+def _cmd_fishing_stop(cmd, rid):
+    global _fishing_bot
+    if not _fishing_bot or not _fishing_bot.is_running():
+        _reply(rid, False, error='FishingBot non actif'); return
+    _fishing_bot.stop()
+    stats = _fishing_bot.get_stats()
+    _fishing_bot = None
+    _reply(rid, True, stats=stats)
+
+def _cmd_fishing_status(cmd, rid):
+    running = _fishing_bot is not None and _fishing_bot.is_running()
+    _reply(rid, True, running=running,
+           stats=_fishing_bot.get_stats() if running else {})
+
+def _cmd_fishing_snapshot(cmd, rid):
+    from modules.engine.fishing import snapshot_ring
+    _reply(rid, True, **snapshot_ring(cmd.get('config')))
+
+# Enregistrer les commandes fishing dans le dispatch
+_DISPATCH['fishing_start']    = _cmd_fishing_start
+_DISPATCH['fishing_stop']     = _cmd_fishing_stop
+_DISPATCH['fishing_status']   = _cmd_fishing_status
+_DISPATCH['fishing_snapshot'] = _cmd_fishing_snapshot
+
 def _handle(cmd: dict):
     c   = cmd.get('cmd', '')
     rid = cmd.get('id', '')

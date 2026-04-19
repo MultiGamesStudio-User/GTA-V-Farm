@@ -169,6 +169,18 @@ function buildActTestForm(type) {
   if (type === 'stop_self') {
     return `<div class="form-row"><span style="color:var(--text-2);font-size:12px">Arrête la macro courante immédiatement.</span></div>`;
   }
+  if (type === 'repeat') {
+    return `<div class="form-row">
+      <div class="form-group"><label>Répétitions</label><input type="number" id="at-count" value="3" min="1"></div>
+      <div class="form-group"><label>Délai entre (s)</label><input type="number" id="at-delay" value="0" min="0" step="0.1"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group flex-2">
+        <label>Sous-actions (JSON)</label>
+        <textarea id="at-actions-json" style="width:100%;min-height:80px;font-family:monospace;font-size:12px;resize:vertical">[{"type":"key_tap","key":"e"},{"type":"wait","duration":0.3}]</textarea>
+      </div>
+    </div>`;
+  }
   return '';
 }
 
@@ -210,6 +222,10 @@ function getActTestObj() {
   if (g('at-name') && g('at-name').trim())  obj.name  = g('at-name');
   if (g('at-value') !== null && g('at-value') !== '') obj.value = g('at-value');
   if (gn('at-amount') !== null) obj.amount = gn('at-amount');
+  // Repeat
+  if (gn('at-delay') !== null) obj.delay = gn('at-delay');
+  const actJson = g('at-actions-json');
+  if (actJson) { try { obj.actions = JSON.parse(actJson); } catch (_) {} }
   return obj;
 }
 

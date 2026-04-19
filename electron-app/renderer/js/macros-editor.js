@@ -6,7 +6,7 @@
 const COND_LABELS = {
   // Vision
   pixel_color: 'Pixel couleur', pixel_color_not: 'Pixel couleur ≠',
-  pixel_changed: 'Pixel a changé',
+  pixel_changed: 'Pixel a changé', pixel_not_changed: 'Pixel n\'a pas changé',
   region_color_avg: 'Couleur moyenne zone',
   text_contains: 'Texte contient', text_not_contains: 'Texte ≠',
   text_regex: 'Texte regex',
@@ -49,6 +49,8 @@ const ACT_LABELS = {
   // Notifications
   send_webhook: '🔔 Envoyer webhook', log_message: '📝 Log message',
   notify_toast: '💬 Notification Windows', play_sound: '🔊 Jouer son',
+  // Flux
+  repeat: '🔁 Répéter bloc',
   // Système
   focus_window: 'Focus fenêtre', screenshot_save: 'Sauvegarder screenshot',
   clipboard_set: 'Copier presse-papier',
@@ -79,6 +81,7 @@ function renderMacroEditor() {
     _populateWindowScopeDropdown(scopeEl, macro.target_hwnd);
   }
   renderRules();
+  renderAdvancedSections();
   updateMacroRunButtons();
 }
 
@@ -435,9 +438,15 @@ function renderConditionInlineFields(c) {
 function syncCondField(inputEl, field, isNum, inputType) {
   const row = inputEl.closest('.item-row');
   if (!row) return;
-  const [, ri, ci] = row.id.split('-').map(Number);
-  if (currentMacroIdx < 0) return;
-  const c = macros[currentMacroIdx]?.rules[ri]?.conditions[ci];
+  let c;
+  const section = row.dataset.section;
+  if (section) {
+    const idx = parseInt(row.dataset.idx);
+    c = macros[currentMacroIdx]?.[section]?.[idx];
+  } else {
+    const [, ri, ci] = row.id.split('-').map(Number);
+    c = macros[currentMacroIdx]?.rules[ri]?.conditions[ci];
+  }
   if (!c) return;
   if (inputType === 'color') c[field] = hexToRgb(inputEl.value);
   else if (isNum) c[field] = parseFloat(inputEl.value);
@@ -447,9 +456,15 @@ function syncCondField(inputEl, field, isNum, inputType) {
 function syncCondProbability(inputEl) {
   const row = inputEl.closest('.item-row');
   if (!row) return;
-  const [, ri, ci] = row.id.split('-').map(Number);
-  if (currentMacroIdx < 0) return;
-  const c = macros[currentMacroIdx]?.rules[ri]?.conditions[ci];
+  let c;
+  const section = row.dataset.section;
+  if (section) {
+    const idx = parseInt(row.dataset.idx);
+    c = macros[currentMacroIdx]?.[section]?.[idx];
+  } else {
+    const [, ri, ci] = row.id.split('-').map(Number);
+    c = macros[currentMacroIdx]?.rules[ri]?.conditions[ci];
+  }
   if (!c) return;
   c.probability = Math.max(0, Math.min(100, parseFloat(inputEl.value) || 0)) / 100;
 }
@@ -511,6 +526,7 @@ const COND_DEFAULTS = {
   key_not_held:     { key: 'f' },
   clipboard_contains:{ text: '' },
   pixel_changed:    { x: 0, y: 0, tolerance: 10 },
+  pixel_not_changed: { x: 0, y: 0, tolerance: 10 },
 };
 
 function setCondType(ri, ci, type) {
@@ -764,15 +780,32 @@ function renderActionInlineFields(a) {
   if (t === 'stop_self') {
     return `<div class="fields-row"><span style="color:var(--text-3);font-size:11px">Arrête immédiatement cette macro.</span></div>`;
   }
+  if (t === 'repeat') {
+    const actJson = JSON.stringify(a.actions || [], null, 2);
+    return `<div class="fields-row">
+      <span>Répétitions</span><input type="number" class="af count" value="${a.count || 1}" min="1" onchange="syncActField(this,'count',true)">
+      <span>Délai (s)</span><input type="number" class="af delay" value="${a.delay || 0}" min="0" step="0.1" onchange="syncActField(this,'delay',true)">
+    </div>
+    <div class="fields-row" style="flex-direction:column;align-items:stretch">
+      <span style="font-size:11px;color:var(--text-3)">Sous-actions (JSON)</span>
+      <textarea class="af actions-json" style="width:100%;min-height:80px;font-family:monospace;font-size:11px;resize:vertical" onchange="syncRepeatActions(this)">${escHtml(actJson)}</textarea>
+    </div>`;
+  }
   return '';
 }
 
 function syncActField(inputEl, field, isNum, inputType) {
   const row = inputEl.closest('.item-row');
   if (!row) return;
-  const [, ri, ai] = row.id.split('-').map(Number);
-  if (currentMacroIdx < 0) return;
-  const a = macros[currentMacroIdx]?.rules[ri]?.actions[ai];
+  let a;
+  const section = row.dataset.section;
+  if (section) {
+    const idx = parseInt(row.dataset.idx);
+    a = macros[currentMacroIdx]?.[section]?.[idx];
+  } else {
+    const [, ri, ai] = row.id.split('-').map(Number);
+    a = macros[currentMacroIdx]?.rules[ri]?.actions[ai];
+  }
   if (!a) return;
   let val;
   if (inputType === 'check') val = inputEl.checked;
@@ -785,9 +818,15 @@ function syncActField(inputEl, field, isNum, inputType) {
 function syncActWebhookMsg(inputEl) {
   const row = inputEl.closest('.item-row');
   if (!row) return;
-  const [, ri, ai] = row.id.split('-').map(Number);
-  if (currentMacroIdx < 0) return;
-  const a = macros[currentMacroIdx]?.rules[ri]?.actions[ai];
+  let a;
+  const section = row.dataset.section;
+  if (section) {
+    const idx = parseInt(row.dataset.idx);
+    a = macros[currentMacroIdx]?.[section]?.[idx];
+  } else {
+    const [, ri, ai] = row.id.split('-').map(Number);
+    a = macros[currentMacroIdx]?.rules[ri]?.actions[ai];
+  }
   if (!a) return;
   const msg = inputEl.value.trim();
   if (msg) {
@@ -907,4 +946,185 @@ function startKeyCapture(input) {
   };
   input.addEventListener('keydown', handler);
   input.addEventListener('blur', blurHandler, { once: true });
+}
+
+/* ── Repeat action: sync nested actions JSON ───────────── */
+function syncRepeatActions(textarea) {
+  const row = textarea.closest('.item-row');
+  if (!row) return;
+  let a;
+  const section = row.dataset.section;
+  if (section) {
+    const idx = parseInt(row.dataset.idx);
+    a = macros[currentMacroIdx]?.[section]?.[idx];
+  } else {
+    const [, ri, ai] = row.id.split('-').map(Number);
+    a = macros[currentMacroIdx]?.rules[ri]?.actions[ai];
+  }
+  if (!a) return;
+  try {
+    a.actions = JSON.parse(textarea.value);
+    textarea.style.borderColor = '';
+  } catch (_) {
+    textarea.style.borderColor = 'var(--danger)';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ADVANCED SECTIONS: start_guard, stop_conditions, pre_stop_actions
+══════════════════════════════════════════════════════════════ */
+
+function renderAdvancedSections() {
+  const macro = macros[currentMacroIdx];
+  if (!macro) return;
+
+  const guardList = document.getElementById('guard-conditions-list');
+  if (guardList) {
+    macro.start_guard = macro.start_guard || [];
+    if (macro.start_guard.length === 0) {
+      guardList.innerHTML = '<div class="empty-mini">Aucune condition de garde</div>';
+    } else {
+      guardList.innerHTML = macro.start_guard.map((c, ci) =>
+        renderSectionCondRow(c, ci, 'start_guard', 'gcrow')).join('');
+    }
+  }
+
+  const stopList = document.getElementById('stop-conditions-list');
+  if (stopList) {
+    macro.stop_conditions = macro.stop_conditions || [];
+    if (macro.stop_conditions.length === 0) {
+      stopList.innerHTML = '<div class="empty-mini">Aucune condition d\'arrêt auto</div>';
+    } else {
+      stopList.innerHTML = macro.stop_conditions.map((c, ci) =>
+        renderSectionCondRow(c, ci, 'stop_conditions', 'scrow')).join('');
+    }
+  }
+
+  const preStopList = document.getElementById('pre-stop-actions-list');
+  if (preStopList) {
+    macro.pre_stop_actions = macro.pre_stop_actions || [];
+    if (macro.pre_stop_actions.length === 0) {
+      preStopList.innerHTML = '<div class="empty-mini">Aucune action de nettoyage</div>';
+    } else {
+      preStopList.innerHTML = macro.pre_stop_actions.map((a, ai) =>
+        renderSectionActRow(a, ai, 'pre_stop_actions', 'parow')).join('');
+    }
+  }
+}
+
+function renderSectionCondRow(c, idx, section, prefix) {
+  const type = c.type || 'pixel_color';
+  return `
+  <div class="item-row" id="${prefix}-${idx}" data-section="${section}" data-idx="${idx}">
+    <div class="item-row-head">
+      <select class="item-type-select" onchange="setSectionCondType('${section}',${idx},this.value)">
+        ${Object.entries(COND_LABELS).map(([k, v]) => `<option value="${k}" ${type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
+      </select>
+      <div class="item-row-btns">
+        <button class="icon-btn" title="Tester" onclick="testSectionCondInline('${section}',${idx})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </button>
+        <button class="icon-btn btn-danger-icon" onclick="deleteSectionCond('${section}',${idx})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="item-fields">${renderConditionInlineFields(c)}</div>
+    <div class="inline-test-result" id="${prefix}-test-${idx}" style="display:none"></div>
+  </div>`;
+}
+
+function renderSectionActRow(a, idx, section, prefix) {
+  const type = a.type || 'key_tap';
+  return `
+  <div class="item-row" id="${prefix}-${idx}" data-section="${section}" data-idx="${idx}">
+    <div class="item-row-head">
+      <select class="item-type-select" onchange="setSectionActType('${section}',${idx},this.value)">
+        ${Object.entries(ACT_LABELS).map(([k, v]) => `<option value="${k}" ${type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
+      </select>
+      <div class="item-row-btns">
+        <button class="icon-btn" title="Exécuter" onclick="execSectionActInline('${section}',${idx})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+        <button class="icon-btn btn-danger-icon" onclick="deleteSectionAct('${section}',${idx})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="item-fields">${renderActionInlineFields(a)}</div>
+  </div>`;
+}
+
+function setSectionCondType(section, idx, type) {
+  if (currentMacroIdx < 0) return;
+  const c = macros[currentMacroIdx][section][idx];
+  c.type = type;
+  const defaults = COND_DEFAULTS[type] || {};
+  for (const [k, v] of Object.entries(defaults)) {
+    if (c[k] === undefined || c[k] === null) c[k] = v;
+  }
+  renderAdvancedSections();
+}
+
+function setSectionActType(section, idx, type) {
+  if (currentMacroIdx < 0) return;
+  macros[currentMacroIdx][section][idx].type = type;
+  renderAdvancedSections();
+}
+
+function addSectionCond(section) {
+  if (currentMacroIdx < 0) return;
+  macros[currentMacroIdx][section] = macros[currentMacroIdx][section] || [];
+  macros[currentMacroIdx][section].push({ type: 'window_focused', title: '' });
+  renderAdvancedSections();
+}
+
+function deleteSectionCond(section, idx) {
+  if (currentMacroIdx < 0) return;
+  macros[currentMacroIdx][section].splice(idx, 1);
+  renderAdvancedSections();
+}
+
+function addSectionAct(section) {
+  if (currentMacroIdx < 0) return;
+  macros[currentMacroIdx][section] = macros[currentMacroIdx][section] || [];
+  macros[currentMacroIdx][section].push({ type: 'key_tap', key: 'escape', duration: 0.05 });
+  renderAdvancedSections();
+}
+
+function deleteSectionAct(section, idx) {
+  if (currentMacroIdx < 0) return;
+  macros[currentMacroIdx][section].splice(idx, 1);
+  renderAdvancedSections();
+}
+
+async function testSectionCondInline(section, idx) {
+  if (currentMacroIdx < 0) return;
+  const cond = macros[currentMacroIdx][section][idx];
+  const prefix = section === 'start_guard' ? 'gcrow' : 'scrow';
+  const resultEl = document.getElementById(`${prefix}-test-${idx}`);
+  if (!resultEl) return;
+  resultEl.style.display = '';
+  resultEl.className = 'inline-test-result testing';
+  resultEl.textContent = 'Test en cours…';
+  try {
+    await ensureEngine();
+    const res = await window.api.testCondition(cond);
+    const ok = res.result === true;
+    resultEl.className = 'inline-test-result ' + (ok ? 'test-ok' : 'test-fail');
+    resultEl.textContent = ok ? '✅ Condition vraie' : '❌ Condition fausse';
+  } catch (e) {
+    resultEl.className = 'inline-test-result test-fail';
+    resultEl.textContent = 'Erreur: ' + e.message;
+  }
+}
+
+async function execSectionActInline(section, idx) {
+  if (currentMacroIdx < 0) return;
+  const action = macros[currentMacroIdx][section][idx];
+  try {
+    await ensureEngine();
+    await window.api.execAction(action);
+    appendLog('INFO', 'Action exécutée: ' + action.type);
+  } catch (e) { appendLog('ERROR', 'Erreur action: ' + e.message); }
 }

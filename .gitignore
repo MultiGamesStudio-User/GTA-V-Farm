@@ -1,7 +1,9 @@
 # ── Dépendances ────────────────────────────────────────────
 node/
+node_modules/
 electron-app/node_modules/
 electron-app/dist/
+electron-app/assets/*.ico
 
 # ── Python embarqué & OCR (téléchargés par le .bat) ────────
 electron-app/python-embed/
@@ -13,22 +15,46 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+dist/
+build/
 
 # ── Modèles ML (trop lourds, téléchargés à l'usage) ────────
 models/
+*.pt
+*.pth
 
 # ── Logs & données runtime ──────────────────────────────────
 *.log
 app.log
+logs/
+*.pid
 
-# ── Fichiers utilisateur (ne pas écraser) ──────────────────
-macros.json
-license.json
-
-# ── OS / IDE ────────────────────────────────────────────────
+# ── Fichiers temporaires ────────────────────────────────────
+*.tmp
+*.bak
+*.swp
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ── IDE & Editor ────────────────────────────────────────────
 .vscode/
+.idea/
 *.suo
 *.user
+*.sln.docstates
+.env.local
+
+# ── OS ──────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+
+# ── Fichiers utilisateur (ne pas écraser) ──────────────────
+# macros.json
+# license.json
+# config.py
+
