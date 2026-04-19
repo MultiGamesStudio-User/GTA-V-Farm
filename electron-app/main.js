@@ -380,10 +380,6 @@ function _dispatchFromEngine(msg) {
     mainWindow?.webContents.send('engine:webhook_error', { msg: msg.msg });
   } else if (msg.type === 'macro_start_request') {
     mainWindow?.webContents.send('engine:macro_start_request', { name: msg.name });
-  } else if (msg.type === 'fishing_press') {
-    mainWindow?.webContents.send('engine:fishing_press', { key: msg.key });
-  } else if (msg.type === 'fishing_stats') {
-    mainWindow?.webContents.send('engine:fishing_stats', msg);
   }
 }
 
@@ -447,8 +443,6 @@ for (const cmd of [
   'record_start', 'record_stop',
   // Webhook
   'set_webhook', 'send_webhook',
-  // Fishing bot
-  'fishing_start', 'fishing_stop', 'fishing_status', 'fishing_snapshot',
   // State / Stats
   'get_stats', 'get_variables', 'set_variable', 'set_counter', 'clear_state',
   // Dead zones

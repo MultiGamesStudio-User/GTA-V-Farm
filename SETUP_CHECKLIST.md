@@ -129,7 +129,6 @@ GTA V FARM/
 ├── 🐍 requirements.txt      ← Python deps
 ├── 🐍 modules/             ← Python engine
 │   └── engine/
-│       ├── fishing.py
 │       ├── screen_reader.py
 │       ├── ocr_engine.py
 │       └── state_machine.py

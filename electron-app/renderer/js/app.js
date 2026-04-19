@@ -23,7 +23,6 @@ function navigate(page) {
   if (page === 'macros')     renderMacroList();
   if (page === 'dashboard')  renderDashboard();
   if (page === 'syslog')     refreshSyslog();
-  if (page === 'fishing' && typeof initFishingPage === 'function') initFishingPage();
 
   // Persist last page
   _saveUiPref('lastPage', page);
@@ -102,6 +101,8 @@ async function checkLicense() {
     return true;
   }
 
+  // Hide splash so the licence modal is fully visible
+  hideSplash();
   // Show modal and wait for valid key
   overlay.style.display = 'flex';
   return new Promise((resolve) => {
@@ -207,8 +208,6 @@ async function init() {
   /* Engine events */
   setupEngineEvents();
   setupRecordingEvents();
-  if (typeof setupFishingEvents === 'function') setupFishingEvents();
-
   /* Load macros */
   await loadMacros();
 

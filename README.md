@@ -127,7 +127,6 @@ GTA V FARM/
 ├── modules/           ← Python engine
 │   ├── screen_reader.py   ← Screenshot capture
 │   ├── ocr_engine.py      ← Text detection
-│   ├── fishing.py         ← Fishing automation
 │   └── state_machine.py   ← Action executor
 ├── main.py            ← Python entry point
 ├── requirements.txt    ← Python dependencies

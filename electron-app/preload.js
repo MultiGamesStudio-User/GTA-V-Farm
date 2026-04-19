@@ -104,14 +104,6 @@ contextBridge.exposeInMainWorld('api', {
   checkLicense:  ()    => ipcRenderer.invoke('license:check'),
   verifyLicense: (key) => ipcRenderer.invoke('license:verify', key),
 
-  // ── Fishing bot ───────────────────────────────────────────
-  fishingStart:    (p) => ipcRenderer.invoke('engine:fishing_start',    p),
-  fishingStop:     (p) => ipcRenderer.invoke('engine:fishing_stop',     p),
-  fishingStatus:   (p) => ipcRenderer.invoke('engine:fishing_status',   p),
-  fishingSnapshot: (p) => ipcRenderer.invoke('engine:fishing_snapshot', p),
-  onFishingPress:  (cb) => ipcRenderer.on('engine:fishing_press', (_, d) => cb(d)),
-  onFishingStats:  (cb) => ipcRenderer.on('engine:fishing_stats', (_, d) => cb(d)),
-
   // ── Log file ──────────────────────────────────────────────
   readLog:   ()  => ipcRenderer.invoke('log:read'),
   openLog:   ()  => ipcRenderer.invoke('log:open'),

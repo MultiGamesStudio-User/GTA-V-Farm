@@ -74,7 +74,7 @@ async function checkForUpdates(botDir, onProgress) {
   const { version, files } = manifest;
 
   // Fichiers exclus de la mise à jour automatique (modifiés localement)
-  const SKIP_FILES = new Set(['main.py', 'modules/engine/fishing.py', 'modules/engine/screen_reader.py']);
+  const SKIP_FILES = new Set(['main.py', 'modules/engine/screen_reader.py']);
 
   // Comparer les hashes
   const toUpdate = [];

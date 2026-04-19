@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'  # Déclenche lors d'un tag (v1.0.0, v2.2.0, etc.)
+  workflow_dispatch:    # Permet de lancer manuellement depuis l'onglet Actions de GitHub
+    inputs:
+      version:
+        description: 'Version (ex: 2.2.0) — laisse vide pour utiliser le tag'
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -56,20 +62,52 @@ jobs:
       - name: 📋 Get version from tag
         id: tag_version
         run: |
-          $version = "${{ github.ref }}".Replace('refs/tags/v', '')
+          if ("${{ github.event_name }}" -eq "workflow_dispatch" -and "${{ github.event.inputs.version }}" -ne "") {
+            $version = "${{ github.event.inputs.version }}"
+          } else {
+            $version = "${{ github.ref }}".Replace('refs/tags/v', '')
+          }
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
 
       - name: 📝 Generate release notes from CHANGELOG
         id: changelog
         run: |
           $content = Get-Content CHANGELOG.md -Raw
-          $content = $content -match '\[.*?\].*?\n(.*?)(?=\n## \[|$)' | Out-Null
-          $notes = $matches[1].Trim()
-          $notes = $notes -replace '`n', '%0A'
-          echo "NOTES=$notes" >> $env:GITHUB_OUTPUT
+          # Extract first section after "## [X.X.X]"
+          if ($content -match '## \[[\d.]+\].*?\n\n([\s\S]*?)(?=\n## \[|\Z)') {
+            $notes = $matches[1].Trim()
+          } else {
+            $notes = "See CHANGELOG.md for details"
+          }
+          # Escape for GitHub output
+          $notes = $notes -replace '"', '\"'
+          echo "NOTES<<EOF" >> $env:GITHUB_OUTPUT
+          echo $notes >> $env:GITHUB_OUTPUT
+          echo "EOF" >> $env:GITHUB_OUTPUT
+
+      - name: � Verify build output
+        working-directory: electron-app
+        run: |
+          Write-Host "=== Contents of dist/ ===" -ForegroundColor Cyan
+          if (Test-Path dist) {
+            Get-ChildItem dist -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
+          } else {
+            Write-Host "❌ dist/ folder does not exist!" -ForegroundColor Red
+            exit 1
+          }
+          if (-not (Test-Path "dist/MacroEngine-Setup.exe")) {
+            Write-Host "❌ MacroEngine-Setup.exe not found!" -ForegroundColor Red
+            exit 1
+          }
+          if (-not (Test-Path "dist/MacroEngine-Portable.exe")) {
+            Write-Host "❌ MacroEngine-Portable.exe not found!" -ForegroundColor Red
+            exit 1
+          }
+          Write-Host "✅ Both EXE files found!" -ForegroundColor Green
 
       - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             electron-app/dist/MacroEngine-Setup.exe
@@ -79,6 +117,16 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 Upload artifacts (manual run)
+        uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: MacroEngine-v${{ steps.tag_version.outputs.VERSION }}
+          path: |
+            electron-app/dist/MacroEngine-Setup.exe
+            electron-app/dist/MacroEngine-Portable.exe
+          retention-days: 7
 
       - name: ✅ Build successful!
         run: |

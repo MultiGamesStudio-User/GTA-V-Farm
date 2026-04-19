@@ -63,7 +63,6 @@ GTA V FARM/
 │   ├── engine/
 │   │   ├── screen_reader.py   ← Screenshot capture
 │   │   ├── ocr_engine.py      ← Tesseract integration
-│   │   ├── fishing.py         ← Fishing module
 │   │   └── state_machine.py   ← Action executor
 │   └── ...
 ├── templates/                  ← Image templates for detection
@@ -78,7 +77,6 @@ GTA V FARM/
     │   └── js/
     │       ├── app.js          ← Main UI logic
     │       ├── macros-editor.js
-    │       ├── page-fishing.js
     │       └── ...
     ├── scripts/
     │   ├── prepare-python.js   ← Download Python/Tesseract
