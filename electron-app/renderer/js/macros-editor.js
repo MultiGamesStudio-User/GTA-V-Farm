@@ -42,11 +42,22 @@ async function saveMacroFromModal() {
 
 /* ── N8N canvas ─────────────────────────────────────────────── */
 let _selectedRuleIdx = -1;
+let _selectedActIdx  = -1;
 
+/* Dispatch: macro-level or rule-level canvas */
 function renderN8nCanvas() {
   const canvas = document.getElementById('n8n-canvas');
   const macro  = macros[currentMacroIdx];
   if (!canvas || !macro) return;
+  if (_selectedRuleIdx >= 0) {
+    _renderRuleCanvas(canvas, macro.rules[_selectedRuleIdx] || {}, _selectedRuleIdx);
+  } else {
+    _renderMacroCanvas(canvas, macro);
+  }
+}
+
+/* Macro-level canvas: CONFIG node + RULE nodes */
+function _renderMacroCanvas(canvas, macro) {
   const rules = macro.rules || [];
   let html = '';
 
@@ -74,12 +85,11 @@ function renderN8nCanvas() {
     </div>
   </div>`;
 
-  // Connector after config node
   html += _n8nConnectorHTML(0);
 
   rules.forEach((rule, ri) => {
-    const condCount = (rule.conditions || []).length;
-    const actCount  = (rule.actions  || []).length;
+    const condCount  = (rule.conditions || []).length;
+    const actCount   = (rule.actions   || []).length;
     const isDisabled = rule.enabled === false;
     html += `<div class="n8n-node n8n-rule-node${isDisabled ? ' n8n-node-disabled' : ''}${_selectedRuleIdx === ri ? ' n8n-selected' : ''}"
         onclick="n8nSelectRule(${ri})" id="n8n-node-${ri}">
@@ -119,6 +129,190 @@ function renderN8nCanvas() {
   canvas.innerHTML = html;
 }
 
+/* Rule-level canvas: RULE header node + ACTION nodes */
+function _renderRuleCanvas(canvas, rule, ri) {
+  const actions = rule.actions || [];
+  let html = '';
+
+  // Rule header node — click → rule overview panel
+  html += `<div class="n8n-node n8n-rule-header-node${_selectedActIdx === -1 ? ' n8n-selected' : ''}"
+      onclick="n8nSelectRuleOverview()" id="n8n-rulenode-hdr">
+    <div class="n8n-node-header">
+      <div class="n8n-node-icon n8n-icon-rule">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      </div>
+      <div class="n8n-node-label">
+        <div class="n8n-node-type">Règle ${ri + 1}</div>
+        <div class="n8n-node-name">${escHtml(rule.label || 'Sans nom')}</div>
+      </div>
+      <div class="n8n-node-btns" onclick="event.stopPropagation()">
+        <button class="icon-btn" onclick="closeRulePanel()" title="Retour aux règles">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="n8n-node-body">
+      <div class="n8n-node-pills">
+        <span class="n8n-node-pill">${(rule.conditions || []).length} cond.</span>
+        <span class="n8n-node-pill">${rule.condition_mode === 'any' ? '≥1' : rule.condition_mode === 'none' ? 'toujours' : 'tout'}</span>
+        ${rule.stop_on_match ? '<span class="n8n-node-pill">stop</span>' : ''}
+        ${rule.enabled === false ? '<span class="n8n-node-pill" style="color:var(--text-3)">off</span>' : ''}
+      </div>
+    </div>
+  </div>`;
+
+  html += _n8nActConnectorHTML(0);
+
+  actions.forEach((a, ai) => {
+    const label   = ACT_LABELS[a.type] || a.type;
+    const summary = _actionNodeSummary(a);
+    const cat     = _actCategory(a.type);
+    html += `<div class="n8n-node n8n-act-node n8n-act-cat-${cat}${_selectedActIdx === ai ? ' n8n-selected' : ''}"
+        id="n8n-act-node-${ai}" onclick="n8nSelectAct(${ai})" draggable="true" data-ai="${ai}">
+      <div class="n8n-node-header">
+        <div class="n8n-act-drag-handle n8n-node-icon n8n-act-icon-${cat}" onclick="event.stopPropagation()" title="Glisser pour déplacer">
+          ${_actIconSVG(a.type)}
+        </div>
+        <div class="n8n-node-label">
+          <div class="n8n-node-type">${escHtml(label)}</div>
+          ${summary ? `<div class="n8n-act-summary">${escHtml(summary)}</div>` : ''}
+        </div>
+        <div class="n8n-node-btns" onclick="event.stopPropagation()">
+          <button class="icon-btn btn-danger-icon" onclick="deleteAction(${ri},${ai})" title="Supprimer action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>`;
+    html += _n8nActConnectorHTML(ai + 1);
+  });
+
+  if (actions.length === 0) {
+    html += `<div class="n8n-canvas-empty-hint">Cliquez "+ Action" dans le panneau pour ajouter une action</div>`;
+  }
+
+  canvas.innerHTML = html;
+  _initCanvasActDnD();
+}
+
+/* Brief text summary shown inside each action node */
+function _actionNodeSummary(a) {
+  const t = a.type || 'key_tap';
+  const s = v => String(v ?? '');
+  if (['key_tap', 'key_hold', 'key_release'].includes(t)) return s(a.key);
+  if (t === 'key_combo')        return s(a.keys);
+  if (t === 'type_text')        return `"${s(a.text).slice(0, 22)}"`;
+  if (t === 'wait')             return `${a.duration ?? 0}s`;
+  if (t === 'random_wait')      return `${a.min_s ?? 0}–${a.max_s ?? 0}s`;
+  if (['mouse_move', 'mouse_click', 'mouse_double_click'].includes(t))
+    return `📍 ${a.x ?? '?'}, ${a.y ?? '?'}`;
+  if (t === 'mouse_drag')       return `📍 ${a.x1 ?? 0},${a.y1 ?? 0} → ${a.x2 ?? 0},${a.y2 ?? 0}`;
+  if (t === 'scroll')           return `${a.clicks ?? 3}× ${a.direction || 'down'}`;
+  if (t === 'set_variable')     return `${s(a.name)} = ${s(a.value)}`;
+  if (['counter_inc','counter_dec','counter_set','counter_reset'].includes(t)) return s(a.name);
+  if (['macro_start','macro_stop'].includes(t)) return s(a.name);
+  if (t === 'send_webhook')     return s(a.event);
+  if (t === 'log_message')      return s(a.message).slice(0, 22);
+  return '';
+}
+
+/* Map action type → category key */
+function _actCategory(type) {
+  if (['key_tap','key_hold','key_release','key_combo','type_text'].includes(type)) return 'kbd';
+  if (['mouse_move','mouse_click','mouse_double_click','mouse_drag','scroll'].includes(type)) return 'mouse';
+  if (['wait','random_wait'].includes(type)) return 'wait';
+  if (['macro_start','macro_stop','stop_self','repeat'].includes(type)) return 'ctrl';
+  if (['set_variable','counter_set','counter_inc','counter_dec','counter_reset'].includes(type)) return 'var';
+  if (['send_webhook','log_message','notify_toast','play_sound'].includes(type)) return 'notif';
+  return 'sys';
+}
+
+/* SVG icon for each action category */
+function _actIconSVG(type) {
+  const icons = {
+    kbd:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M6 11h0M10 11h0M14 11h0M18 11h0M6 15h12"/></svg>`,
+    mouse: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M12 2a6 6 0 0 1 6 6v8a6 6 0 0 1-12 0V8a6 6 0 0 1 6-6z"/><line x1="12" y1="2" x2="12" y2="9"/></svg>`,
+    wait:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    ctrl:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+    var:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    notif: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+    sys:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>`,
+  };
+  return icons[_actCategory(type)] || icons.sys;
+}
+
+/* Connector between action nodes (with insert button) */
+function _n8nActConnectorHTML(insertIdx) {
+  return `<div class="n8n-connector">
+    <div class="n8n-conn-line"></div>
+    <button class="n8n-add-btn" title="Insérer une action ici" onclick="addActionAt(${_selectedRuleIdx},${insertIdx})">+</button>
+    <div class="n8n-conn-line"></div>
+  </div>`;
+}
+
+/* Drag-and-drop for action nodes on the canvas */
+let _dndActSrc = -1;
+function _initCanvasActDnD() {
+  const canvas = document.getElementById('n8n-canvas');
+  if (!canvas || canvas._actDndReady) return;
+  canvas._actDndReady = true;
+
+  canvas.addEventListener('dragstart', e => {
+    const node = e.target.closest('.n8n-act-node');
+    if (!node) return;
+    _dndActSrc = parseInt(node.dataset.ai);
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => node.classList.add('dnd-dragging'), 0);
+  });
+
+  canvas.addEventListener('dragover', e => {
+    if (_dndActSrc < 0) return;
+    const node = e.target.closest('.n8n-act-node');
+    canvas.querySelectorAll('.n8n-act-node').forEach(n => n.classList.remove('dnd-over-top', 'dnd-over-bot'));
+    if (!node) return;
+    e.preventDefault();
+    const rect = node.getBoundingClientRect();
+    node.classList.add(e.clientY < rect.top + rect.height / 2 ? 'dnd-over-top' : 'dnd-over-bot');
+  });
+
+  canvas.addEventListener('dragleave', e => {
+    if (!canvas.contains(e.relatedTarget)) {
+      canvas.querySelectorAll('.n8n-act-node').forEach(n => n.classList.remove('dnd-over-top', 'dnd-over-bot'));
+    }
+  });
+
+  canvas.addEventListener('drop', e => {
+    e.preventDefault();
+    const node = e.target.closest('.n8n-act-node');
+    canvas.querySelectorAll('.n8n-act-node').forEach(n => n.classList.remove('dnd-over-top', 'dnd-over-bot', 'dnd-dragging'));
+    if (!node || _dndActSrc < 0) { _dndActSrc = -1; return; }
+    const dropAi = parseInt(node.dataset.ai);
+    if (_dndActSrc === dropAi) { _dndActSrc = -1; return; }
+    const acts = macros[currentMacroIdx]?.rules[_selectedRuleIdx]?.actions;
+    if (!acts) { _dndActSrc = -1; return; }
+    const rect   = node.getBoundingClientRect();
+    const before = e.clientY < rect.top + rect.height / 2;
+    const [moved] = acts.splice(_dndActSrc, 1);
+    let tgt = dropAi > _dndActSrc ? dropAi - 1 : dropAi;
+    if (!before) tgt++;
+    acts.splice(tgt, 0, moved);
+    // Adjust selected index
+    if      (_selectedActIdx === _dndActSrc)                              _selectedActIdx = tgt;
+    else if (_selectedActIdx > _dndActSrc && _selectedActIdx <= tgt)      _selectedActIdx--;
+    else if (_selectedActIdx < _dndActSrc && _selectedActIdx >= tgt)      _selectedActIdx++;
+    _dndActSrc = -1;
+    renderN8nCanvas();
+    if (_selectedActIdx >= 0) renderN8nActPanel(_selectedRuleIdx, _selectedActIdx);
+  });
+
+  canvas.addEventListener('dragend', () => {
+    canvas.querySelectorAll('.n8n-act-node').forEach(n => n.classList.remove('dnd-dragging', 'dnd-over-top', 'dnd-over-bot'));
+    _dndActSrc = -1;
+  });
+}
+
 function _n8nConnectorHTML(insertIdx) {
   return `<div class="n8n-connector">
     <div class="n8n-conn-line"></div>
@@ -129,6 +323,7 @@ function _n8nConnectorHTML(insertIdx) {
 
 function n8nSelectMacroSettings() {
   _selectedRuleIdx = -1;
+  _selectedActIdx  = -1;
   const ruleProps  = document.getElementById('n8n-rule-props');
   const macroProps = document.getElementById('n8n-macro-props');
   if (ruleProps)  ruleProps.style.display = 'none';
@@ -138,20 +333,24 @@ function n8nSelectMacroSettings() {
 
 function n8nSelectRule(ri) {
   _selectedRuleIdx = ri;
+  _selectedActIdx  = -1;
   const ruleProps  = document.getElementById('n8n-rule-props');
   const macroProps = document.getElementById('n8n-macro-props');
   if (macroProps) macroProps.style.display = 'none';
   if (ruleProps)  ruleProps.style.display  = '';
+  // Show rule overview, hide action editor
+  const overview  = document.getElementById('n8n-rule-overview');
+  const actEditor = document.getElementById('n8n-act-editor');
+  if (overview)  overview.style.display  = '';
+  if (actEditor) actEditor.style.display = 'none';
+  // Back bar: "< Macro"
+  const backLabel = document.getElementById('n8n-panel-back-label');
+  if (backLabel) backLabel.textContent = 'Macro';
   const macro = macros[currentMacroIdx];
   const rule  = macro?.rules[ri];
   const titleEl = document.getElementById('n8n-rule-panel-title');
   if (titleEl) titleEl.textContent = rule?.label || `Règle ${ri + 1}`;
-  const content = document.getElementById('n8n-rule-content');
-  if (content && rule) {
-    content.innerHTML = renderRuleHTML(rule, ri);
-    _initRulesDnD();
-    _initItemsDnD();
-  }
+  renderN8nRulePanel(ri);
   renderN8nCanvas();
 }
 
@@ -164,6 +363,179 @@ function deleteSelectedRule() {
   const ri = _selectedRuleIdx;
   closeRulePanel();
   deleteRule(ri);
+}
+
+/* ── N8N panel navigation ──────────────────────────────────── */
+
+/** Back button in rule/action panel header — dispatches based on current view */
+function _n8nBackBtn() {
+  if (_selectedActIdx >= 0) {
+    n8nSelectRuleOverview();
+  } else {
+    closeRulePanel();
+  }
+}
+
+/** Delete button in rule/action panel header — dispatches based on current view */
+function _n8nDelBtn() {
+  if (_selectedActIdx >= 0) {
+    deleteSelectedAct();
+  } else {
+    deleteSelectedRule();
+  }
+}
+
+/** Show rule overview in the right panel (settings + conditions list) */
+function n8nSelectRuleOverview() {
+  _selectedActIdx = -1;
+  const overview  = document.getElementById('n8n-rule-overview');
+  const actEditor = document.getElementById('n8n-act-editor');
+  if (overview)  overview.style.display  = '';
+  if (actEditor) actEditor.style.display = 'none';
+  const backLabel = document.getElementById('n8n-panel-back-label');
+  if (backLabel) backLabel.textContent = 'Macro';
+  if (_selectedRuleIdx >= 0) {
+    const rule = macros[currentMacroIdx]?.rules[_selectedRuleIdx];
+    const titleEl = document.getElementById('n8n-rule-panel-title');
+    if (titleEl) titleEl.textContent = rule?.label || `Règle ${_selectedRuleIdx + 1}`;
+    renderN8nRulePanel(_selectedRuleIdx);
+  }
+  renderN8nCanvas();
+}
+
+/** Select an action node — shows its editor in the right panel */
+function n8nSelectAct(ai) {
+  if (_selectedRuleIdx < 0) return;
+  const rule = macros[currentMacroIdx]?.rules[_selectedRuleIdx];
+  if (!rule || ai < 0 || ai >= (rule.actions || []).length) return;
+  _selectedActIdx = ai;
+  const overview  = document.getElementById('n8n-rule-overview');
+  const actEditor = document.getElementById('n8n-act-editor');
+  if (overview)  overview.style.display  = 'none';
+  if (actEditor) actEditor.style.display = '';
+  const backLabel = document.getElementById('n8n-panel-back-label');
+  if (backLabel) backLabel.textContent = 'Règle';
+  const titleEl = document.getElementById('n8n-rule-panel-title');
+  const label   = ACT_LABELS[rule.actions[ai].type] || rule.actions[ai].type;
+  if (titleEl) titleEl.textContent = label;
+  renderN8nActPanel(_selectedRuleIdx, ai);
+  renderN8nCanvas();
+}
+
+/** Delete the currently selected action and return to rule overview */
+function deleteSelectedAct() {
+  if (_selectedActIdx < 0 || _selectedRuleIdx < 0 || currentMacroIdx < 0) return;
+  macros[currentMacroIdx].rules[_selectedRuleIdx].actions.splice(_selectedActIdx, 1);
+  _selectedActIdx = -1;
+  n8nSelectRuleOverview();
+}
+
+/** Insert a new key_tap action at position idx in rule ri, then select it */
+function addActionAt(ri, idx) {
+  if (currentMacroIdx < 0) return;
+  const acts = macros[currentMacroIdx].rules[ri].actions;
+  acts.splice(idx, 0, { type: 'key_tap', key: 'f', duration: 0.05, count: 1 });
+  if (_selectedActIdx >= idx) _selectedActIdx++;
+  if (ri === _selectedRuleIdx && document.getElementById('n8n-canvas')) {
+    n8nSelectAct(idx);
+    return;
+  }
+  renderRules();
+}
+
+/** Render rule settings + conditions list into #n8n-rule-overview */
+function renderN8nRulePanel(ri) {
+  const container = document.getElementById('n8n-rule-overview');
+  if (!container) return;
+  const rule = macros[currentMacroIdx]?.rules[ri];
+  if (!rule) return;
+  rule.conditions = rule.conditions || [];
+  rule.actions    = rule.actions    || [];
+  const condMode  = rule.condition_mode || 'all';
+
+  container.innerHTML = `
+    <div class="n8n-rule-settings">
+      <div class="n8n-rule-field">
+        <label>Nom</label>
+        <input type="text" value="${escHtml(rule.label || '')}" placeholder="Nom de la règle"
+          oninput="setRuleField(${ri},'label',this.value)">
+      </div>
+      <div class="n8n-rule-field">
+        <label>Mode conditions</label>
+        <select onchange="setRuleField(${ri},'condition_mode',this.value)">
+          <option value="all"  ${condMode === 'all'  ? 'selected' : ''}>Toutes vraies</option>
+          <option value="any"  ${condMode === 'any'  ? 'selected' : ''}>Au moins une</option>
+          <option value="none" ${condMode === 'none' ? 'selected' : ''}>Aucune (toujours)</option>
+        </select>
+      </div>
+      <div class="n8n-rule-toggle-row">
+        <label><input type="checkbox" ${rule.stop_on_match ? 'checked' : ''}
+          onchange="setRuleField(${ri},'stop_on_match',this.checked)"> Stop si match</label>
+        <label><input type="checkbox" ${rule.enabled !== false ? 'checked' : ''}
+          onchange="setRuleField(${ri},'enabled',this.checked)"> Règle active</label>
+      </div>
+    </div>
+    <div class="n8n-panel-section-hdr" style="padding-top:10px">
+      <span class="n8n-panel-section-title">CONDITIONS</span>
+      <button class="btn btn-xs btn-secondary" onclick="addCondition(${ri})">+ Condition</button>
+    </div>
+    <div id="n8n-ro-conds" class="n8n-ro-conds">
+      ${rule.conditions.length === 0
+        ? '<div class="n8n-empty-hint">Pas de condition — règle toujours active</div>'
+        : rule.conditions.map((c, ci) => renderConditionRowHTML(c, ri, ci, rule.conditions.length)).join('')
+      }
+    </div>
+    <div class="n8n-panel-section-hdr" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+      <span class="n8n-panel-section-title">ACTIONS</span>
+      <button class="btn btn-xs btn-secondary" onclick="addAction(${ri})">+ Action</button>
+    </div>
+    <div class="n8n-empty-hint">
+      ${rule.actions.length} action${rule.actions.length !== 1 ? 's' : ''} — cliquez un nœud pour éditer
+    </div>
+  `;
+}
+
+/** Render action type selector + inline fields into #n8n-act-editor */
+function renderN8nActPanel(ri, ai) {
+  const container = document.getElementById('n8n-act-editor');
+  if (!container) return;
+  const rule = macros[currentMacroIdx]?.rules[ri];
+  if (!rule) return;
+  const a     = rule.actions[ai];
+  if (!a) return;
+  const total = rule.actions.length;
+
+  container.innerHTML = `
+    <div class="n8n-act-nav-bar">
+      <button class="icon-btn" onclick="n8nSelectAct(${ai - 1})" ${ai === 0 ? 'disabled' : ''} title="Action précédente">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="18 15 12 9 6 15"/></svg>
+      </button>
+      <span class="n8n-act-nav-label">${ai + 1} / ${total}</span>
+      <button class="icon-btn" onclick="n8nSelectAct(${ai + 1})" ${ai >= total - 1 ? 'disabled' : ''} title="Action suivante">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+    </div>
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+      <label style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Type d'action</label>
+      <select style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:12px;color:var(--text-1)" onchange="setActType(${ri},${ai},this.value)">
+        ${Object.entries(ACT_LABELS).map(([k, v]) => `<option value="${k}" ${a.type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="n8n-act-fields-section">
+      <div class="item-row" id="arow-${ri}-${ai}">
+        <div class="item-fields">${renderActionInlineFields(a)}</div>
+      </div>
+    </div>
+    <div class="n8n-act-actions-bar">
+      <button class="btn btn-xs btn-secondary" onclick="execActionInline(${ri},${ai})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Tester
+      </button>
+      <button class="btn btn-xs btn-secondary" onclick="addActionAt(${ri},${ai + 1})">
+        + Insérer après
+      </button>
+    </div>
+  `;
 }
 
 function addRuleAt(idx) {
@@ -386,11 +758,10 @@ function renderRules() {
     renderN8nCanvas();
     if (_selectedRuleIdx >= 0) {
       const rule = macros[currentMacroIdx]?.rules[_selectedRuleIdx];
-      const content = document.getElementById('n8n-rule-content');
-      if (content && rule) {
-        content.innerHTML = renderRuleHTML(rule, _selectedRuleIdx);
-        _initRulesDnD();
-        _initItemsDnD();
+      if (_selectedActIdx >= 0 && rule) {
+        renderN8nActPanel(_selectedRuleIdx, _selectedActIdx);
+      } else if (rule) {
+        renderN8nRulePanel(_selectedRuleIdx);
         const titleEl = document.getElementById('n8n-rule-panel-title');
         if (titleEl) titleEl.textContent = rule.label || `Règle ${_selectedRuleIdx + 1}`;
       }
@@ -1292,19 +1663,41 @@ function syncActWebhookMsg(inputEl) {
 function setActType(ri, ai, type) {
   if (currentMacroIdx < 0) return;
   macros[currentMacroIdx].rules[ri].actions[ai].type = type;
+  // Update inline fields in action panel
   const fieldsEl = document.querySelector(`#arow-${ri}-${ai} .item-fields`);
   if (fieldsEl) fieldsEl.innerHTML = renderActionInlineFields(macros[currentMacroIdx].rules[ri].actions[ai]);
+  // Refresh canvas node (category/icon/label may change)
+  renderN8nCanvas();
+  // Update panel title if this is the currently displayed action
+  if (_selectedActIdx === ai && _selectedRuleIdx === ri) {
+    const titleEl = document.getElementById('n8n-rule-panel-title');
+    if (titleEl) titleEl.textContent = ACT_LABELS[type] || type;
+  }
 }
 
 function addAction(ri) {
   if (currentMacroIdx < 0) return;
-  macros[currentMacroIdx].rules[ri].actions.push({ type: 'key_tap', key: 'f', duration: 0.05, count: 1 });
+  const acts  = macros[currentMacroIdx].rules[ri].actions;
+  const newAi = acts.length;
+  acts.push({ type: 'key_tap', key: 'f', duration: 0.05, count: 1 });
+  if (ri === _selectedRuleIdx && document.getElementById('n8n-canvas')) {
+    n8nSelectAct(newAi);
+    return;
+  }
   renderRules();
 }
 
 function deleteAction(ri, ai) {
   if (currentMacroIdx < 0) return;
   macros[currentMacroIdx].rules[ri].actions.splice(ai, 1);
+  if (ri === _selectedRuleIdx) {
+    if (_selectedActIdx === ai) {
+      _selectedActIdx = -1;
+      n8nSelectRuleOverview();
+      return;
+    }
+    if (_selectedActIdx > ai) _selectedActIdx--;
+  }
   renderRules();
 }
 

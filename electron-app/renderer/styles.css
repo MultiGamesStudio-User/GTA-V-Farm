@@ -1634,3 +1634,130 @@ kbd {
 
 /* ── Syslog page (couleurs de lignes) ────────────────────────── */
 #syslog-output div { line-height: 1.65; padding: 1px 0; }
+
+/* ══════════════════════════════════════════════════════════════
+   N8N — Action nodes (rule canvas) + Panel sections
+══════════════════════════════════════════════════════════════ */
+
+/* Category CSS vars */
+.n8n-act-cat-kbd   { --act-color: #e87d2a; }
+.n8n-act-cat-mouse { --act-color: #2a86e8; }
+.n8n-act-cat-wait  { --act-color: #6e6e9a; }
+.n8n-act-cat-ctrl  { --act-color: #e8352a; }
+.n8n-act-cat-var   { --act-color: #9a2ae8; }
+.n8n-act-cat-notif { --act-color: #2ae890; }
+.n8n-act-cat-sys   { --act-color: #8888a0; }
+
+/* Action node — no body section, compact */
+.n8n-act-node .n8n-node-header { border-bottom: none; border-left: 3px solid var(--act-color, var(--border)); }
+.n8n-act-node.n8n-selected { border-color: var(--act-color); box-shadow: 0 0 0 3px rgba(255,255,255,.07), 0 8px 28px rgba(0,0,0,.45); }
+
+/* Rule header node shown at top of rule-canvas */
+.n8n-rule-header-node {
+  border-color: rgba(42,134,232,.35);
+  background: linear-gradient(145deg, var(--bg-card) 65%, rgba(42,134,232,.06));
+}
+
+/* Category icon backgrounds */
+.n8n-act-icon-kbd   { background: linear-gradient(135deg, #e87d2a, #c05c0a) !important; }
+.n8n-act-icon-mouse { background: linear-gradient(135deg, #2a86e8, #1a5ab5) !important; }
+.n8n-act-icon-wait  { background: linear-gradient(135deg, #6e6e9a, #4a4a6a) !important; }
+.n8n-act-icon-ctrl  { background: linear-gradient(135deg, #e8352a, #b02018) !important; }
+.n8n-act-icon-var   { background: linear-gradient(135deg, #9a2ae8, #6a10b0) !important; }
+.n8n-act-icon-notif { background: linear-gradient(135deg, #2ae890, #10b050) !important; }
+.n8n-act-icon-sys   { background: linear-gradient(135deg, #6888a0, #3a5060) !important; }
+
+/* Drag handle on action nodes */
+.n8n-act-drag-handle { cursor: grab; }
+.n8n-act-drag-handle:active { cursor: grabbing; }
+
+/* Brief summary text inside action node */
+.n8n-act-summary {
+  font-size: 11px; color: var(--text-2); font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Empty state hint on rule canvas */
+.n8n-canvas-empty-hint {
+  color: var(--text-3); font-size: 11px; text-align: center;
+  padding: 20px; font-style: italic; width: 280px;
+}
+
+/* DnD indicators on action nodes */
+.n8n-act-node.dnd-over-top { border-top: 2px solid var(--act-color, var(--accent)) !important; }
+.n8n-act-node.dnd-over-bot { border-bottom: 2px solid var(--act-color, var(--accent)) !important; }
+
+/* ── Rule overview panel ──────────────────────────────────── */
+.n8n-rule-settings {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 9px;
+}
+.n8n-rule-field { display: flex; flex-direction: column; gap: 3px; }
+.n8n-rule-field label {
+  font-size: 10px; font-weight: 700; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.n8n-rule-field input[type="text"],
+.n8n-rule-field select {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 5px; padding: 5px 8px; font-size: 12px;
+  color: var(--text-1); width: 100%; box-sizing: border-box;
+  font-family: var(--font);
+}
+.n8n-rule-field input[type="text"]:focus,
+.n8n-rule-field select:focus { outline: none; border-color: var(--accent); }
+.n8n-rule-toggle-row {
+  display: flex; align-items: center; gap: 14px;
+  font-size: 11px; color: var(--text-2);
+}
+.n8n-rule-toggle-row label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+
+/* Section header row (title + action button) */
+.n8n-panel-section-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px 5px;
+}
+.n8n-panel-section-title {
+  font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-3);
+}
+
+/* Condition list in rule overview */
+.n8n-ro-conds { padding: 0 0 4px; }
+.n8n-ro-conds .item-row {
+  border-radius: 0 !important;
+  border-left: none !important; border-right: none !important; border-top: none !important;
+  box-shadow: none !important;
+}
+
+/* Inline empty hint */
+.n8n-empty-hint {
+  padding: 8px 14px 12px;
+  font-size: 11px; color: var(--text-3); font-style: italic;
+}
+
+/* ── Action editor panel ──────────────────────────────────── */
+.n8n-act-nav-bar {
+  display: flex; align-items: center; gap: 4px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.01);
+  flex-shrink: 0;
+}
+.n8n-act-nav-label {
+  flex: 1; font-size: 11px; color: var(--text-2); text-align: center; font-weight: 600;
+}
+
+/* Action inline fields wrapper */
+.n8n-act-fields-section { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.n8n-act-fields-section .item-row {
+  border: none !important; padding: 0 !important; background: none !important;
+}
+.n8n-act-fields-section .fields-row { flex-wrap: wrap; gap: 6px; }
+
+/* Bottom bar: test + insert */
+.n8n-act-actions-bar {
+  padding: 10px 12px; display: flex; gap: 7px; flex-wrap: wrap;
+  border-top: none;
+}
