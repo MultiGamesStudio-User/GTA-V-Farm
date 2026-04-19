@@ -13,7 +13,7 @@
 ; etc.
 
 ; ─────────────────────────────────────────────────────────────────────────────
-; MUI Settings
+; MUI Settings (MUST be before MUI_LANGUAGE!)
 ; ─────────────────────────────────────────────────────────────────────────────
 
 !insertmacro MUI_PAGE_WELCOME
@@ -21,17 +21,8 @@
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 
+; Languages MUST come after pages!
 !insertmacro MUI_LANGUAGE "French"
 !insertmacro MUI_LANGUAGE "English"
 
-; ─────────────────────────────────────────────────────────────────────────────
-; Custom Install Actions
-; ─────────────────────────────────────────────────────────────────────────────
-
-Section "Custom Install"
-  ; Créer les raccourcis (optionnel - electron-builder en fait déjà)
-  CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\${APP_FILENAME}.exe"
-  CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${APP_FILENAME}.exe"
-SectionEnd
 
