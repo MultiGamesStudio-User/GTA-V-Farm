@@ -1,8 +1,10 @@
 /* ── Auto Clicker page ───────────────────────────────────── */
-let _acpRunning      = false;
-let _acpStatusPoller = null;
-let _acpCountdown    = null;   // setInterval handle for start-delay countdown
-let _acpHotkeys      = {};     // { 'acp-key-start': 'F6', 'acp-key-stop': 'F7' }
+let _acpRunning            = false;
+let _acpStatusPoller       = null;
+let _acpCountdown          = null;   // setInterval handle for start-delay countdown
+let _acpCountdownResolve   = null;   // stored Promise resolve so stopAutoClicker can unblock it
+let _acpCountdownCancelled = false;  // true when stopAutoClicker interrupts the countdown
+let _acpHotkeys            = {};     // { 'acp-key-start': 'F6', 'acp-key-stop': 'F7' }
 
 const _ACP_STORAGE_KEY = 'acp_settings';
 
@@ -151,12 +153,15 @@ async function startAutoClicker() {
     document.getElementById('acp-btn-stop').disabled  = false;
     let remaining = delay;
     document.getElementById('acp-status').textContent = `⏳ Démarrage dans ${remaining}s…`;
-    let cancelled = false;
+    _acpCountdownCancelled = false;
+
     await new Promise(resolve => {
+      _acpCountdownResolve = resolve;
       _acpCountdown = setInterval(() => {
         remaining--;
         if (remaining <= 0) {
           clearInterval(_acpCountdown); _acpCountdown = null;
+          _acpCountdownResolve = null;
           resolve();
         } else {
           const el = document.getElementById('acp-status');
@@ -164,12 +169,9 @@ async function startAutoClicker() {
         }
       }, 1000);
     });
-    // If stopAutoClicker() was called during countdown it clears _acpCountdown and calls _acpSetRunning(false)
-    if (_acpRunning === false && _acpCountdown === null) {
-      // already cleaned up by stopAutoClicker
-      return;
-    }
+
     document.getElementById('acp-btn-start').disabled = false;
+    if (_acpCountdownCancelled) return;  // stopAutoClicker() was pressed
   }
 
   const macro = _acpBuildMacro();
@@ -193,7 +195,11 @@ async function startAutoClicker() {
 }
 
 function stopAutoClicker() {
-  if (_acpCountdown)    { clearInterval(_acpCountdown);    _acpCountdown    = null; }
+  if (_acpCountdown) {
+    clearInterval(_acpCountdown); _acpCountdown = null;
+    _acpCountdownCancelled = true;
+    if (_acpCountdownResolve) { _acpCountdownResolve(); _acpCountdownResolve = null; }
+  }
   if (_acpStatusPoller) { clearInterval(_acpStatusPoller); _acpStatusPoller = null; }
   window.api.macroStop({ macro_id: '__auto_clicker__' }).catch(() => {});
   _acpSetRunning(false);
