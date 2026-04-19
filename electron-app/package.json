@@ -31,6 +31,8 @@
       "main.js",
       "preload.js",
       "picker-preload.js",
+      "updater.js",
+      "app.config.json",
       "config_parser.py",
       "renderer/**/*",
       "package.json"
