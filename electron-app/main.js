@@ -49,10 +49,13 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // ── Chemins ───────────────────────────────────────────────────────────────────
-const IS_PACKED   = app.isPackaged;
-const BOT_DIR     = IS_PACKED
+const IS_PACKED      = app.isPackaged;
+const BOT_DIR        = IS_PACKED
   ? path.join(process.resourcesPath, 'bot')
   : path.join(__dirname, '..');
+const RENDERER_DIR   = IS_PACKED
+  ? path.join(process.resourcesPath, 'app.asar.unpacked', 'renderer')
+  : path.join(__dirname, 'renderer');
 
 const ROOT_DIR      = BOT_DIR;
 const MAIN_PY       = path.join(BOT_DIR, 'main.py');
@@ -227,7 +230,7 @@ function createWindow () {
     },
   });
 
-  const htmlPath = path.join(__dirname, 'renderer', 'index.html');
+  const htmlPath = path.join(RENDERER_DIR, 'index.html');
   writeLog('INFO', 'loadFile:', htmlPath, '| existe:', fs.existsSync(htmlPath));
   mainWindow.loadFile(htmlPath);
 
@@ -267,7 +270,7 @@ async function _runAutoUpdate() {
   writeLog('INFO', 'Updater: vérification des mises à jour…');
   mainWindow?.webContents.send('updater:checking');
   try {
-    const result = await checkForUpdates(BOT_DIR, APP_CONFIG.github, (file) => {
+    const result = await checkForUpdates(BOT_DIR, RENDERER_DIR, APP_CONFIG.github, (file) => {
       writeLog('INFO', 'Updater: ↓', file);
       mainWindow?.webContents.send('updater:progress', { file });
     });
@@ -280,10 +283,12 @@ async function _runAutoUpdate() {
       if (result.errors.length) {
         for (const e of result.errors) writeLog('WARN', `Updater: erreur sur ${e.file} — ${e.error}`);
       }
+      const needsReload = result.updated.some(f => f.startsWith('electron-app/renderer/'));
       mainWindow?.webContents.send('updater:done', {
-        version : result.version,
-        updated : result.updated,
-        errors  : result.errors,
+        version    : result.version,
+        updated    : result.updated,
+        errors     : result.errors,
+        needsReload,
       });
     }
   } catch (err) {

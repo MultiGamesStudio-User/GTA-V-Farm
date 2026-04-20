@@ -48,6 +48,16 @@ for (const name of ['main.py', 'config.py']) {
   if (fs.existsSync(full)) files[name] = fileHash(full);
 }
 
+// Fichiers renderer (JS + CSS) — clés préfixées par electron-app/renderer/
+const rendererJsDir = path.join(ROOT, 'electron-app', 'renderer', 'js');
+for (const name of fs.readdirSync(rendererJsDir)) {
+  if (!name.endsWith('.js')) continue;
+  const rel = `electron-app/renderer/js/${name}`;
+  files[rel] = fileHash(path.join(ROOT, rel));
+}
+const cssRel = 'electron-app/renderer/styles.css';
+if (fs.existsSync(path.join(ROOT, cssRel))) files[cssRel] = fileHash(path.join(ROOT, cssRel));
+
 const manifest = {
   version : PKG.version,
   date    : new Date().toISOString().slice(0, 10),

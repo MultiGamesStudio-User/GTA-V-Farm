@@ -63,15 +63,24 @@ function fileHash(filePath) {
 
 // ── API principale ────────────────────────────────────────────────────────────
 /**
- * checkForUpdates(botDir, github, onProgress?)
+ * checkForUpdates(botDir, rendererDir, github, onProgress?)
  *
- * botDir      — dossier racine du bot (resources/bot/ en prod, ../ en dev)
- * github      — { user, repo, branch } depuis app.config.json
- * onProgress  — callback(relPath) appelé pour chaque fichier téléchargé
+ * botDir       — dossier racine du bot (resources/bot/ en prod, ../ en dev)
+ * rendererDir  — dossier renderer dépacké (resources/app.asar.unpacked/renderer/ en prod)
+ * github       — { user, repo, branch } depuis app.config.json
+ * onProgress   — callback(relPath) appelé pour chaque fichier téléchargé
  *
  * Retourne : { upToDate, version, updated[], errors[] }
+ *
+ * Convention des chemins dans le manifest :
+ *   - fichiers Python : clé = "main.py", "modules/engine/actions.py", …
+ *     → écrits dans botDir/<clé>
+ *   - fichiers renderer : clé = "electron-app/renderer/js/app.js", …
+ *     → écrits dans rendererDir/<partie après "electron-app/renderer/">
  */
-async function checkForUpdates(botDir, github, onProgress) {
+const RENDERER_MANIFEST_PREFIX = 'electron-app/renderer/';
+
+async function checkForUpdates(botDir, rendererDir, github, onProgress) {
   const base = `https://raw.githubusercontent.com/${github.user}/${github.repo}/${github.branch}`;
   MANIFEST_URL = `${base}/update-manifest.json`;
   BASE_URL     = `${base}/`;
@@ -85,7 +94,9 @@ async function checkForUpdates(botDir, github, onProgress) {
   const toUpdate = [];
   for (const [relPath, expectedHash] of Object.entries(files)) {
     if (SKIP_FILES.has(relPath)) continue;
-    const localPath = path.join(botDir, relPath);
+    const localPath = relPath.startsWith(RENDERER_MANIFEST_PREFIX)
+      ? path.join(rendererDir, relPath.slice(RENDERER_MANIFEST_PREFIX.length))
+      : path.join(botDir, relPath);
     if (fileHash(localPath) !== expectedHash) {
       toUpdate.push(relPath);
     }
@@ -101,7 +112,10 @@ async function checkForUpdates(botDir, github, onProgress) {
 
   for (const relPath of toUpdate) {
     try {
-      await downloadFile(relPath, path.join(botDir, relPath));
+      const destPath = relPath.startsWith(RENDERER_MANIFEST_PREFIX)
+        ? path.join(rendererDir, relPath.slice(RENDERER_MANIFEST_PREFIX.length))
+        : path.join(botDir, relPath);
+      await downloadFile(relPath, destPath);
       updated.push(relPath);
       if (onProgress) onProgress(relPath);
     } catch (e) {

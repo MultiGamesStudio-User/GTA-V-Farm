@@ -15,6 +15,19 @@
     "modules/engine/__init__.py": "7c4621ac5cf352d2e76cc8b82fa45f7925dc610d4a7873763ab007324e321962",
     "modules/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "main.py": "3c2a3e7091495c30254d140c5e8c3b1f2955ffba053c2f98159d44eb88387628",
-    "config.py": "6652c4a3760d6aabee709c32487c393af875b4f52dd926650edcbab95bac1f47"
+    "config.py": "6652c4a3760d6aabee709c32487c393af875b4f52dd926650edcbab95bac1f47",
+    "electron-app/renderer/js/app.js": "b47a985a911300f4461c447e651ae6716c0fcefac6a9f712f2e15e3d4d5ae7f3",
+    "electron-app/renderer/js/console.js": "e65c873e276af41b00ebb5095bcc97cf3c06e3a138ff8d5da21ef25855bdb00a",
+    "electron-app/renderer/js/engine.js": "2f05a9ba460a9748f3c87a52d9ae959f723dd9951b31814d9a586a06bd5b1255",
+    "electron-app/renderer/js/macros-data.js": "36f542eab8aa74a1dbd2722b4ce49f646cf99741405370c5403f32a62ec80191",
+    "electron-app/renderer/js/macros-editor.js": "3929b2819bfd06ec87008d1a0b5bcccb4468da74a5c7604d075554e03c930315",
+    "electron-app/renderer/js/macros-runner.js": "320cc61d8b83f304dc4b42eda82ff2b38ccc0705c69bfd1cf012d1af0a115f50",
+    "electron-app/renderer/js/page-actions.js": "1baf0bc4897243666b4878a9c0c6fc6b82e92715ff879cd295ff524deb59fb29",
+    "electron-app/renderer/js/page-autoclicker.js": "b2026a0d62ddc545a59ba36e52468511edf0affb8b933611117ad66c71dfb436",
+    "electron-app/renderer/js/page-conditions.js": "6002e038cddd8745e3673348cd9e059c2b9626d534244bfaab71a45490b7a0f4",
+    "electron-app/renderer/js/page-dashboard.js": "4928c8e473d3efcaa74a943146c0e409b3cab3fed3b71d4340979418e8c0f2a9",
+    "electron-app/renderer/js/page-windows.js": "1c098cfde9fa5a2c2a5effd9c9a563cf45519cf7f708c8090a5db37b362c67a3",
+    "electron-app/renderer/js/utils.js": "f02ca70e9b3bc65e99eede8301df5a92e99af582feeda5b714e17fe5c874a209",
+    "electron-app/renderer/styles.css": "08c6c6f4d58cc18e2fc2627d71984855f1c75881e968ee044e9416be62401056"
   }
 }

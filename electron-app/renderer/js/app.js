@@ -512,22 +512,62 @@ async function saveOcrEngine() {
 function _setupUpdater() {
   if (!window.api.onUpdaterDone) return;
 
+  const banner    = document.getElementById('update-banner');
+  const bannerMsg = document.getElementById('update-banner-msg');
+  const reloadBtn = document.getElementById('update-reload-btn');
+  let   hideTimer = null;
+
+  function showBanner(msg, { done = false, showReload = false } = {}) {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    banner.classList.remove('update-banner--hidden', 'update-banner--done');
+    if (done) banner.classList.add('update-banner--done');
+    bannerMsg.textContent = msg;
+    reloadBtn.style.display = showReload ? '' : 'none';
+  }
+
+  function hideBanner(delay = 0) {
+    if (delay > 0) {
+      hideTimer = setTimeout(() => banner.classList.add('update-banner--hidden'), delay);
+    } else {
+      banner.classList.add('update-banner--hidden');
+    }
+  }
+
   window.api.onUpdaterChecking(() => {
-    // silencieux au démarrage
+    showBanner('Vérification des mises à jour…');
+  });
+
+  window.api.onUpdaterProgress((d) => {
+    showBanner(`Téléchargement : ${d.file}`);
+  });
+
+  window.api.onUpdaterUpToDate(() => {
+    hideBanner();
   });
 
   window.api.onUpdaterDone((d) => {
     const n = d.updated ? d.updated.length : 0;
-    if (n === 0) return;
-    showToast(`✓ ${n} fichier${n > 1 ? 's mis à jour' : ' mis à jour'} — v${d.version}`, 'success', 6000);
+    if (n === 0) { hideBanner(); return; }
+
     appendLog('INFO', `Mise à jour appliquée (v${d.version}) : ${d.updated.join(', ')}`);
     if (d.errors && d.errors.length) {
       d.errors.forEach(e => appendLog('WARNING', `Updater: erreur sur ${e.file} — ${e.error}`));
     }
+
+    if (d.needsReload) {
+      showBanner(
+        `Mise à jour v${d.version} appliquée — rechargez pour en bénéficier`,
+        { done: true, showReload: true }
+      );
+      reloadBtn.onclick = () => location.reload();
+    } else {
+      showBanner(`✓ ${n} fichier${n > 1 ? 's mis à jour' : ' mis à jour'} — v${d.version}`, { done: true });
+      hideBanner(5000);
+    }
   });
 
   window.api.onUpdaterError((d) => {
-    // Pas de toast — juste un log discret (pas de connexion = normal)
+    hideBanner();
     appendLog('WARNING', 'Updater: ' + (d.error || 'Erreur inconnue'));
   });
 }

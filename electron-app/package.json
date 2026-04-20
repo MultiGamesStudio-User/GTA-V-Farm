@@ -38,6 +38,9 @@
       "renderer/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "renderer/**"
+    ],
     "extraResources": [
       {
         "from": "../",
