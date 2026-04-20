@@ -112,11 +112,19 @@ def _send_webhook(event: str, data: dict):
         _webhook_last_sent = now
 
     def _do_send():
-        global _webhook_fail_count, _webhook_disabled, _webhook_last_sent
+        global _webhook_fail_count, _webhook_disabled
         try:
+            # Afficher le message texte directement si présent, sinon JSON des données
+            extra = {k: v for k, v in data.items() if k != 'message'}
+            if data.get('message'):
+                desc = str(data['message'])[:2000]
+                if extra:
+                    desc += '\n```json\n' + json.dumps(extra, ensure_ascii=False, indent=2)[:1800] + '\n```'
+            else:
+                desc = json.dumps(data, ensure_ascii=False, indent=2)[:2000] if data else '—'
             embed = {
                 'title':       f'MacroEngine — {event}',
-                'description': json.dumps(data, ensure_ascii=False, indent=2)[:2000],
+                'description': desc,
                 'color':       0x5865F2,
                 'footer':      {'text': 'MacroEngine'},
             }
@@ -132,10 +140,10 @@ def _send_webhook(event: str, data: dict):
             )
             urllib.request.urlopen(req, timeout=5)
 
-            # Succès — réinitialiser compteur d'échecs
+            # Succès — réinitialiser compteur d'échecs (le slot _webhook_last_sent
+            # est déjà réservé avant le lancement du thread, pas besoin de le réécrire)
             with _webhook_lock:
                 _webhook_fail_count = 0
-                _webhook_last_sent  = time.time()
 
         except urllib.error.HTTPError as e:
             with _webhook_lock:
