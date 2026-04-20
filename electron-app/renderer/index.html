@@ -977,6 +977,11 @@
 <script src="js/page-actions.js"></script>
 <script src="js/page-windows.js"></script>
 <script src="js/page-autoclicker.js"></script>
+
+<!-- Patch : expose toutes les fonctions critiques sur window APRÈS chargement de tous les scripts -->
+<script>
+  if (typeof exposeMacroFunctions === 'function') exposeMacroFunctions();
+</script>
 </body>
 </html>
 

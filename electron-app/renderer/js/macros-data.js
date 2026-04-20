@@ -14,7 +14,7 @@ function exposeMacroFunctions() {
   window.handleImportMacros = handleImportMacros;
   window.openMacroModal = function(idx) { console.log('[MacroEngine] openMacroModal(' + idx + ')'); return openMacroModal(idx); };
 }
-exposeMacroFunctions();
+// exposeMacroFunctions() sera appelé à la fin de index.html pour garantir que toutes les fonctions sont bien définies.
 'use strict';
 /* ═══════════════════════════════════════════════════════════════
    MACROS DATA — persistence + CRUD + DnD + search + import/export
