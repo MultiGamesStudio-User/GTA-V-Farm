@@ -42,8 +42,8 @@ function renderDashboard() {
         <div class="ql-card-meta">${rulesCount} règle${rulesCount !== 1 ? 's' : ''}</div>
         <div class="ql-card-actions">
           ${isRunning
-            ? `<button class="btn btn-xs btn-danger" data-macro-stop="${escHtml(m.name)}" onclick="stopMacroByName(this.dataset.macroStop)">⏹ Stop</button>`
-            : `<button class="btn btn-xs btn-success" onclick="startMacro(${i})">▶ Lancer</button>`
+            ? `<button class="btn btn-xs btn-danger" data-macro-stop="${escHtml(m.name)}" onclick="stopMacroByName(this.dataset.macroStop)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10"><rect x="3" y="3" width="18" height="18" rx="2"/></svg> Stop</button>`
+            : `<button class="btn btn-xs btn-success" onclick="startMacro(${i})"><svg viewBox="0 0 24 24" fill="currentColor" width="10"><polygon points="5 3 19 12 5 21 5 3"/></svg> Lancer</button>`
           }
           <button class="btn btn-xs btn-secondary" onclick="selectMacro(${i});navigate('macros')" title="Modifier">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>

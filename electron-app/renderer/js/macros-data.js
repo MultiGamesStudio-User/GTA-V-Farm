@@ -1,7 +1,7 @@
 'use strict';
 // Expose toutes les fonctions critiques sur window (robustesse update)
 function exposeMacroFunctions() {
-  window.addMacro = function() { console.log('[MacroEngine] addMacro() called'); return addMacro(); };
+  window.addMacro = addMacro;
   window.duplicateMacro = duplicateMacro;
   window.moveMacroUp = moveMacroUp;
   window.moveMacroDown = moveMacroDown;
@@ -12,7 +12,7 @@ function exposeMacroFunctions() {
   window.exportCurrentMacroByIdx = exportCurrentMacroByIdx;
   window.triggerImportMacros = triggerImportMacros;
   window.handleImportMacros = handleImportMacros;
-  window.openMacroModal = function(idx) { console.log('[MacroEngine] openMacroModal(' + idx + ')'); return openMacroModal(idx); };
+  window.openMacroModal = openMacroModal;
 }
 // exposeMacroFunctions() sera appelé à la fin de index.html pour garantir que toutes les fonctions sont bien définies.
 'use strict';

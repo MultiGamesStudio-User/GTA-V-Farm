@@ -20,6 +20,26 @@ function updateStatusBadge(running) {
   text.textContent = running ? 'Actif' : 'Arrêté';
 }
 
+function updateRunningOverlay() {
+  const overlay = document.getElementById('running-overlay');
+  if (!overlay) return;
+  if (!runningMacros || runningMacros.size === 0) {
+    overlay.classList.add('hidden');
+    overlay.innerHTML = '';
+    return;
+  }
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = [...runningMacros].map(name => `
+    <div class="running-badge">
+      <div class="running-badge-dot"></div>
+      <span class="running-badge-name">${name}</span>
+      <button class="running-badge-stop" data-macro-stop="${name}" onclick="stopMacroByName(this.dataset.macroStop)" title="Arrêter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="9"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
 function setupEngineEvents() {
   window.api.onEngineLog(ev => {
     appendLog(ev.level || 'INFO', ev.msg || '');
@@ -33,6 +53,7 @@ function setupEngineEvents() {
     renderDashboard();
     updateStatusBadge(running.length > 0);
     updateMacroRunButtons();
+    updateRunningOverlay();
   });
 
   window.api.onEngineStatusUpd(ev => {
@@ -46,6 +67,7 @@ function setupEngineEvents() {
     runningMacros.clear();
     renderDashboard();
     updateMacroRunButtons();
+    updateRunningOverlay();
     if (typeof stopUptimeClock === 'function') stopUptimeClock();
     appendLog('WARNING', 'Engine Python arrêté');
   });
