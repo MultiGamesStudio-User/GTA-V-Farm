@@ -148,10 +148,23 @@ function verifyLicenseOnline(key) {
   return new Promise((resolve) => {
     const safeKey = encodeURIComponent(key);
     const url = `${APP_CONFIG.licenseApiBase}/${APP_CONFIG.licenseApiId}/${safeKey}/verify`;
-    const req = https.get(url, { headers: { 'User-Agent': `${APP_CONFIG.appName}/${app.getVersion()}` } }, (res) => {
+
+    // AbortController garantit un timeout total (DNS + connexion + réponse)
+    // req.setTimeout ne couvre que l'inactivité socket, pas la résolution DNS
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
+      resolve({ valid: false, offline: true });
+    }, LICENSE_TIMEOUT_MS);
+
+    const req = https.get(url, {
+      headers: { 'User-Agent': `${APP_CONFIG.appName}/${app.getVersion()}` },
+      signal: controller.signal,
+    }, (res) => {
       let body = '';
       res.on('data', (chunk) => { body += chunk; });
       res.on('end', () => {
+        clearTimeout(timer);
         try {
           const data = JSON.parse(body);
           resolve({ valid: !!data.valid, offline: false });
@@ -160,11 +173,8 @@ function verifyLicenseOnline(key) {
         }
       });
     });
-    req.setTimeout(LICENSE_TIMEOUT_MS, () => {
-      req.destroy();
-      resolve({ valid: false, offline: true });
-    });
     req.on('error', () => {
+      clearTimeout(timer);
       resolve({ valid: false, offline: true });
     });
   });
