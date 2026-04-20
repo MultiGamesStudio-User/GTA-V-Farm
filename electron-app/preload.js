@@ -111,8 +111,9 @@ contextBridge.exposeInMainWorld('api', {
   getConfig: () => ipcRenderer.invoke('app:getConfig'),
 
   // ── License ───────────────────────────────────────────────
-  checkLicense:  ()    => ipcRenderer.invoke('license:check'),
-  verifyLicense: (key) => ipcRenderer.invoke('license:verify', key),
+  checkLicense:     ()    => ipcRenderer.invoke('license:check'),
+  verifyLicense:    (key) => ipcRenderer.invoke('license:verify', key),
+  onLicenseRevoked: (cb)  => ipcRenderer.on('license:revoked', (_, d) => cb(d)),
 
   // ── App ───────────────────────────────────────────────────────────────────
   restartApp:   ()    => ipcRenderer.invoke('app:restart'),

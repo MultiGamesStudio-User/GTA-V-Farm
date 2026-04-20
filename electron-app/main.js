@@ -351,12 +351,16 @@ app.whenReady().then(() => {
 
     // ── Vérification automatique des mises à jour ──────────────
     _runAutoUpdate();
+
+    // ── Surveillance périodique de la licence ──────────────────
+    _startLicenseWatcher();
   });
 }).catch(err => {
   writeLog('FATAL', 'app.whenReady() rejeté:', err.stack || err.message);
 });
 
 app.on('window-all-closed', () => {
+  _stopLicenseWatcher();
   killEngine();
   if (process.platform !== 'darwin') app.quit();
 });
@@ -806,6 +810,54 @@ ipcMain.handle('app:restart', () => {
   app.relaunch();
   app.exit(0);
 });
+
+// ── Vérification périodique de licence (toutes les 10 min) ───────────────────
+const LICENSE_CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+let _licenseWatcherTimer = null;
+
+function _startLicenseWatcher() {
+  if (_licenseWatcherTimer) return;
+  _licenseWatcherTimer = setInterval(async () => {
+    const licData = readLicenseData();
+    if (!licData || !licData.key) {
+      writeLog('WARN', '[LIC-WATCH] Aucune clé — révocation');
+      _onLicenseRevoked('missing');
+      return;
+    }
+    try {
+      const result = await verifyLicenseOnline(licData.key);
+      if (result.offline) {
+        // Réseau KO — on ne révoque pas, grâce hors-ligne encore active
+        writeLog('INFO', '[LIC-WATCH] Réseau KO — grâce hors-ligne maintenue');
+        return;
+      }
+      if (!result.valid) {
+        writeLog('WARN', '[LIC-WATCH] Licence révoquée/invalide');
+        _onLicenseRevoked('invalid');
+      } else {
+        saveLicense(licData.key);
+        writeLog('INFO', '[LIC-WATCH] Licence toujours valide');
+      }
+    } catch (e) {
+      writeLog('WARN', '[LIC-WATCH] Erreur vérif:', e.message);
+    }
+  }, LICENSE_CHECK_INTERVAL_MS);
+  writeLog('INFO', '[LIC-WATCH] Surveillance licence démarrée (10 min)');
+}
+
+function _stopLicenseWatcher() {
+  if (_licenseWatcherTimer) {
+    clearInterval(_licenseWatcherTimer);
+    _licenseWatcherTimer = null;
+  }
+}
+
+function _onLicenseRevoked(reason) {
+  _stopLicenseWatcher();
+  killEngine();
+  mainWindow?.webContents.send('license:revoked', { reason });
+  writeLog('WARN', '[LIC-WATCH] Engine arrêté — licence révoquée:', reason);
+}
 
 // ── IPC: license ─────────────────────────────────────────────────────────────
 ipcMain.handle('license:check', async () => {

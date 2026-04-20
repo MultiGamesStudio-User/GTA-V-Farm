@@ -311,6 +311,21 @@ async function init() {
     });
   }
 
+  /* Surveillance périodique de la licence (révocation côté serveur) */
+  if (window.api.onLicenseRevoked) {
+    window.api.onLicenseRevoked((d) => {
+      appendLog('WARNING', 'Licence révoquée — arrêt forcé (' + (d?.reason || 'invalid') + ')');
+      stopAllMacros().catch(() => {});
+      // Afficher l'overlay de licence
+      const overlay = document.getElementById('license-overlay');
+      const errEl   = document.getElementById('license-error');
+      const btn     = document.getElementById('license-submit');
+      if (overlay) overlay.style.display = 'flex';
+      if (errEl)   { errEl.textContent = 'Votre licence a été révoquée ou n\'est plus valide. Entrez une clé valide pour continuer.'; errEl.style.display = 'block'; }
+      if (btn)     { btn.disabled = false; btn.textContent = 'Activer'; }
+    });
+  }
+
   /* Webhook URL auto-save */
   initWebhookAutoSave();
 

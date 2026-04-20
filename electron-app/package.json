@@ -1,6 +1,6 @@
 {
   "name": "macro-engine",
-  "version": "2.3.9",
+  "version": "2.4.0",
   "description": "MacroEngine — Système d'automatisation par macros",
   "main": "main.js",
   "scripts": {
@@ -12,7 +12,8 @@
     "build-nsis": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win nsis --publish=never",
     "build-portable": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win portable --publish=never",
     "release": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win --publish=always",
-    "release-prepare": "node scripts/release.js"
+    "release-prepare": "node scripts/release.js",
+    "generate-manifest": "node scripts/generate-manifest.js"
   },
   "keywords": [
     "macro",
