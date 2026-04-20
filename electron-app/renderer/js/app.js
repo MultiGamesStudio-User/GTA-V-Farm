@@ -102,26 +102,36 @@ async function checkLicense() {
   const btn     = document.getElementById('license-submit');
   const errEl   = document.getElementById('license-error');
 
-  // Timeout de 8s pour éviter un blocage permanent si l'IPC ne répond pas
-  const timeoutPromise = new Promise(r => setTimeout(() => r({ valid: false, reason: 'timeout' }), 8000));
-  const result = await Promise.race([window.api.checkLicense(), timeoutPromise]);
+  // Timeout strict de 5s pour éviter tout blocage
+  const timeoutMs = 5000;
+  const timeoutPromise = new Promise(r => setTimeout(() => r({ valid: false, reason: 'timeout' }), timeoutMs));
+  let result;
+  try {
+    result = await Promise.race([window.api.checkLicense(), timeoutPromise]);
+  } catch (e) {
+    result = { valid: false, reason: 'exception', error: e && e.message };
+  }
   if (result.valid) {
     overlay.style.display = 'none';
     if (result.offline && result.daysLeft != null) {
-      // Avertissement discret mode hors-ligne
       showToast(`Mode hors-ligne — licence non vérifiée (${result.daysLeft}j restants)`, 'warn', 8000);
     }
     return true;
   }
 
-  // Hide splash so the licence modal is fully visible
   hideSplash();
-
   if (result.reason === 'grace_expired') {
     showLicenseError('Connexion requise pour revalider la licence (délai hors-ligne expiré).');
+  } else if (result.reason === 'timeout') {
+    showLicenseError('Erreur : la vérification de la licence ne répond pas (timeout). Redémarre l\'app ou contacte le support.');
+    btn.disabled = false;
+    btn.textContent = 'Activer';
+  } else if (result.reason === 'exception') {
+    showLicenseError('Erreur JS : ' + (result.error || 'inconnue'));
+    btn.disabled = false;
+    btn.textContent = 'Activer';
   }
 
-  // Show modal and wait for valid key
   overlay.style.display = 'flex';
   return new Promise((resolve) => {
     async function submit() {
@@ -130,12 +140,28 @@ async function checkLicense() {
       btn.disabled = true;
       btn.textContent = 'Vérification…';
       errEl.style.display = 'none';
-      const res = await window.api.verifyLicense(key);
+      let res;
+      try {
+        res = await Promise.race([
+          window.api.verifyLicense(key),
+          new Promise(r => setTimeout(() => r({ valid: false, reason: 'timeout' }), timeoutMs))
+        ]);
+      } catch (e) {
+        res = { valid: false, reason: 'exception', error: e && e.message };
+      }
       if (res.valid) {
         overlay.style.display = 'none';
         resolve(true);
       } else if (res.reason === 'network') {
         showLicenseError('Impossible de contacter le serveur. Vérifiez votre connexion.');
+        btn.disabled = false;
+        btn.textContent = 'Activer';
+      } else if (res.reason === 'timeout') {
+        showLicenseError('Erreur : la vérification de la licence ne répond pas (timeout). Redémarre l\'app ou contacte le support.');
+        btn.disabled = false;
+        btn.textContent = 'Activer';
+      } else if (res.reason === 'exception') {
+        showLicenseError('Erreur JS : ' + (res.error || 'inconnue'));
         btn.disabled = false;
         btn.textContent = 'Activer';
       } else {
