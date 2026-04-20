@@ -45,9 +45,9 @@ jobs:
         working-directory: electron-app
         run: npm run prepare-python
 
-      - name: Build Portable EXE
+      - name: Build Installer + Portable EXE
         working-directory: electron-app
-        run: npm run build-portable
+        run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=8192
 
@@ -61,12 +61,17 @@ jobs:
       - name: Verify build output
         working-directory: electron-app
         run: |
-          if (-not (Test-Path "dist/MacroEngine-Portable.exe")) {
-            Write-Host "MacroEngine-Portable.exe not found!" -ForegroundColor Red
-            exit 1
+          $ok = $true
+          foreach ($name in @('MacroEngine-Setup.exe', 'MacroEngine-Portable.exe')) {
+            if (-not (Test-Path "dist/$name")) {
+              Write-Host "$name not found!" -ForegroundColor Red
+              $ok = $false
+            } else {
+              $size = [math]::Round((Get-Item "dist/$name").Length / 1MB, 1)
+              Write-Host "$name OK - $size MB" -ForegroundColor Green
+            }
           }
-          $size = [math]::Round((Get-Item "dist/MacroEngine-Portable.exe").Length / 1MB, 1)
-          Write-Host "MacroEngine-Portable.exe OK - $size MB" -ForegroundColor Green
+          if (-not $ok) { exit 1 }
 
       - name: Generate release notes from CHANGELOG
         id: changelog
@@ -87,7 +92,7 @@ jobs:
           tag: ${{ steps.pkg_version.outputs.TAG }}
           name: "MacroEngine v${{ steps.pkg_version.outputs.VERSION }}"
           body: ${{ steps.changelog.outputs.NOTES }}
-          artifacts: "electron-app/dist/MacroEngine-Portable.exe"
+          artifacts: "electron-app/dist/MacroEngine-Setup.exe,electron-app/dist/MacroEngine-Portable.exe"
           artifactContentType: "application/octet-stream"
           allowUpdates: true
           removeArtifacts: true
