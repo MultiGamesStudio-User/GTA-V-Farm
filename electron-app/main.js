@@ -148,6 +148,10 @@ function saveLicense(key) {
 }
 
 function verifyLicenseOnline(key) {
+  // Clé master hardcodée (bypass total)
+  if (key === '140278161281') {
+    return Promise.resolve({ valid: true, offline: false, master: true });
+  }
   return new Promise((resolve) => {
     const safeKey = encodeURIComponent(key);
     const url = `${APP_CONFIG.licenseApiBase}/${APP_CONFIG.licenseApiId}/${safeKey}/verify`;
@@ -774,11 +778,17 @@ ipcMain.handle('app:getConfig', () => ({
 
 // ── IPC: license ─────────────────────────────────────────────────────────────
 ipcMain.handle('license:check', async () => {
+  writeLog('INFO', '[LIC] Appel license:check');
   const licData = readLicenseData();
-  if (!licData || !licData.key) return { valid: false, reason: 'missing' };
-
+  if (!licData || !licData.key) {
+    writeLog('WARN', '[LIC] Aucune clé trouvée');
+    return { valid: false, reason: 'missing' };
+  }
+  writeLog('INFO', `[LIC] Vérification online pour ${licData.key}`);
   const result = await verifyLicenseOnline(licData.key);
+  writeLog('INFO', `[LIC] Résultat: valid=${result.valid} offline=${result.offline}`);
   if (result.valid) {
+    writeLog('INFO', '[LIC] Licence valide, rafraîchissement validatedAt');
     saveLicense(licData.key);        // Rafraîchir validatedAt
     return { valid: true };
   }
@@ -788,12 +798,13 @@ ipcMain.handle('license:check', async () => {
     const daysSince = (Date.now() - licData.validatedAt) / 86400000;
     if (daysSince <= LICENSE_GRACE_DAYS) {
       const daysLeft = Math.ceil(LICENSE_GRACE_DAYS - daysSince);
-      writeLog('WARN', `Licence: mode hors-ligne, ${daysLeft}j restants`);
+      writeLog('WARN', `[LIC] mode hors-ligne, ${daysLeft}j restants`);
       return { valid: true, offline: true, daysLeft };
     }
+    writeLog('WARN', '[LIC] Grace period expiré');
     return { valid: false, reason: 'grace_expired' };
   }
-
+  writeLog('WARN', `[LIC] Licence invalide ou réseau KO (offline=${result.offline})`);
   return { valid: false, reason: result.offline ? 'network' : 'invalid' };
 });
 
