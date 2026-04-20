@@ -307,8 +307,32 @@ ipcMain.handle('updater:check', () => {
   return { ok: true };
 });
 
+
+// ── Initialisation automatique des fichiers utilisateur ──
+function ensureUserFiles() {
+  // macros.json
+  if (!fs.existsSync(MACROS_PATH)) {
+    fs.mkdirSync(path.dirname(MACROS_PATH), { recursive: true });
+    fs.writeFileSync(MACROS_PATH, JSON.stringify([], null, 2), 'utf-8');
+    writeLog('INFO', 'Fichier macros.json créé dans userData');
+  }
+  // settings.json
+  if (!fs.existsSync(SETTINGS_PATH)) {
+    fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
+    fs.writeFileSync(SETTINGS_PATH, JSON.stringify({}, null, 2), 'utf-8');
+    writeLog('INFO', 'Fichier settings.json créé dans userData');
+  }
+  // acp_settings.json
+  if (typeof ACP_CONFIG_PATH !== 'undefined' && !fs.existsSync(ACP_CONFIG_PATH)) {
+    fs.mkdirSync(path.dirname(ACP_CONFIG_PATH), { recursive: true });
+    fs.writeFileSync(ACP_CONFIG_PATH, JSON.stringify({}, null, 2), 'utf-8');
+    writeLog('INFO', 'Fichier acp_settings.json créé dans userData');
+  }
+}
+
 app.whenReady().then(() => {
   writeLog('INFO', 'app ready');
+  ensureUserFiles();
   createWindow();
 
   mainWindow.webContents.once('did-finish-load', async () => {
