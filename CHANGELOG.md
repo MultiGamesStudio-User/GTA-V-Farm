@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.3.2] – 2026-04-20
+## [2.3.3] – 2026-04-20
+
+### Fixed
+- 🐛 Macros — sélection d'un point (clic souris, drag, scroll, condition pixel) : les coordonnées ne se sauvegardaient pas et le formulaire revenait à la valeur précédente. Les inputs `x`/`y` étant de type `hidden`, le `dispatchEvent(change)` ne déclenchait aucun handler ; remplacé par des appels directs à `syncActField`/`syncCondField`.
+- 🐛 Idem pour la sélection de région (condition zone) : `w` et `h` non sauvegardés.
+
+---
+
+
 
 ### Added
 - ✨ Section **Auto Clicker** dans l'overlay HUD (toujours au-dessus) : démarrer/arrêter l'auto-clicker depuis la mini-fenêtre flottante sans quitter le jeu

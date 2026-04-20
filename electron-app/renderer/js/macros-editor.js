@@ -1805,8 +1805,8 @@ async function pickPointForCondField(btn) {
     if (!row) return;
     const xInput = row.querySelector('.cf.x');
     const yInput = row.querySelector('.cf.y');
-    if (xInput) { xInput.value = res.x; xInput.dispatchEvent(new Event('change')); }
-    if (yInput) { yInput.value = res.y; yInput.dispatchEvent(new Event('change')); }
+    if (xInput) { xInput.value = res.x; syncCondField(xInput, 'x', true); }
+    if (yInput) { yInput.value = res.y; syncCondField(yInput, 'y', true); }
     renderMacroEditor();
   } catch (e) { appendLog('ERROR', 'Picker: ' + e.message); }
 }
@@ -1821,10 +1821,10 @@ async function pickRegionForCondField(btn) {
     const yInput = row.querySelector('.cf.y');
     const wInput = row.querySelector('.cf.w');
     const hInput = row.querySelector('.cf.h');
-    if (xInput) { xInput.value = res.x; xInput.dispatchEvent(new Event('change')); }
-    if (yInput) { yInput.value = res.y; yInput.dispatchEvent(new Event('change')); }
-    if (wInput) { wInput.value = res.w; wInput.dispatchEvent(new Event('change')); }
-    if (hInput) { hInput.value = res.h; hInput.dispatchEvent(new Event('change')); }
+    if (xInput) { xInput.value = res.x; syncCondField(xInput, 'x', true); }
+    if (yInput) { yInput.value = res.y; syncCondField(yInput, 'y', true); }
+    if (wInput) { wInput.value = res.w; syncCondField(wInput, 'w', true); }
+    if (hInput) { hInput.value = res.h; syncCondField(hInput, 'h', true); }
     renderMacroEditor();
   } catch (e) { appendLog('ERROR', 'Picker: ' + e.message); }
 }
@@ -1837,8 +1837,8 @@ async function pickPointForActField(btn, xField, yField) {
     if (!row) return;
     const xInput = row.querySelector('.af.' + (xField || 'x'));
     const yInput = row.querySelector('.af.' + (yField || 'y'));
-    if (xInput) { xInput.value = res.x; xInput.dispatchEvent(new Event('change')); }
-    if (yInput) { yInput.value = res.y; yInput.dispatchEvent(new Event('change')); }
+    if (xInput) { xInput.value = res.x; syncActField(xInput, xField || 'x', true); }
+    if (yInput) { yInput.value = res.y; syncActField(yInput, yField || 'y', true); }
     renderMacroEditor();
   } catch (e) { appendLog('ERROR', 'Picker: ' + e.message); }
 }
