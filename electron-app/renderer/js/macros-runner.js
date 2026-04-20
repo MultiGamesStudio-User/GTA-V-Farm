@@ -28,7 +28,7 @@ async function runCurrentMacro() {
   try {
     await ensureEngine();
     // Send webhook URL to engine before starting
-    const settings = await window.api.readSettings();
+    const settings = await window.api.readSettings().catch(() => ({}));
     if (settings && settings.webhookUrl) {
       await window.api.setWebhook({ url: settings.webhookUrl });
     }
@@ -91,7 +91,7 @@ async function startMacro(idx) {
   const macro = macros[idx];
   try {
     await ensureEngine();
-    const settings = await window.api.readSettings();
+    const settings = await window.api.readSettings().catch(() => ({}));
     if (settings && settings.webhookUrl) {
       await window.api.setWebhook({ url: settings.webhookUrl });
     }

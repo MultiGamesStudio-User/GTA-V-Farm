@@ -194,7 +194,7 @@ async function startAutoClicker() {
           _acpStatusPoller = null;
         }
       } catch (_) {}
-    }, 600);
+    }, 1000);
   } catch (e) {
     appendLog('ERROR', 'Auto Clicker: ' + e.message);
     _acpSetRunning(false);

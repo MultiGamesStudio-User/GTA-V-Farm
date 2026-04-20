@@ -477,9 +477,12 @@ for (const cmd of [
 ]) {
   ipcMain.handle(`engine:${cmd}`, async (_evt, params) => {
     if (!engineProc) {
-      // auto-start engine on first use
+      // auto-start engine on first use; poll up to 3 s for stdin readiness
       startEngine();
-      await new Promise(r => setTimeout(r, 800));
+      for (let _i = 0; _i < 30; _i++) {
+        if (engineProc?.stdin?.writable) break;
+        await new Promise(r => setTimeout(r, 100));
+      }
     }
     try {
       return await engineCmd({ cmd, ...params });

@@ -34,8 +34,8 @@ async function refreshWindows() {
           <button class="btn btn-xs ${isTarget ? 'btn-success' : 'btn-secondary'}" onclick="selectTargetWindowByIdx(${i})">
             ${isTarget ? '✓ Cible' : 'Cibler'}
           </button>
-          <button class="btn btn-xs btn-secondary" onclick="focusWindowById(${w.hwnd})">Focus</button>
-          <button class="btn btn-xs btn-secondary" onclick="showWindowRect(${w.hwnd})">Rect</button>
+          <button class="btn btn-xs btn-secondary" onclick="focusWindowByIdx(${i})">Focus</button>
+          <button class="btn btn-xs btn-secondary" onclick="showWindowRectByIdx(${i})">Rect</button>
           <span class="window-hwnd">hwnd: ${w.hwnd || '?'}</span>
         </div>
       </div>`;
@@ -49,6 +49,18 @@ function selectTargetWindowByIdx(idx) {
   const w = windowsList[idx];
   if (!w) return;
   selectTargetWindow(w.hwnd, w.title, w.pid, w.exe);
+}
+
+function focusWindowByIdx(idx) {
+  const w = windowsList[idx];
+  if (!w) return;
+  focusWindowById(w.hwnd);
+}
+
+function showWindowRectByIdx(idx) {
+  const w = windowsList[idx];
+  if (!w) return;
+  showWindowRect(w.hwnd);
 }
 
 function selectTargetWindow(hwnd, title, pid, exe) {
