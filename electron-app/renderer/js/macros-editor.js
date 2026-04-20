@@ -692,6 +692,7 @@ async function _populateWindowScopeDropdown(scopeEl, selectedHwnd) {
 function macroFieldChanged() {
   if (currentMacroIdx < 0) return;
   const m = macros[currentMacroIdx];
+  if (!m) return;
   m.name             = document.getElementById('me-name').value;
   m.loop             = document.getElementById('me-loop').checked;
   m.loop_delay       = parseFloat(document.getElementById('me-loop-delay').value) || 0.1;

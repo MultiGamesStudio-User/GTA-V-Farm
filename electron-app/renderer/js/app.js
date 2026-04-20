@@ -119,9 +119,16 @@ async function checkLicense() {
     return true;
   }
 
+  function showLicenseError(msg) {
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+  }
+
   hideSplash();
   if (result.reason === 'grace_expired') {
     showLicenseError('Connexion requise pour revalider la licence (délai hors-ligne expiré).');
+    btn.disabled = false;
+    btn.textContent = 'Activer';
   } else if (result.reason === 'timeout') {
     showLicenseError('Erreur : la vérification de la licence ne répond pas (timeout). Redémarre l\'app ou contacte le support.');
     btn.disabled = false;
@@ -169,10 +176,6 @@ async function checkLicense() {
         btn.disabled = false;
         btn.textContent = 'Activer';
       }
-    }
-    function showLicenseError(msg) {
-      errEl.textContent = msg;
-      errEl.style.display = 'block';
     }
     btn.addEventListener('click', submit);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
@@ -379,7 +382,7 @@ async function loadAppSettings() {
     if (ramEl && s.maxRamMb != null) ramEl.value = s.maxRamMb;
 
     // Last macro selection
-    if (typeof s.lastMacroIdx === 'number' && s.lastMacroIdx >= 0) {
+    if (typeof s.lastMacroIdx === 'number' && s.lastMacroIdx >= 0 && s.lastMacroIdx < macros.length) {
       currentMacroIdx = s.lastMacroIdx;
     }
 
