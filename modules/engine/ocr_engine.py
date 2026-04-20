@@ -13,15 +13,22 @@ Usage :
 """
 from __future__ import annotations
 import os
+import sys
 import logging
 import numpy as np
 import cv2
 
 logger = logging.getLogger('engine.ocr')
 
-_ROOT      = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_MODEL_DIR = os.path.join(_ROOT, 'models', 'easyocr')
-_DEBUG_DIR = os.path.join(_ROOT, 'ocr_debug')   # si DEBUG_OCR=1, sauvegarde les images ici
+
+# Stockage userData (APPDATA) pour éviter les problèmes de droits
+if sys.platform == 'win32':
+    _USERDATA = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'MacroEngine')
+else:
+    _USERDATA = os.path.join(os.path.expanduser('~/.macroengine'))
+os.makedirs(_USERDATA, exist_ok=True)
+_MODEL_DIR = os.path.join(_USERDATA, 'models', 'easyocr')
+_DEBUG_DIR = os.path.join(_USERDATA, 'ocr_debug')   # si DEBUG_OCR=1, sauvegarde les images ici
 os.makedirs(_MODEL_DIR, exist_ok=True)
 
 _DEBUG_OCR = os.environ.get('DEBUG_OCR', '0') == '1'
