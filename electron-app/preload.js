@@ -70,7 +70,11 @@ contextBridge.exposeInMainWorld('api', {
   writeMacros: (macros)  => ipcRenderer.invoke('macros:write', macros),
 
   // ── Settings ──────────────────────────────────────────────
-  readSettings:  ()      => ipcRenderer.invoke('settings:read'),
+  readSettings: async () => {
+    const r = await ipcRenderer.invoke('settings:read');
+    // Unwrap the { ok, settings } envelope — return plain settings object
+    return (r && r.settings !== undefined) ? r.settings : (r || {});
+  },
   writeSettings: (data)  => ipcRenderer.invoke('settings:write', data),
 
   // ── Global shortcuts ──────────────────────────────────────

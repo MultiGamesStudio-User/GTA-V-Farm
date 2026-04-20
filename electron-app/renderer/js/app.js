@@ -92,10 +92,6 @@ async function _saveUiPref(key, val) {
       s[key] = val;
       await window.api.writeSettings(s);
     } catch (_) {}
-  });(await window.api.readSettings()) || {};
-      s[key] = val;
-      await window.api.writeSettings(s);
-    } catch (_) {}
   });
 }
 
@@ -307,8 +303,7 @@ async function init() {
 /* ── Settings page functions ──────────────────────────────── */
 async function loadAppSettings() {
   try {
-    const r = await window.api.readSettings();
-    const s = (r && r.settings) ? r.settings : (r || {});
+    const s = (await window.api.readSettings()) || {};
 
     // Webhook
     const urlEl = document.getElementById('set-webhook-url');

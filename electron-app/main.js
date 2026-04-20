@@ -170,6 +170,12 @@ function verifyLicenseOnline(key) {
   });
 }
 
+// ── Utilitaires ──────────────────────────────────────────────────────────────
+function _debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
 // ── État global ───────────────────────────────────────────────────────────────
 let mainWindow    = null;
 let overlayWindow = null;
@@ -233,13 +239,13 @@ function createWindow () {
   }
 
   // Save window bounds on close/resize/move
-  function saveBounds() {
+  const saveBounds = _debounce(() => {
     if (!mainWindow || mainWindow.isMaximized() || mainWindow.isMinimized()) return;
     const b = mainWindow.getBounds();
     const s = readSettings();
     s.windowBounds = b;
     saveSettings(s);
-  }
+  }, 500);
 
   mainWindow.on('resize', saveBounds);
   mainWindow.on('move',   saveBounds);
@@ -403,20 +409,24 @@ function engineCmd(cmd) {
   return new Promise((resolve, reject) => {
     if (!engineProc) { reject(new Error('Engine not running')); return; }
     const id = `${cmd.cmd}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    _pending.set(id, { resolve, reject });
-    try {
-      engineProc.stdin.write(JSON.stringify({ ...cmd, id }) + '\n');
-    } catch (e) {
-      _pending.delete(id);
-      reject(e);
-    }
-    // timeout after 15s
-    setTimeout(() => {
+    // Store timer handle so it can be cancelled when response arrives
+    const timer = setTimeout(() => {
       if (_pending.has(id)) {
         _pending.delete(id);
         reject(new Error('Engine timeout'));
       }
     }, 15000);
+    _pending.set(id, {
+      resolve: (v) => { clearTimeout(timer); resolve(v); },
+      reject:  (e) => { clearTimeout(timer); reject(e); },
+    });
+    try {
+      engineProc.stdin.write(JSON.stringify({ ...cmd, id }) + '\n');
+    } catch (e) {
+      clearTimeout(timer);
+      _pending.delete(id);
+      reject(e);
+    }
   });
 }
 
@@ -584,21 +594,24 @@ function createOverlayWindow() {
   });
 
   // Persist position
-  overlayWindow.on('move', () => {
+  const _saveOverlayPos = _debounce(() => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
     const [x, y] = overlayWindow.getPosition();
     const s = readSettings();
     s.overlayBounds = { x, y };
     saveSettings(s);
-  });
+  }, 500);
 
-  overlayWindow.on('resize', () => {
+  const _saveOverlaySize = _debounce(() => {
     if (!overlayWindow || overlayWindow.isDestroyed()) return;
     const [width, height] = overlayWindow.getSize();
     const s = readSettings();
     s.overlaySize = { width, height };
     saveSettings(s);
-  });
+  }, 500);
+
+  overlayWindow.on('move',   _saveOverlayPos);
+  overlayWindow.on('resize', _saveOverlaySize);
 
   overlayWindow.on('closed', () => {
     overlayWindow = null;
