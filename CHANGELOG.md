@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.2] – 2026-04-20
+
+### Added
+- ✨ Section **Auto Clicker** dans l'overlay HUD (toujours au-dessus) : démarrer/arrêter l'auto-clicker depuis la mini-fenêtre flottante sans quitter le jeu
+- 🔄 Sync config Auto Clicker vers `userData/acp_settings.json` pour la partager avec l'overlay
+
+### Fixed
+- 🐛 `console.js` — SyntaxError critique (parenthèse manquante) qui empêchait l'app de démarrer
+- 🐛 `macros-runner.js` — `readSettings()` sans `.catch()` → macros silencieusement non démarrées
+- 🐛 `main.js` — délai fixe 800 ms remplacé par un polling sur `stdin.writable` (démarrage moteur plus fiable)
+- 🐛 `page-autoclicker.js` — poller statut 600 ms → 1000 ms (moins de charge IPC)
+- 🐛 `page-windows.js` — injection HWND brut dans `onclick` remplacée par index sécurisé (XSS)
+- 🐛 Webhook Discord — la description affichait du JSON brut (`{"message":"…"}`) au lieu du texte seul
+- 🐛 Webhook — double écriture de `_webhook_last_sent` après succès (redondant, supprimé)
+
+---
+
 ## [2.2.0] – 2024-04-19
 
 ### Added

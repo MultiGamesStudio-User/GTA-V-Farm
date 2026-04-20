@@ -1,20 +1,20 @@
 {
-  "version": "2.3.1",
-  "date": "2026-04-19",
+  "version": "2.3.2",
+  "date": "2026-04-20",
   "files": {
     "modules/engine/actions.py": "bb4e77e5c351fe488d5032d0107ad50145eb7cfc7dec14bc213662418d6a5b20",
-    "modules/engine/conditions.py": "1eeb7b7caa751ccc2106a9f5acdcc7de09ae85e2fb2dd0e9ee4b8eec05eeac3e",
+    "modules/engine/conditions.py": "2e8cf790ab41ea26c586bcd5f4b0cfa2bd4232652c8d066290adaf46ede8143e",
     "modules/engine/coord_utils.py": "d51db7357003a8986b3c2b1ed4057cdcba2d8a9cd4c4601101a1aab70fee509e",
     "modules/engine/humanizer.py": "ea58f0de9adfd3b68835145ef5837390ba44201bf6f63f7c8056b67403beb981",
     "modules/engine/macro_runner.py": "2c8f7055f84e4ff3ad36ed618269006c7ee7268c856ca22c89f6217c33707e47",
     "modules/engine/ocr_engine.py": "b1d085ce52ec699c65103be099fbbd43aae6eb0a49df58e0c24fecba3d0cbd79",
     "modules/engine/recorder.py": "dfe527a5363ed6c85219e5be838ce7cfc20ba57465d3d6c33ea9ebb9a12c9da1",
-    "modules/engine/screen_reader.py": "6b96a3de7c5bfe9e823edaca5f5b7221eb6e7d609cf02e499e7223393ef2c4c5",
+    "modules/engine/screen_reader.py": "d6bf7e99e4afe8f18977571cb9c6eabab64a715001720e25e113ab4bca24c2f6",
     "modules/engine/state.py": "9e5984e2e30ab7c38aed40a8c99800c38c3454be01737667f5b9862e88e429f6",
     "modules/engine/window_manager.py": "c2203c6654203e64b9bf12759949830462a2014505053e69de8083710feb7881",
     "modules/engine/__init__.py": "7c4621ac5cf352d2e76cc8b82fa45f7925dc610d4a7873763ab007324e321962",
     "modules/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "main.py": "c18fa46e70450ef7f50000bf3469e29aa393b518256814a4564dbf7a6fd694f0",
+    "main.py": "3c2a3e7091495c30254d140c5e8c3b1f2955ffba053c2f98159d44eb88387628",
     "config.py": "6652c4a3760d6aabee709c32487c393af875b4f52dd926650edcbab95bac1f47"
   }
 }
