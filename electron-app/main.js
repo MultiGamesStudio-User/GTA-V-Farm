@@ -59,9 +59,10 @@ const RENDERER_DIR   = IS_PACKED
 
 const ROOT_DIR      = BOT_DIR;
 const MAIN_PY       = path.join(BOT_DIR, 'main.py');
-const MACROS_PATH   = path.join(BOT_DIR, 'macros.json');
-const LICENSE_PATH  = path.join(app.getPath('userData'), 'license.json');
-const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
+const USERDATA_DIR  = app.getPath('userData');
+const MACROS_PATH   = path.join(USERDATA_DIR, 'macros.json');
+const LICENSE_PATH  = path.join(USERDATA_DIR, 'license.json');
+const SETTINGS_PATH = path.join(USERDATA_DIR, 'settings.json');
 
 // ── Résolution du chemin Python ───────────────────────────────────────────────
 function resolvePython() {
@@ -761,7 +762,7 @@ ipcMain.handle('macros:write', (_evt, macros) => {
 });
 
 // ── IPC: Auto Clicker config (shared with overlay) ───────────────────────────
-const ACP_CONFIG_PATH = path.join(app.getPath('userData'), 'acp_settings.json');
+const ACP_CONFIG_PATH = path.join(USERDATA_DIR, 'acp_settings.json');
 
 ipcMain.handle('acp:save-config', (_evt, data) => {
   try {
