@@ -1,3 +1,15 @@
+// Expose les fonctions nécessaires pour l'UI (onclick)
+window.addMacro = addMacro;
+window.duplicateMacro = duplicateMacro;
+window.moveMacroUp = moveMacroUp;
+window.moveMacroDown = moveMacroDown;
+window.deleteMacro = deleteMacro;
+window.selectMacro = selectMacro;
+window.exportAllMacros = exportAllMacros;
+window.exportCurrentMacro = exportCurrentMacro;
+window.exportCurrentMacroByIdx = exportCurrentMacroByIdx;
+window.triggerImportMacros = triggerImportMacros;
+window.handleImportMacros = handleImportMacros;
 'use strict';
 /* ═══════════════════════════════════════════════════════════════
    MACROS DATA — persistence + CRUD + DnD + search + import/export
