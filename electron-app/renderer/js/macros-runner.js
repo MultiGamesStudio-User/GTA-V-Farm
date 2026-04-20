@@ -23,7 +23,7 @@ function updateMacroRunButtons() {
 
 async function runCurrentMacro() {
   if (currentMacroIdx < 0) return;
-  flushEditorToMacro();
+  if (macros[currentMacroIdx]) { try { flushEditorToMacro(); } catch (e) {} }
   const macro = macros[currentMacroIdx];
   try {
     await ensureEngine();
@@ -42,15 +42,19 @@ async function runCurrentMacro() {
 
 async function pauseCurrentMacro() {
   if (currentMacroIdx < 0) return;
+  const macro = macros[currentMacroIdx];
+  if (!macro) return;
   try {
-    await window.api.macroPause({ macro_id: macros[currentMacroIdx].name });
-    appendLog('INFO', 'Macro en pause: ' + macros[currentMacroIdx].name);
+    await window.api.macroPause({ macro_id: macro.name });
+    appendLog('INFO', 'Macro en pause: ' + macro.name);
   } catch (e) { appendLog('ERROR', e.message); }
 }
 
 async function stopCurrentMacro() {
   if (currentMacroIdx < 0) return;
-  const name = macros[currentMacroIdx].name;
+  const macro = macros[currentMacroIdx];
+  if (!macro) return;
+  const name = macro.name;
   try {
     await window.api.macroStop({ macro_id: name });
     runningMacros.delete(name);
@@ -86,7 +90,9 @@ async function startMacro(idx) {
   // Only flush form data if the modal is open for this exact macro
   const modal = document.getElementById('macro-modal');
   const modalOpen = modal && modal.style.display !== 'none';
-  if (modalOpen && currentMacroIdx === idx) flushEditorToMacro();
+  if (modalOpen && currentMacroIdx === idx && macros[idx]) {
+    try { flushEditorToMacro(); } catch (e) {}
+  }
   currentMacroIdx = idx;
   const macro = macros[idx];
   try {

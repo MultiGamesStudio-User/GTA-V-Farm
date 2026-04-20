@@ -106,6 +106,7 @@ async function showWindowRect(hwnd) {
 
 async function checkOcrStatus() {
   const el = document.getElementById('ocr-status-text');
+  if (!el) return;
   el.textContent = 'Vérification…';
   try {
     await ensureEngine();

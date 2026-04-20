@@ -30,7 +30,9 @@ async function loadMacros() {
 }
 
 async function saveMacros() {
-  if (currentMacroIdx >= 0) flushEditorToMacro();
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) {
+    try { flushEditorToMacro(); } catch (e) { console.error('[saveMacros] flush error:', e); }
+  }
   try {
     await window.api.writeMacros(macros);
     appendLog('INFO', 'Macros sauvegardées');
@@ -46,17 +48,21 @@ function updateMacroCounters() {
 }
 
 function addMacro() {
-  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) flushEditorToMacro();
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) {
+    try { flushEditorToMacro(); } catch (e) { console.error('[addMacro] flush error:', e); }
+  }
   macros.push({ name: 'Nouvelle macro', loop: true, loop_delay: 0.1, max_iterations: 0, timeout_s: 0, humanize: false, humanize_factor: 0.12, rules: [] });
   currentMacroIdx = macros.length - 1;
-  renderMacroList();
-  updateMacroCounters();
-  openMacroModal(currentMacroIdx);
-  setTimeout(() => document.getElementById('me-name')?.select(), 80);
+  try { renderMacroList(); }     catch (e) { console.error('[addMacro] renderMacroList:', e); }
+  try { updateMacroCounters(); } catch (e) {}
+  try {
+    openMacroModal(currentMacroIdx);
+    setTimeout(() => document.getElementById('me-name')?.select(), 80);
+  } catch (e) { console.error('[addMacro] openMacroModal:', e); }
 }
 
 function duplicateMacro(idx) {
-  if (currentMacroIdx >= 0) flushEditorToMacro();
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) { try { flushEditorToMacro(); } catch (e) {} }
   const copy = JSON.parse(JSON.stringify(macros[idx]));
   copy.name += ' (copie)';
   macros.splice(idx + 1, 0, copy);
@@ -68,7 +74,7 @@ function duplicateMacro(idx) {
 
 function moveMacroUp(idx) {
   if (idx <= 0) return;
-  if (currentMacroIdx >= 0) flushEditorToMacro();
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) { try { flushEditorToMacro(); } catch (e) {} }
   [macros[idx - 1], macros[idx]] = [macros[idx], macros[idx - 1]];
   if (currentMacroIdx === idx) currentMacroIdx = idx - 1;
   else if (currentMacroIdx === idx - 1) currentMacroIdx = idx;
@@ -78,7 +84,7 @@ function moveMacroUp(idx) {
 
 function moveMacroDown(idx) {
   if (idx >= macros.length - 1) return;
-  if (currentMacroIdx >= 0) flushEditorToMacro();
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) { try { flushEditorToMacro(); } catch (e) {} }
   [macros[idx], macros[idx + 1]] = [macros[idx + 1], macros[idx]];
   if (currentMacroIdx === idx) currentMacroIdx = idx + 1;
   else if (currentMacroIdx === idx + 1) currentMacroIdx = idx;
@@ -102,10 +108,12 @@ function deleteMacro(idx) {
 }
 
 function selectMacro(idx) {
-  if (currentMacroIdx >= 0) flushEditorToMacro();
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) {
+    try { flushEditorToMacro(); } catch (e) {}
+  }
   currentMacroIdx = idx;
-  renderMacroList();
-  openMacroModal(idx);
+  try { renderMacroList(); } catch (e) {}
+  try { openMacroModal(idx); } catch (e) { console.error('[selectMacro] openMacroModal:', e); }
   _saveUiPref('lastMacroIdx', idx);
 }
 
@@ -246,7 +254,7 @@ function renderMacroList() {
 
 /* ── Import / Export ─────────────────────────────────────── */
 function exportAllMacros() {
-  if (currentMacroIdx >= 0) flushEditorToMacro();
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) { try { flushEditorToMacro(); } catch (e) {} }
   const json = JSON.stringify(macros, null, 2);
   _downloadJson(json, 'macros-export.json');
   showToast(`${macros.length} macro${macros.length !== 1 ? 's' : ''} exportée${macros.length !== 1 ? 's' : ''}`, 'success', 3000);
@@ -258,7 +266,7 @@ function exportCurrentMacro() {
 }
 
 function exportCurrentMacroByIdx(idx) {
-  if (currentMacroIdx >= 0) flushEditorToMacro();
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) { try { flushEditorToMacro(); } catch (e) {} }
   const macro = macros[idx];
   if (!macro) return;
   const json = JSON.stringify([macro], null, 2);
@@ -286,7 +294,7 @@ async function handleImportMacros(e) {
     const data  = JSON.parse(text);
     const items = Array.isArray(data) ? data : (Array.isArray(data?.macros) ? data.macros : null);
     if (!items || !items.length) { showToast('Fichier invalide ou vide', 'error', 4000); return; }
-    if (currentMacroIdx >= 0) flushEditorToMacro();
+    if (currentMacroIdx >= 0 && macros[currentMacroIdx]) { try { flushEditorToMacro(); } catch (e) {} }
     let added = 0;
     for (const m of items) {
       if (!m || typeof m !== 'object') continue;

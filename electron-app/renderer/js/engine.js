@@ -4,7 +4,12 @@
 ════════════════════════════════════════════════════════════════ */
 
 async function ensureEngine() {
-  try { await window.api.startEngine(); } catch (_) {}
+  try {
+    await window.api.startEngine();
+  } catch (e) {
+    appendLog('WARNING', 'Engine non disponible: ' + (e.message || e));
+    throw e;
+  }
 }
 
 function updateStatusBadge(running) {
@@ -56,9 +61,10 @@ function setupEngineEvents() {
 
   window.api.onSetupDone(() => {
     const banner = document.getElementById('deps-banner');
+    const msgEl  = document.getElementById('deps-msg');
     if (banner) {
       banner.classList.add('deps-done');
-      document.getElementById('deps-msg').textContent = 'Dépendances Python prêtes ✓';
+      if (msgEl) msgEl.textContent = 'Dépendances Python prêtes ✓';
       setTimeout(() => banner.classList.add('deps-hidden'), 3000);
     }
     appendLog('INFO', 'Dépendances Python installées');

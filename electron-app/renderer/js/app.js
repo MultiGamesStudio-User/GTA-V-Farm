@@ -91,7 +91,9 @@ async function _saveUiPref(key, val) {
       const s = (await window.api.readSettings()) || {};
       s[key] = val;
       await window.api.writeSettings(s);
-    } catch (_) {}
+    } catch (e) {
+      console.warn('[_saveUiPref] échec sauvegarde', key, ':', e.message);
+    }
   });
 }
 
@@ -286,22 +288,28 @@ async function init() {
   });
 
   /* Overlay closed externally */
-  window.api.onOverlayClosed && window.api.onOverlayClosed(() => {
-    _overlayVisible = false;
-    _updateOverlayBtn();
-  });
+  if (window.api.onOverlayClosed) {
+    window.api.onOverlayClosed(() => {
+      _overlayVisible = false;
+      _updateOverlayBtn();
+    });
+  }
 
   /* Webhook error handler */
-  window.api.onWebhookError && window.api.onWebhookError((d) => {
-    showToast('Webhook error: ' + (d.msg || 'Erreur inconnue'), 'error', 6000);
-    appendLog('WARNING', 'Webhook désactivé: ' + (d.msg || ''));
-  });
+  if (window.api.onWebhookError) {
+    window.api.onWebhookError((d) => {
+      showToast('Webhook error: ' + (d.msg || 'Erreur inconnue'), 'error', 6000);
+      appendLog('WARNING', 'Webhook désactivé: ' + (d.msg || ''));
+    });
+  }
 
   /* Cross-macro start request from engine */
-  window.api.onMacroStartRequest && window.api.onMacroStartRequest((d) => {
-    const idx = macros.findIndex(m => m.name === d.name);
-    if (idx >= 0) startMacro(idx);
-  });
+  if (window.api.onMacroStartRequest) {
+    window.api.onMacroStartRequest((d) => {
+      const idx = macros.findIndex(m => m.name === d.name);
+      if (idx >= 0) startMacro(idx);
+    });
+  }
 
   /* Webhook URL auto-save */
   initWebhookAutoSave();
@@ -321,12 +329,7 @@ async function init() {
   const reloadBtn = document.getElementById('update-reload-btn');
   if (updateBanner && reloadBtn) {
     reloadBtn.onclick = () => {
-      // Forcer un vrai redémarrage Electron (pas juste reload du renderer)
-      if (window.api && window.api.restartApp) {
-        window.api.restartApp();
-      } else {
-        location.reload();
-      }
+      window.api.restartApp().catch(() => location.reload());
     };
   }
 

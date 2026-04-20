@@ -5,27 +5,38 @@
 
 /* ── Modal control ──────────────────────────────────────────── */
 function openMacroModal(idx) {
-  console.log('[MacroEngine] openMacroModal(' + idx + ')');
-  currentMacroIdx = idx;
-  const modal   = document.getElementById('macro-modal');
-  const titleEl = document.getElementById('macro-modal-title-text');
-  if (!modal) { alert('Erreur critique : modale macro absente du DOM'); return; }
-  const macro = macros[idx];
-  if (titleEl) titleEl.textContent = macro?.name || 'Macro';
-  renderMacroEditor();
-  modal.style.display = 'flex';
-  modal.focus && modal.focus();
-  document.addEventListener('keydown', _modalEscHandler);
+  try {
+    currentMacroIdx = idx;
+    const modal = document.getElementById('macro-modal');
+    if (!modal) { console.error('[openMacroModal] #macro-modal introuvable'); return; }
+    const macro = macros[idx];
+    if (!macro) { console.error('[openMacroModal] macro idx', idx, 'introuvable'); return; }
+
+    // Show modal FIRST — before any rendering so a crash in render doesn't block opening
+    const titleEl = document.getElementById('macro-modal-title-text');
+    if (titleEl) titleEl.textContent = macro.name || 'Macro';
+    modal.style.display = 'flex';
+    if (modal.focus) modal.focus();
+    document.removeEventListener('keydown', _modalEscHandler);
+    document.addEventListener('keydown', _modalEscHandler);
+
+    // Render content — wrapped so errors don't prevent modal from being visible
+    try { renderMacroEditor(); } catch (e) { console.error('[openMacroModal] renderMacroEditor error:', e); }
+  } catch (e) {
+    console.error('[openMacroModal] critical error:', e);
+  }
 }
 
 function closeMacroModal() {
   const modal = document.getElementById('macro-modal');
   if (!modal || modal.style.display === 'none') return;
-  if (currentMacroIdx >= 0) flushEditorToMacro();
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) {
+    try { flushEditorToMacro(); } catch (e) { console.error('[closeMacroModal] flush error:', e); }
+  }
   modal.style.display = 'none';
   document.removeEventListener('keydown', _modalEscHandler);
-  renderMacroList();
-  renderDashboard();
+  try { renderMacroList(); } catch (e) { console.error('[closeMacroModal] renderMacroList error:', e); }
+  try { renderDashboard(); } catch (e) {}
 }
 
 function _modalEscHandler(e) {
@@ -33,12 +44,13 @@ function _modalEscHandler(e) {
 }
 
 async function saveMacroFromModal() {
-  if (currentMacroIdx >= 0) flushEditorToMacro();
-  // Update modal title to reflect any name change
+  if (currentMacroIdx >= 0 && macros[currentMacroIdx]) {
+    try { flushEditorToMacro(); } catch (e) { console.error('[saveMacroFromModal] flush error:', e); }
+  }
   const macro   = macros[currentMacroIdx];
   const titleEl = document.getElementById('macro-modal-title-text');
   if (titleEl && macro) titleEl.textContent = macro.name || 'Macro';
-  renderMacroList();
+  try { renderMacroList(); } catch (e) {}
   await saveMacros();
 }
 
@@ -628,30 +640,38 @@ const ACT_LABELS = {
 };
 
 /* ── Editor form ──────────────────────────────────────────── */
+function _setEl(id, prop, val) {
+  const el = document.getElementById(id);
+  if (el) el[prop] = val;
+}
+
 function renderMacroEditor() {
   const macro = macros[currentMacroIdx];
   if (!macro) return;
-  document.getElementById('macro-editor-empty').style.display = 'none';
-  document.getElementById('macro-editor-form').style.display = '';
-  document.getElementById('me-name').value = macro.name || '';
-  document.getElementById('me-loop').checked = macro.loop !== false;
-  document.getElementById('me-loop-delay').value = macro.loop_delay != null ? macro.loop_delay : 0.1;
-  document.getElementById('me-max-iter').value = macro.max_iterations != null ? macro.max_iterations : 0;
-  document.getElementById('me-timeout').value = macro.timeout_s != null ? macro.timeout_s : 0;
-  document.getElementById('me-humanize').checked = !!macro.humanize;
-  document.getElementById('me-humanize-factor').value = macro.humanize_factor != null ? macro.humanize_factor : 0.12;
-  // Window scope — populate asynchronously with all windows
+
+  _setEl('macro-editor-empty', 'style', { display: 'none' });
+  const emptyEl = document.getElementById('macro-editor-empty');
+  if (emptyEl) emptyEl.style.display = 'none';
+  const formEl = document.getElementById('macro-editor-form');
+  if (formEl) formEl.style.display = '';
+
+  _setEl('me-name',           'value',   macro.name || '');
+  _setEl('me-loop',           'checked', macro.loop !== false);
+  _setEl('me-loop-delay',     'value',   macro.loop_delay != null ? macro.loop_delay : 0.1);
+  _setEl('me-max-iter',       'value',   macro.max_iterations != null ? macro.max_iterations : 0);
+  _setEl('me-timeout',        'value',   macro.timeout_s != null ? macro.timeout_s : 0);
+  _setEl('me-humanize',       'checked', !!macro.humanize);
+  _setEl('me-humanize-factor','value',   macro.humanize_factor != null ? macro.humanize_factor : 0.12);
+
   const scopeEl = document.getElementById('me-target-window');
   if (scopeEl) {
     scopeEl.innerHTML = '<option value="">Aucune (toutes les fenêtres)</option>';
-    // Keep saved value visible immediately
     if (macro.target_hwnd) {
       scopeEl.innerHTML += `<option value="${macro.target_hwnd}" selected>hwnd: ${macro.target_hwnd}</option>`;
     }
-    // Fetch all windows and populate
     _populateWindowScopeDropdown(scopeEl, macro.target_hwnd);
   }
-  // N8N: reset to macro settings panel
+
   _selectedRuleIdx = -1;
   const ruleProps  = document.getElementById('n8n-rule-props');
   const macroProps = document.getElementById('n8n-macro-props');
@@ -659,9 +679,10 @@ function renderMacroEditor() {
   if (macroProps) macroProps.style.display = '';
   const panelName = document.getElementById('n8n-panel-macro-name');
   if (panelName) panelName.textContent = macro.name || 'Paramètres';
-  renderN8nCanvas();
-  renderAdvancedSections();
-  updateMacroRunButtons();
+
+  try { renderN8nCanvas(); }        catch (e) { console.error('[renderMacroEditor] canvas error:', e); }
+  try { renderAdvancedSections(); } catch (e) { console.error('[renderMacroEditor] sections error:', e); }
+  try { updateMacroRunButtons(); }  catch (e) {}
 }
 
 async function _populateWindowScopeDropdown(scopeEl, selectedHwnd) {
@@ -693,35 +714,33 @@ function macroFieldChanged() {
   if (currentMacroIdx < 0) return;
   const m = macros[currentMacroIdx];
   if (!m) return;
-  m.name             = document.getElementById('me-name').value;
-  m.loop             = document.getElementById('me-loop').checked;
-  m.loop_delay       = parseFloat(document.getElementById('me-loop-delay').value) || 0.1;
-  m.max_iterations   = parseInt(document.getElementById('me-max-iter').value, 10) || 0;
-  m.timeout_s        = parseFloat(document.getElementById('me-timeout').value) || 0;
-  m.humanize         = document.getElementById('me-humanize').checked;
-  m.humanize_factor  = parseFloat(document.getElementById('me-humanize-factor').value) || 0.12;
-  const scopeEl = document.getElementById('me-target-window');
-  if (scopeEl) {
-    const val = scopeEl.value;
-    m.target_hwnd = val || null;
-  }
-  const items = document.querySelectorAll('.macro-list-item, .wf-card');
-  if (items[currentMacroIdx]) {
-    const nameEl = items[currentMacroIdx].querySelector('.macro-list-name, .wf-card-name');
-    if (nameEl) nameEl.textContent = m.name || 'Sans nom';
-  }
-  // Update modal title live
-  const titleEl = document.getElementById('macro-modal-title-text');
-  if (titleEl) titleEl.textContent = m.name || 'Sans nom';
-  // Update n8n panel header + start node
-  const panelName = document.getElementById('n8n-panel-macro-name');
-  if (panelName) panelName.textContent = m.name || 'Paramètres';
-  const startName = document.querySelector('#n8n-node-config .n8n-node-name');
-  if (startName) startName.textContent = m.name || 'Sans nom';
+  try {
+    m.name            = document.getElementById('me-name')?.value ?? m.name;
+    m.loop            = !!document.getElementById('me-loop')?.checked;
+    m.loop_delay      = parseFloat(document.getElementById('me-loop-delay')?.value) || 0.1;
+    m.max_iterations  = parseInt(document.getElementById('me-max-iter')?.value, 10) || 0;
+    m.timeout_s       = parseFloat(document.getElementById('me-timeout')?.value) || 0;
+    m.humanize        = !!document.getElementById('me-humanize')?.checked;
+    m.humanize_factor = parseFloat(document.getElementById('me-humanize-factor')?.value) || 0.12;
+    const scopeEl = document.getElementById('me-target-window');
+    if (scopeEl) m.target_hwnd = scopeEl.value || null;
+    const items = document.querySelectorAll('.macro-list-item, .wf-card');
+    if (items[currentMacroIdx]) {
+      const nameEl = items[currentMacroIdx].querySelector('.macro-list-name, .wf-card-name');
+      if (nameEl) nameEl.textContent = m.name || 'Sans nom';
+    }
+    const titleEl   = document.getElementById('macro-modal-title-text');
+    if (titleEl)    titleEl.textContent = m.name || 'Sans nom';
+    const panelName = document.getElementById('n8n-panel-macro-name');
+    if (panelName)  panelName.textContent = m.name || 'Paramètres';
+    const startName = document.querySelector('#n8n-node-config .n8n-node-name');
+    if (startName)  startName.textContent = m.name || 'Sans nom';
+  } catch (e) { console.error('[macroFieldChanged] error:', e); }
 }
 
 function flushEditorToMacro() {
   if (currentMacroIdx < 0) return;
+  if (!macros[currentMacroIdx]) return;
   macroFieldChanged();
 }
 

@@ -308,6 +308,8 @@ ipcMain.handle('updater:check', () => {
 });
 
 
+const ACP_CONFIG_PATH = path.join(USERDATA_DIR, 'acp_settings.json');
+
 // ── Initialisation automatique des fichiers utilisateur ──
 function ensureUserFiles() {
   // macros.json
@@ -323,7 +325,7 @@ function ensureUserFiles() {
     writeLog('INFO', 'Fichier settings.json créé dans userData');
   }
   // acp_settings.json
-  if (typeof ACP_CONFIG_PATH !== 'undefined' && !fs.existsSync(ACP_CONFIG_PATH)) {
+  if (!fs.existsSync(ACP_CONFIG_PATH)) {
     fs.mkdirSync(path.dirname(ACP_CONFIG_PATH), { recursive: true });
     fs.writeFileSync(ACP_CONFIG_PATH, JSON.stringify({}, null, 2), 'utf-8');
     writeLog('INFO', 'Fichier acp_settings.json créé dans userData');
@@ -786,8 +788,6 @@ ipcMain.handle('macros:write', (_evt, macros) => {
 });
 
 // ── IPC: Auto Clicker config (shared with overlay) ───────────────────────────
-const ACP_CONFIG_PATH = path.join(USERDATA_DIR, 'acp_settings.json');
-
 ipcMain.handle('acp:save-config', (_evt, data) => {
   try {
     fs.writeFileSync(ACP_CONFIG_PATH, JSON.stringify(data, null, 2), 'utf-8');
@@ -800,6 +800,12 @@ ipcMain.handle('app:getConfig', () => ({
   ...APP_CONFIG,
   version: app.getVersion(),
 }));
+
+// ── IPC: restart ──────────────────────────────────────────────────────────────
+ipcMain.handle('app:restart', () => {
+  app.relaunch();
+  app.exit(0);
+});
 
 // ── IPC: license ─────────────────────────────────────────────────────────────
 ipcMain.handle('license:check', async () => {
