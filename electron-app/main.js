@@ -358,6 +358,8 @@ function startEngine() {
     _pending.clear();
     mainWindow?.webContents.send('engine:stopped', { code });
     _sendToOverlay('overlay:stopped');
+    _overlayAcpRunning = false;
+    _sendToOverlay('overlay:acp-status', { running: false });
   });
 
   engineProc.on('error', err => {
@@ -663,6 +665,45 @@ ipcMain.on('overlay:macro-stop', async (_, { name }) => {
   try { await engineCmd({ cmd: 'macro_stop', name }); } catch (_) {}
 });
 
+// ── Overlay: Auto Clicker ─────────────────────────────────────────────────────
+let _overlayAcpRunning = false;
+
+ipcMain.on('overlay:acp-start', async (evt, { macro }) => {
+  if (_overlayAcpRunning) return;
+  _overlayAcpRunning = true;
+  _sendToOverlay('overlay:acp-status', { running: true });
+  try {
+    // Ensure engine is alive before sending the macro
+    if (!engineProc) {
+      startEngine();
+      for (let _i = 0; _i < 30; _i++) {
+        if (engineProc?.stdin?.writable) break;
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+    await engineCmd({ cmd: 'macro_start', macro, macro_id: '__auto_clicker__' });
+  } catch (e) {
+    _overlayAcpRunning = false;
+    _sendToOverlay('overlay:acp-status', { running: false, error: e.message });
+  }
+});
+
+ipcMain.on('overlay:acp-stop', async () => {
+  try { await engineCmd({ cmd: 'macro_stop', macro_id: '__auto_clicker__' }); } catch (_) {}
+  _overlayAcpRunning = false;
+  _sendToOverlay('overlay:acp-status', { running: false });
+});
+
+// Sync _overlayAcpRunning with engine status events
+// (handled via existing overlay:status forwarding from engineProc stdout)
+
+ipcMain.handle('overlay:get-acp-config', () => {
+  try {
+    if (fs.existsSync(ACP_CONFIG_PATH)) return { ok: true, config: JSON.parse(fs.readFileSync(ACP_CONFIG_PATH, 'utf-8')) };
+  } catch (_) {}
+  return { ok: false };
+});
+
 ipcMain.handle('overlay:get-macros', () => {
   try {
     if (!fs.existsSync(MACROS_PATH)) return { macros: [] };
@@ -698,6 +739,16 @@ ipcMain.handle('macros:write', (_evt, macros) => {
   } catch (e) {
     return { ok: false, error: e.message };
   }
+});
+
+// ── IPC: Auto Clicker config (shared with overlay) ───────────────────────────
+const ACP_CONFIG_PATH = path.join(app.getPath('userData'), 'acp_settings.json');
+
+ipcMain.handle('acp:save-config', (_evt, data) => {
+  try {
+    fs.writeFileSync(ACP_CONFIG_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
 });
 
 // ── IPC: app config ───────────────────────────────────────────────────────────

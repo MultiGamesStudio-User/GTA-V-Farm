@@ -35,6 +35,8 @@ function _acpSave() {
     data[f.id] = f.type === 'bool' ? el.checked : el.value;
   });
   localStorage.setItem(_ACP_STORAGE_KEY, JSON.stringify(data));
+  // Sync to userData file so the overlay can read it
+  window.api.saveAcpConfig && window.api.saveAcpConfig(data).catch(() => {});
 }
 
 function _acpLoad() {

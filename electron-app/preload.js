@@ -104,6 +104,9 @@ contextBridge.exposeInMainWorld('api', {
   toggleOverlay:   ()  => ipcRenderer.invoke('overlay:toggle'),
   onOverlayClosed: (cb) => ipcRenderer.on('overlay:closed', () => cb()),
 
+  // ── Auto Clicker config (shared with overlay) ─────────────
+  saveAcpConfig: (data) => ipcRenderer.invoke('acp:save-config', data),
+
   // ── App config ────────────────────────────────────────────
   getConfig: () => ipcRenderer.invoke('app:getConfig'),
 

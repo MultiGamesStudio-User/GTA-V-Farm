@@ -14,4 +14,9 @@ contextBridge.exposeInMainWorld('overlay', {
   focusMain:       ()   => ipcRenderer.send('overlay:focus-main'),
   close:           ()   => ipcRenderer.send('overlay:close'),
   hide:            ()   => ipcRenderer.send('overlay:minimize'),
+  // Auto Clicker
+  acpStart:        (macro) => ipcRenderer.send('overlay:acp-start', { macro }),
+  acpStop:         ()      => ipcRenderer.send('overlay:acp-stop'),
+  onAcpStatus:     (cb)    => ipcRenderer.on('overlay:acp-status', (_, d) => cb(d)),
+  getAcpConfig:    ()      => ipcRenderer.invoke('overlay:get-acp-config'),
 });
