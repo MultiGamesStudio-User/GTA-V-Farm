@@ -11,7 +11,7 @@ function updateStatusBadge(running) {
   const dot  = document.getElementById('sidebar-dot');
   const text = document.getElementById('sidebar-status-text');
   if (!dot || !text) return;
-  dot.className  = 'dot ' + (running ? 'dot-green' : '');
+  dot.classList.toggle('dot-green', !!running);
   text.textContent = running ? 'Actif' : 'Arrêté';
 }
 
@@ -31,7 +31,9 @@ function setupEngineEvents() {
   });
 
   window.api.onEngineStatusUpd(ev => {
-    updateStatusBadge(ev.running);
+    // ev.running may be an array (list of macro ids) or a boolean
+    const running = Array.isArray(ev.running) ? ev.running.length > 0 : !!ev.running;
+    updateStatusBadge(running);
   });
 
   window.api.onEngineStopped(() => {

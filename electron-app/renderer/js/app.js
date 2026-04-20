@@ -83,12 +83,20 @@ function showToast(msg, type = 'info', duration = 4000) {
 }
 
 /* ── UI prefs (light settings — no engine round-trip) ──────── */
+let _settingsWriteQueue = Promise.resolve();
+
 async function _saveUiPref(key, val) {
-  try {
-    const s = (await window.api.readSettings()) || {};
-    s[key] = val;
-    await window.api.writeSettings(s);
-  } catch (_) {}
+  _settingsWriteQueue = _settingsWriteQueue.then(async () => {
+    try {
+      const s = (await window.api.readSettings()) || {};
+      s[key] = val;
+      await window.api.writeSettings(s);
+    } catch (_) {}
+  });(await window.api.readSettings()) || {};
+      s[key] = val;
+      await window.api.writeSettings(s);
+    } catch (_) {}
+  });
 }
 
 /* ── License gate ──────────────────────────────────────────── */
@@ -98,7 +106,9 @@ async function checkLicense() {
   const btn     = document.getElementById('license-submit');
   const errEl   = document.getElementById('license-error');
 
-  const result = await window.api.checkLicense();
+  // Timeout de 8s pour éviter un blocage permanent si l'IPC ne répond pas
+  const timeoutPromise = new Promise(r => setTimeout(() => r({ valid: false, reason: 'timeout' }), 8000));
+  const result = await Promise.race([window.api.checkLicense(), timeoutPromise]);
   if (result.valid) {
     overlay.style.display = 'none';
     if (result.offline && result.daysLeft != null) {

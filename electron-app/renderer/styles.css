@@ -1672,8 +1672,8 @@ kbd {
 /* Auto-clicker inline fields */
 .ac-row { flex-wrap: wrap; gap: 5px; }
 .ac-section-lbl { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; min-width: 60px; }
-.ac-narrow { width: 46px !important; text-align: center; padding: 2px 4px; }
-.ac-mid    { width: 62px !important; text-align: center; padding: 2px 4px; }
+.ac-narrow { width: 68px !important; text-align: center; padding: 5px 6px; font-size: 14px; }
+.ac-mid    { width: 80px !important; text-align: center; padding: 5px 6px; font-size: 14px; }
 .ac-unit   { font-size: 10px; color: var(--text-3); margin-left: -2px; }
 .ac-chk-lbl { display: flex; align-items: center; gap: 4px; font-size: 11px; white-space: nowrap; }
 

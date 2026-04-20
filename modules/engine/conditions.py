@@ -70,11 +70,7 @@ from .ocr_engine import read_text as _ocr_read, ocr_status as _ocr_status
 def _ocr_available() -> bool:
     return _ocr_status()['available']
 
-# Compatibilité descendante (utilisé dans main.py pour check_ocr)
-@property
-def _OCR_AVAILABLE():
-    return _ocr_available()
-# Redéfini comme variable simple pour les imports directs
+# Variable module calculée au chargement pour compatibilité descendante
 try:
     _OCR_AVAILABLE = _ocr_available()
 except Exception:

@@ -58,6 +58,8 @@ function _acpLoad() {
 }
 
 function _acpBindAutoSave() {
+  if (_acpBound) return;
+  _acpBound = true;
   _ACP_FIELDS.forEach(f => {
     const el = document.getElementById(f.id);
     if (!el) return;
@@ -176,6 +178,11 @@ async function startAutoClicker() {
 
   const macro = _acpBuildMacro();
   try {
+    await ensureEngine();
+    const settings = await window.api.readSettings().catch(() => ({}));
+    if (settings?.webhookUrl) {
+      await window.api.setWebhook({ url: settings.webhookUrl }).catch(() => {});
+    }
     await window.api.macroStart({ macro, macro_id: '__auto_clicker__' });
     _acpSetRunning(true);
     _acpStatusPoller = setInterval(async () => {
@@ -229,11 +236,12 @@ async function _acpPickPoint() {
       document.getElementById('acp-y').value = pos.y;
       _acpSave();
     }
-  } catch (e) { /* pickPoint may not be available in all builds */ }
+  } catch (e) { appendLog('WARNING', 'Sélecteur de point indisponible: ' + (e.message || e)); }
 }
 
 /* ── Hotkey capture ──────────────────────────────────────── */
 let _acpCapturing = null;  // { el, fieldId } while waiting for key press
+let _acpBound     = false; // guard against duplicate event listener registration
 
 function _acpCapKey(el, fieldId) {
   _acpCapturing = { el, fieldId };

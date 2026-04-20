@@ -5,8 +5,8 @@
 
 function appendLog(level, msg) {
   const ts = new Date().toLocaleTimeString('fr-FR');
-  allLogs.push({ level, msg, ts });
-  if (allLogs.length > 1000) allLogs.shift();
+  if (allLogs.length >= 1000) allLogs.shift();
+  allLogs.push({ level, msg, ts }
 
   const filter = document.getElementById('log-level-filter')?.value || 'ALL';
   if (filter !== 'ALL' && filter !== level) return;

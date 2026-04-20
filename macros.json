@@ -1,44 +1,6 @@
 [
   {
     "name": "Nouvelle macro",
-    "loop": false,
-    "loop_delay": 0.1,
-    "rules": [
-      {
-        "id": "rule_1773928003336",
-        "label": "Règle 1",
-        "enabled": true,
-        "condition_mode": "all",
-        "conditions": [],
-        "actions": [
-          {
-            "type": "key_tap",
-            "key": "f",
-            "duration": 0.05,
-            "count": 1
-          }
-        ],
-        "stop_on_match": false
-      }
-    ],
-    "target_hwnd": null
-  },
-  {
-    "name": "Nouvelle macro",
-    "loop": true,
-    "loop_delay": 0.1,
-    "max_iterations": 0,
-    "timeout_s": 0,
-    "humanize": false,
-    "humanize_factor": 0.12,
-    "rules": [],
-    "start_guard": [],
-    "stop_conditions": [],
-    "pre_stop_actions": [],
-    "target_hwnd": null
-  },
-  {
-    "name": "Nouvelle macro",
     "loop": true,
     "loop_delay": 0.1,
     "max_iterations": 0,

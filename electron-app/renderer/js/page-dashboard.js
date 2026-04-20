@@ -20,7 +20,7 @@ function renderDashboard() {
         <div class="running-item">
           <div class="running-dot"></div>
           <span class="running-item-name">${escHtml(name)}</span>
-          <button class="btn btn-xs btn-danger" onclick="stopMacroByName('${escHtml(name).replace(/'/g,"\\'")}')">Arrêter</button>
+          <button class="btn btn-xs btn-danger" data-macro-stop="${escHtml(name)}" onclick="stopMacroByName(this.dataset.macroStop)">Arrêter</button>
         </div>
       `).join('');
     }
@@ -42,7 +42,7 @@ function renderDashboard() {
         <div class="ql-card-meta">${rulesCount} règle${rulesCount !== 1 ? 's' : ''}</div>
         <div class="ql-card-actions">
           ${isRunning
-            ? `<button class="btn btn-xs btn-danger" onclick="stopMacroByName('${escHtml(m.name).replace(/'/g,"\\'")}')">⏹ Stop</button>`
+            ? `<button class="btn btn-xs btn-danger" data-macro-stop="${escHtml(m.name)}" onclick="stopMacroByName(this.dataset.macroStop)">⏹ Stop</button>`
             : `<button class="btn btn-xs btn-success" onclick="startMacro(${i})">▶ Lancer</button>`
           }
           <button class="btn btn-xs btn-secondary" onclick="selectMacro(${i});navigate('macros')" title="Modifier">

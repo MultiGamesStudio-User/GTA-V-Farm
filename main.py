@@ -107,6 +107,9 @@ def _send_webhook(event: str, data: dict):
         now = time.time()
         if now - _webhook_last_sent < _webhook_min_interval:
             return
+        # Réserver le slot immédiatement pour éviter la race condition
+        # (deux threads vérifiant simultanément avant que _do_send mette à jour)
+        _webhook_last_sent = now
 
     def _do_send():
         global _webhook_fail_count, _webhook_disabled, _webhook_last_sent
