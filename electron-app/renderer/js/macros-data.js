@@ -1,15 +1,20 @@
-// Expose les fonctions nécessaires pour l'UI (onclick)
-window.addMacro = addMacro;
-window.duplicateMacro = duplicateMacro;
-window.moveMacroUp = moveMacroUp;
-window.moveMacroDown = moveMacroDown;
-window.deleteMacro = deleteMacro;
-window.selectMacro = selectMacro;
-window.exportAllMacros = exportAllMacros;
-window.exportCurrentMacro = exportCurrentMacro;
-window.exportCurrentMacroByIdx = exportCurrentMacroByIdx;
-window.triggerImportMacros = triggerImportMacros;
-window.handleImportMacros = handleImportMacros;
+'use strict';
+// Expose toutes les fonctions critiques sur window (robustesse update)
+function exposeMacroFunctions() {
+  window.addMacro = function() { console.log('[MacroEngine] addMacro() called'); return addMacro(); };
+  window.duplicateMacro = duplicateMacro;
+  window.moveMacroUp = moveMacroUp;
+  window.moveMacroDown = moveMacroDown;
+  window.deleteMacro = deleteMacro;
+  window.selectMacro = selectMacro;
+  window.exportAllMacros = exportAllMacros;
+  window.exportCurrentMacro = exportCurrentMacro;
+  window.exportCurrentMacroByIdx = exportCurrentMacroByIdx;
+  window.triggerImportMacros = triggerImportMacros;
+  window.handleImportMacros = handleImportMacros;
+  window.openMacroModal = function(idx) { console.log('[MacroEngine] openMacroModal(' + idx + ')'); return openMacroModal(idx); };
+}
+exposeMacroFunctions();
 'use strict';
 /* ═══════════════════════════════════════════════════════════════
    MACROS DATA — persistence + CRUD + DnD + search + import/export

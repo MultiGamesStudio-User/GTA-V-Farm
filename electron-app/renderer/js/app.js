@@ -244,12 +244,14 @@ async function init() {
 
   /* Load app config and set version strings dynamically */
   try {
+    // Lecture version courante depuis package.json à la racine du build (pas cache)
     const appCfg = await window.api.getConfig();
     const splashSub = document.querySelector('.splash-sub');
     const titleVer  = document.querySelector('.titlebar-version');
     if (splashSub) splashSub.textContent = `${appCfg.appSubtitle} \u00a0\u2022\u00a0 v${appCfg.version}`;
     if (titleVer)  titleVer.textContent  = `v${appCfg.version}`;
-  } catch (_) { /* fallback: laisse le texte HTML tel quel */ }
+    window._macroEngineVersion = appCfg.version;
+  } catch (e) { console.warn('Erreur lecture version courante:', e); }
 
   setSplashMsg('Vérification de la licence...');
   /* License check — block everything until valid */
@@ -267,6 +269,8 @@ async function init() {
   setupRecordingEvents();
   /* Load macros */
   await loadMacros();
+  // Log version courante pour debug update
+  console.log('[MacroEngine] Version courante UI:', window._macroEngineVersion);
 
   setSplashMsg('Chargement des paramètres...');
   /* Load settings & register shortcuts */
@@ -309,6 +313,19 @@ async function init() {
   renderDashboard();
   renderConditionFields();
   renderActionFields();
+  // Patch : forcer reload complet après update (si update-banner visible)
+  const updateBanner = document.getElementById('update-banner');
+  const reloadBtn = document.getElementById('update-reload-btn');
+  if (updateBanner && reloadBtn) {
+    reloadBtn.onclick = () => {
+      // Forcer un vrai redémarrage Electron (pas juste reload du renderer)
+      if (window.api && window.api.restartApp) {
+        window.api.restartApp();
+      } else {
+        location.reload();
+      }
+    };
+  }
 
   setSplashMsg('Démarrage du moteur Python...');
   appendLog('INFO', 'MacroEngine UI démarrée');

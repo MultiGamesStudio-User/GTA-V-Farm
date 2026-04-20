@@ -94,10 +94,12 @@ async function checkForUpdates(botDir, rendererDir, github, onProgress) {
   const toUpdate = [];
   for (const [relPath, expectedHash] of Object.entries(files)) {
     if (SKIP_FILES.has(relPath)) continue;
+    // Toujours updater package.json (pour version UI)
+    const isPkg = relPath === 'electron-app/package.json';
     const localPath = relPath.startsWith(RENDERER_MANIFEST_PREFIX)
       ? path.join(rendererDir, relPath.slice(RENDERER_MANIFEST_PREFIX.length))
       : path.join(botDir, relPath);
-    if (fileHash(localPath) !== expectedHash) {
+    if (fileHash(localPath) !== expectedHash || isPkg) {
       toUpdate.push(relPath);
     }
   }

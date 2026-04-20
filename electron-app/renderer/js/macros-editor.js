@@ -5,14 +5,16 @@
 
 /* ── Modal control ──────────────────────────────────────────── */
 function openMacroModal(idx) {
+  console.log('[MacroEngine] openMacroModal(' + idx + ')');
   currentMacroIdx = idx;
   const modal   = document.getElementById('macro-modal');
   const titleEl = document.getElementById('macro-modal-title-text');
-  if (!modal) return;
+  if (!modal) { alert('Erreur critique : modale macro absente du DOM'); return; }
   const macro = macros[idx];
   if (titleEl) titleEl.textContent = macro?.name || 'Macro';
   renderMacroEditor();
   modal.style.display = 'flex';
+  modal.focus && modal.focus();
   document.addEventListener('keydown', _modalEscHandler);
 }
 
