@@ -60,7 +60,7 @@ const RENDERER_DIR   = IS_PACKED
 const ROOT_DIR      = BOT_DIR;
 const MAIN_PY       = path.join(BOT_DIR, 'main.py');
 const MACROS_PATH   = path.join(BOT_DIR, 'macros.json');
-const LICENSE_PATH  = path.join(BOT_DIR, 'license.json');
+const LICENSE_PATH  = path.join(app.getPath('userData'), 'license.json');
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
 
 // ── Résolution du chemin Python ───────────────────────────────────────────────
