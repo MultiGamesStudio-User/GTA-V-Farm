@@ -10,25 +10,57 @@ let runningMacros   = new Set();
 let allLogs         = [];
 
 /* ── Navigation ───────────────────────────────────────────── */
-function navigate(page) {
+function navigate(page, testTab) {
+  // Redirect legacy page names to the unified tests page
+  if (page === 'conditions' || page === 'actions' || page === 'windows') {
+    testTab = page;
+    page    = 'tests';
+  }
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const pageEl = document.getElementById('page-' + page);
-  const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
+  const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
   if (pageEl) pageEl.classList.add('active');
-  if (navEl) navEl.classList.add('active');
+  if (navEl)  navEl.classList.add('active');
 
-  if (page === 'conditions') renderConditionFields();
-  if (page === 'actions')    renderActionFields();
+  if (page === 'tests')      switchTestTab(testTab || null);
   if (page === 'macros')     renderMacroList();
   if (page === 'dashboard')  renderDashboard();
   if (page === 'syslog')     refreshSyslog();
   if (page === 'settings')   refreshSyslog();
-  if (page === 'windows')    refreshWindows();
   if (page === 'autoclicker') initAutoClicker();
 
-  // Persist last page
   _saveUiPref('lastPage', page);
+}
+
+/* ── Tests page tab switching ─────────────────────────────── */
+function switchTestTab(tab) {
+  // Default to last saved tab or conditions
+  if (!tab) {
+    try {
+      tab = window._lastTestTab || 'conditions';
+    } catch (_) { tab = 'conditions'; }
+  }
+  window._lastTestTab = tab;
+
+  document.querySelectorAll('.test-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tests-tab').forEach(t => t.classList.remove('active'));
+
+  const panel  = document.getElementById('test-panel-' + tab);
+  const tabBtn = document.querySelector(`.tests-tab[data-tab="${tab}"]`);
+  if (panel)  panel.classList.add('active');
+  if (tabBtn) tabBtn.classList.add('active');
+
+  // Refresh button in header — only shown on Fenêtres tab
+  const winActions = document.getElementById('tests-header-actions-windows');
+  if (winActions) winActions.style.display = tab === 'windows' ? '' : 'none';
+
+  if (tab === 'conditions') renderConditionFields();
+  if (tab === 'actions')    renderActionFields();
+  if (tab === 'windows')    refreshWindows();
+
+  _saveUiPref('lastTestTab', tab);
 }
 
 /* ── Syslog page ──────────────────────────────────────────── */
@@ -410,6 +442,7 @@ async function loadAppSettings() {
     if (ocrEl && s.ocrEngine) ocrEl.value = s.ocrEngine;
 
     // Last page — navigate after short delay so DOM is ready
+    if (s.lastTestTab) window._lastTestTab = s.lastTestTab;
     if (s.lastPage) {
       setTimeout(() => navigate(s.lastPage), 50);
     }

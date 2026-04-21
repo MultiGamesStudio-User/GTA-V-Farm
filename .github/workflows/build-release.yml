@@ -1,4 +1,4 @@
-﻿name: Build & Release MacroEngine
+name: Build & Release MacroEngine
 
 on:
   push:
@@ -16,6 +16,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,6 +40,31 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Get version from package.json
+        id: pkg_version
+        run: |
+          $version = (Get-Content electron-app/package.json | ConvertFrom-Json).version
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "TAG=v$version" >> $env:GITHUB_OUTPUT
+
+      # ── Génération du manifest de mise à jour ────────────────────────────────
+      - name: Generate update-manifest.json
+        run: node electron-app/scripts/generate-manifest.js
+
+      - name: Commit update-manifest.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add update-manifest.json
+          # Ne committer que si le fichier a changé
+          if (git diff --cached --quiet) {
+            Write-Host "update-manifest.json unchanged — skipping commit"
+          } else {
+            git commit -m "chore: update manifest v${{ steps.pkg_version.outputs.VERSION }} [skip ci]"
+            git push
+          }
+
+      # ── Build ────────────────────────────────────────────────────────────────
       - name: Check icons
         working-directory: electron-app
         run: npm run check-icons
@@ -50,13 +78,6 @@ jobs:
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=8192
-
-      - name: Get version from package.json
-        id: pkg_version
-        run: |
-          $version = (Get-Content electron-app/package.json | ConvertFrom-Json).version
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-          echo "TAG=v$version" >> $env:GITHUB_OUTPUT
 
       - name: Verify build output
         working-directory: electron-app

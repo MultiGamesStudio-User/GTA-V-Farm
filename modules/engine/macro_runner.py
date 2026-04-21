@@ -82,9 +82,9 @@ class MacroRunner:
 
     def stop(self):
         self._stop.set()
-        self._pause_lock.set()
+        self._pause_lock.set()   # débloquer un éventuel pause.wait()
         if self._thread:
-            self._thread.join(timeout=5)
+            self._thread.join(timeout=2)
             self._thread = None
 
     def pause(self):

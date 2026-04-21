@@ -444,6 +444,7 @@ function _dispatchFromEngine(msg) {
     _sendToOverlay('overlay:log', { level: msg.level, msg: msg.msg });
   } else if (msg.type === 'status') {
     mainWindow?.webContents.send('engine:status', { running: msg.running });
+    _sendToOverlay('overlay:status', { running: msg.running });
   } else if (msg.type === 'status_update') {
     mainWindow?.webContents.send('engine:status_update', msg);
     _sendToOverlay('overlay:status', msg);
@@ -622,11 +623,11 @@ function createOverlayWindow() {
   overlayWindow = new BrowserWindow({
     x:           pos.x,
     y:           pos.y,
-    width:       300,
-    height:      savedSize.height || 360,
-    minWidth:    260,
-    minHeight:   200,
-    maxWidth:    400,
+    width:       280,
+    height:      savedSize.height || 300,
+    minWidth:    240,
+    minHeight:   80,
+    maxWidth:    360,
     frame:       false,
     transparent: true,
     alwaysOnTop: true,
@@ -705,6 +706,23 @@ ipcMain.on('overlay:close', () => {
 ipcMain.on('overlay:minimize', () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide();
   mainWindow?.webContents.send('overlay:closed');
+});
+
+ipcMain.on('overlay:set-size', (_, { w, h }) => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.setSize(Math.round(w), Math.round(h), true);
+  }
+});
+
+ipcMain.on('overlay:pause-all', async () => {
+  mainWindow?.webContents.send('shortcut:triggered', { action: 'pause' });
+});
+
+ipcMain.handle('overlay:get-shortcuts', () => {
+  try {
+    const s = readSettings();
+    return { ok: true, stop: s.shortcutStop || '', pause: s.shortcutPause || '' };
+  } catch (_) { return { ok: false, stop: '', pause: '' }; }
 });
 
 ipcMain.on('overlay:macro-start', async (_, { name }) => {
@@ -909,6 +927,13 @@ ipcMain.handle('settings:read', () => {
 ipcMain.handle('settings:write', (_evt, data) => {
   try {
     saveSettings(data);
+    // Notify overlay if shortcuts changed
+    if (data.shortcutStop !== undefined || data.shortcutPause !== undefined) {
+      _sendToOverlay('overlay:shortcuts-updated', {
+        stop:  data.shortcutStop  || '',
+        pause: data.shortcutPause || '',
+      });
+    }
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });

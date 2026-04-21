@@ -9,329 +9,272 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        rgba(7, 7, 10, 0.92);
-      --border:    rgba(255,255,255,.07);
-      --border-2:  rgba(255,255,255,.12);
-      --accent:    #e8352a;
-      --green:     #3ddc84;
-      --orange:    #ff9500;
-      --blue:      #4a9eff;
-      --text:      #e8e8f0;
-      --text-2:    #6060a0;
-      --text-3:    #303050;
-      --radius:    12px;
-      --font:      'Segoe UI', system-ui, sans-serif;
-      --mono:      'Consolas', monospace;
+      --bg:      rgba(9,9,15,0.97);
+      --b:       rgba(255,255,255,.07);
+      --b2:      rgba(255,255,255,.12);
+      --green:   #3ddc84;
+      --red:     #ff4a4a;
+      --orange:  #ff9500;
+      --blue:    #4a9eff;
+      --purple:  #a78bfa;
+      --t:       #d0d0e0;
+      --t2:      rgba(160,160,200,.4);
+      --t3:      rgba(100,100,140,.28);
+      --r:       9px;
+      --f:       'Segoe UI', system-ui, sans-serif;
+      --m:       'Consolas', monospace;
     }
 
-    html, body { height: 100%; background: transparent; font-family: var(--font);
-      -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; }
+    html, body {
+      height: 100%; background: transparent;
+      font-family: var(--f); overflow: hidden; user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
 
     #root {
+      display: flex; flex-direction: column; height: 100%;
       background: var(--bg);
-      border: 1px solid var(--border-2);
-      border-radius: var(--radius);
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
-      display: flex;
-      flex-direction: column;
-      height: 100%;
+      border: 1px solid var(--b2);
+      border-radius: var(--r);
       overflow: hidden;
-      box-shadow: 0 16px 56px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.04) inset;
+      box-shadow: 0 20px 60px rgba(0,0,0,.92), 0 0 0 1px rgba(255,255,255,.03) inset;
+      backdrop-filter: blur(32px);
+      -webkit-backdrop-filter: blur(32px);
     }
 
-    /* ── Titlebar ─────────────────────────────────────────── */
-    #titlebar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 8px 7px 10px;
-      border-bottom: 1px solid var(--border);
+    /* ── animations ── */
+    @keyframes pg {
+      0%,100% { box-shadow: 0 0 0 0 rgba(61,220,132,.55); }
+      60%      { box-shadow: 0 0 0 5px rgba(61,220,132,0); }
+    }
+    @keyframes po {
+      0%,100% { box-shadow: 0 0 0 0 rgba(255,149,0,.55); }
+      60%      { box-shadow: 0 0 0 5px rgba(255,149,0,0); }
+    }
+
+    /* ── titlebar ── */
+    #tb {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 7px 6px 10px;
       -webkit-app-region: drag;
+      border-bottom: 1px solid var(--b);
+      background: rgba(255,255,255,.015);
       flex-shrink: 0;
-      background: rgba(255,255,255,.025);
-      border-radius: var(--radius) var(--radius) 0 0;
     }
-
-    .title-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--text-3); flex-shrink: 0;
-      transition: background .4s, box-shadow .4s;
+    #tb-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--t3); flex-shrink: 0; transition: background .3s;
     }
-    .title-dot.running {
-      background: var(--green);
-      box-shadow: 0 0 8px var(--green);
-      animation: glow 2.2s ease-in-out infinite;
+    #tb-dot.on { background: var(--green); animation: pg 2.5s ease-in-out infinite; }
+    #tb-label {
+      font-size: 8.5px; font-weight: 700; letter-spacing: .2em;
+      text-transform: uppercase; color: var(--t2); flex: 1;
     }
-    @keyframes glow {
-      0%,100% { box-shadow: 0 0 4px rgba(61,220,132,.5); }
-      50%      { box-shadow: 0 0 10px rgba(61,220,132,.9); }
-    }
-
-    .title-label {
-      font-size: 9px; font-weight: 700; letter-spacing: .18em;
-      text-transform: uppercase; color: var(--text-2); flex: 1;
-    }
-
-    .title-count {
-      font-size: 9px; font-weight: 700; font-family: var(--mono);
-      color: var(--green); background: rgba(61,220,132,.12);
-      border: 1px solid rgba(61,220,132,.2); border-radius: 4px;
+    #tb-count {
+      font-size: 8px; font-weight: 700; font-family: var(--m);
+      color: var(--green); background: rgba(61,220,132,.1);
+      border: 1px solid rgba(61,220,132,.16); border-radius: 3px;
       padding: 1px 5px; display: none;
     }
-    .title-count.visible { display: inline; }
+    #tb-count.on { display: inline; }
+    .tbb {
+      display: flex; gap: 2px; -webkit-app-region: no-drag;
+    }
+    .tb-btn {
+      width: 18px; height: 18px; border-radius: 4px; border: none;
+      background: transparent; color: var(--t3); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .1s, color .1s; padding: 0;
+    }
+    .tb-btn:hover                { background: rgba(255,255,255,.07); color: var(--t2); }
+    .tb-btn.c-col:hover          { background: rgba(167,139,250,.12); color: var(--purple); }
+    .tb-btn.c-close:hover        { background: rgba(255,74,74,.2);    color: var(--red); }
 
-    .title-btns { display: flex; gap: 3px; -webkit-app-region: no-drag; }
-    .title-btn {
-      width: 19px; height: 19px; border-radius: 5px; border: none;
-      background: rgba(255,255,255,.05); color: var(--text-3);
+    /* ── kill bar ── */
+    #kill {
+      display: flex; gap: 4px; padding: 5px 7px;
+      border-bottom: 1px solid var(--b); flex-shrink: 0;
+    }
+    .kk {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 4px 6px; border-radius: 6px; border: none; cursor: pointer;
+      font-family: var(--f); transition: filter .1s, transform .07s;
+      background: rgba(255,74,74,.09); border: 1px solid rgba(255,74,74,.13);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .kk.kp { background: rgba(255,149,0,.08); border-color: rgba(255,149,0,.12); }
+    .kk:hover  { filter: brightness(1.3); }
+    .kk:active { transform: translateY(1px); filter: brightness(.95); }
+
+    .kk-key {
+      font-size: 8px; font-weight: 800; font-family: var(--m);
+      color: var(--red); background: rgba(255,74,74,.1);
+      border: 1px solid rgba(255,74,74,.18); border-radius: 3px;
+      padding: 0 4px; line-height: 14px;
+      box-shadow: 0 1px 0 rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+    }
+    .kk.kp .kk-key { color: var(--orange); background: rgba(255,149,0,.09); border-color: rgba(255,149,0,.17); }
+    .kk-lbl { font-size: 9px; font-weight: 600; color: rgba(255,110,110,.65); }
+    .kk.kp .kk-lbl { color: rgba(255,170,60,.65); }
+
+    /* ── expandable ── */
+    #body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+    /* ── macro list ── */
+    #mlist {
+      flex: 1; overflow-y: auto; padding: 3px 6px 4px;
+      display: flex; flex-direction: column; gap: 2px; min-height: 0;
+    }
+    .empty { padding: 14px 10px; font-size: 10px; color: var(--t3); text-align: center; }
+
+    .mr {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 7px 5px 8px; border-radius: 6px;
+      border: 1px solid transparent; transition: background .12s;
+    }
+    .mr.i { background: rgba(255,255,255,.02); border-color: rgba(255,255,255,.04); }
+    .mr.i:hover { background: rgba(255,255,255,.04); }
+    .mr.r {
+      background: rgba(61,220,132,.055);
+      border-color: rgba(61,220,132,.13);
+      box-shadow: inset 2px 0 0 rgba(61,220,132,.35);
+    }
+    .mr.r:hover { background: rgba(61,220,132,.085); }
+
+    .md { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+    .mr.i .md { background: var(--t3); }
+    .mr.r .md { background: var(--green); animation: pg 2.5s ease-in-out infinite; }
+
+    .mn {
+      flex: 1; font-size: 10.5px; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mr.i .mn { color: rgba(180,180,210,.45); }
+    .mr.r .mn { color: var(--t); }
+
+    .mt {
+      font-size: 9px; color: var(--green); font-weight: 600;
+      font-family: var(--m); opacity: .75; flex-shrink: 0;
+      font-variant-numeric: tabular-nums; min-width: 34px; text-align: right;
+    }
+
+    .mb {
+      width: 20px; height: 20px; border-radius: 4px; border: none;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
-      transition: background .14s, color .14s; padding: 0;
+      flex-shrink: 0; padding: 0; transition: background .1s, transform .07s;
     }
-    .title-btn:hover                { background: rgba(255,255,255,.12); color: var(--text-2); }
-    .title-btn.btn-main:hover       { background: rgba(74,158,255,.2);   color: var(--blue); }
-    .title-btn.btn-close:hover      { background: rgba(232,53,42,.25);   color: #ff7070; }
+    .mb:active { transform: scale(.86); }
+    .mr.i .mb { background: rgba(61,220,132,.08); color: rgba(61,220,132,.75); }
+    .mr.i .mb:hover { background: rgba(61,220,132,.2); }
+    .mr.r .mb { background: rgba(255,74,74,.09); color: rgba(255,100,100,.8); }
+    .mr.r .mb:hover { background: rgba(255,74,74,.2); }
 
-    /* ── Sections header ──────────────────────────────────── */
-    .section-header {
-      padding: 6px 10px 3px;
-      font-size: 8.5px; font-weight: 700; letter-spacing: .14em;
-      text-transform: uppercase; color: var(--text-3);
-      flex-shrink: 0;
-    }
-
-    /* ── Macro list ───────────────────────────────────────── */
-    #macros-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 2px 7px 4px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      min-height: 0;
-    }
-
-    .no-macros {
-      padding: 18px 12px;
-      font-size: 11px; color: var(--text-3);
-      text-align: center;
-    }
-
-    .macro-row {
-      display: flex; align-items: center; gap: 7px;
-      padding: 5px 7px 5px 8px;
-      border-radius: 7px;
-      border: 1px solid transparent;
-      transition: background .15s, border-color .15s;
-      cursor: default;
-    }
-    .macro-row.idle {
-      background: rgba(255,255,255,.025);
-      border-color: rgba(255,255,255,.05);
-    }
-    .macro-row.idle:hover {
-      background: rgba(255,255,255,.05);
-      border-color: rgba(255,255,255,.1);
-    }
-    .macro-row.running {
-      background: rgba(61,220,132,.07);
-      border-color: rgba(61,220,132,.18);
-    }
-    .macro-row.running:hover {
-      background: rgba(61,220,132,.11);
-    }
-
-    .macro-dot {
-      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-      transition: background .3s, box-shadow .3s;
-    }
-    .macro-row.idle    .macro-dot { background: var(--text-3); }
-    .macro-row.running .macro-dot {
-      background: var(--green);
-      box-shadow: 0 0 6px rgba(61,220,132,.7);
-      animation: glow 2.2s ease-in-out infinite;
-    }
-
-    .macro-name {
-      flex: 1; font-size: 11.5px; font-weight: 600;
-      color: var(--text); overflow: hidden;
-      text-overflow: ellipsis; white-space: nowrap;
-    }
-    .macro-row.idle .macro-name { color: rgba(224,224,240,.6); }
-
-    .macro-time {
-      font-size: 10px; color: var(--green); font-weight: 600;
-      font-family: var(--mono); opacity: .8; flex-shrink: 0;
-      font-variant-numeric: tabular-nums; min-width: 38px; text-align: right;
-    }
-
-    .macro-btn {
-      width: 22px; height: 22px; border-radius: 5px; border: none;
-      cursor: pointer; display: flex; align-items: center; justify-content: center;
-      transition: background .14s, transform 80ms; flex-shrink: 0; padding: 0;
-    }
-    .macro-btn:active { transform: scale(.9); }
-
-    .macro-row.idle    .macro-btn {
-      background: rgba(61,220,132,.1); color: var(--green);
-    }
-    .macro-row.idle    .macro-btn:hover { background: rgba(61,220,132,.22); }
-
-    .macro-row.running .macro-btn {
-      background: rgba(232,53,42,.12); color: #ff6060;
-    }
-    .macro-row.running .macro-btn:hover { background: rgba(232,53,42,.26); }
-
-    /* ── Log strip ────────────────────────────────────────── */
-    #log-strip {
-      flex-shrink: 0;
-      border-top: 1px solid var(--border);
-      padding: 4px 9px 4px;
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-      max-height: 58px;
-      overflow: hidden;
-    }
-
-    .log-line {
-      font-size: 9.5px; font-family: var(--mono);
-      color: var(--text-3); white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-      line-height: 1.5;
-    }
-    .log-line.level-ERROR, .log-line.level-FATAL   { color: #ff5858; }
-    .log-line.level-WARNING, .log-line.level-PYERR { color: var(--orange); }
-    .log-line.level-INFO                           { color: rgba(96,96,160,.9); }
-
-    /* ── Footer ───────────────────────────────────────────── */
-    #footer {
-      padding: 5px 7px 7px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    #btn-stop {
-      width: 100%; padding: 6px 10px;
-      border-radius: 7px;
-      background: rgba(232,53,42,.1);
-      border: 1px solid rgba(232,53,42,.22);
-      color: #ff6060; font-size: 10.5px; font-weight: 700;
-      cursor: pointer; letter-spacing: .06em; text-transform: uppercase;
-      transition: background .14s, border-color .14s, transform 80ms;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      font-family: var(--font);
-    }
-    #btn-stop:hover  { background: rgba(232,53,42,.22); border-color: rgba(232,53,42,.4); }
-    #btn-stop:active { transform: scale(.98); }
-
-    /* ── Scrollbar ────────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 3px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.15); }
-
-    /* ── Auto Clicker section ─────────────────────────────── */
-    #acp-section {
-      flex-shrink: 0;
-      border-top: 1px solid var(--border);
+    /* ── ACP section ── */
+    #acp {
+      flex-shrink: 0; border-top: 1px solid var(--b);
       padding: 5px 7px 6px;
     }
+    #acp-row1 {
+      display: flex; align-items: center; gap: 5px; margin-bottom: 5px;
+    }
+    .ad {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--t3); flex-shrink: 0; transition: background .3s;
+    }
+    .ad.on { background: var(--orange); animation: po 2.5s ease-in-out infinite; }
+    #acp-title {
+      font-size: 8px; font-weight: 700; letter-spacing: .16em;
+      text-transform: uppercase; color: var(--t3); flex: 1;
+    }
+    #acp-info { font-size: 8.5px; color: var(--t3); font-family: var(--m); }
 
-    #acp-header {
-      display: flex; align-items: center; gap: 6px;
-      cursor: pointer; padding: 2px 3px;
-      border-radius: 5px;
-      transition: background .13s;
-      user-select: none;
+    #acp-hks {
+      display: flex; gap: 4px; margin-bottom: 5px;
     }
-    #acp-header:hover { background: rgba(255,255,255,.04); }
+    .ahk {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 3px;
+      padding: 3px 5px; border-radius: 4px;
+      background: rgba(255,255,255,.02); border: 1px solid rgba(255,149,0,.07);
+    }
+    .ahk-k {
+      font-size: 7.5px; font-weight: 800; font-family: var(--m);
+      color: var(--orange); background: rgba(255,149,0,.09);
+      border: 1px solid rgba(255,149,0,.16); border-radius: 2px;
+      padding: 0 3px; line-height: 13px;
+      box-shadow: 0 1px 0 rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .ahk-l { font-size: 8px; color: rgba(255,165,50,.55); font-weight: 500; }
 
-    #acp-header-label {
-      font-size: 8.5px; font-weight: 700; letter-spacing: .14em;
-      text-transform: uppercase; color: var(--text-3); flex: 1;
+    #acp-cd {
+      display: none; text-align: center; font-size: 11px; font-weight: 800;
+      font-family: var(--m); color: var(--orange); padding: 1px 0 4px;
+      letter-spacing: .03em;
     }
+    #acp-cd.on { display: block; }
 
-    .acp-dot {
-      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-      background: var(--text-3); transition: background .3s, box-shadow .3s;
+    #acp-btn {
+      width: 100%; padding: 5px 8px; border-radius: 5px;
+      border: 1px solid rgba(255,149,0,.18);
+      background: rgba(255,149,0,.07);
+      color: var(--orange); font-size: 9.5px; font-weight: 700;
+      cursor: pointer; letter-spacing: .05em; text-transform: uppercase;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      font-family: var(--f); transition: background .1s, transform .07s;
     }
-    .acp-dot.running {
-      background: var(--orange);
-      box-shadow: 0 0 6px rgba(255,149,0,.7);
-      animation: glow-orange 2.2s ease-in-out infinite;
-    }
-    @keyframes glow-orange {
-      0%,100% { box-shadow: 0 0 4px rgba(255,149,0,.5); }
-      50%      { box-shadow: 0 0 10px rgba(255,149,0,.9); }
-    }
+    #acp-btn:hover  { background: rgba(255,149,0,.16); }
+    #acp-btn:active { transform: scale(.99); }
+    #acp-btn.s { border-color: rgba(255,74,74,.2); background: rgba(255,74,74,.08); color: var(--red); }
+    #acp-btn.s:hover { background: rgba(255,74,74,.18); }
+    #acp-btn.cancel { border-color: rgba(255,149,0,.25); background: rgba(255,149,0,.12); }
 
-    .acp-chevron {
-      color: var(--text-3); transition: transform .2s;
-      display: flex; align-items: center;
+    /* ── footer ── */
+    #foot { padding: 4px 6px 6px; border-top: 1px solid var(--b); flex-shrink: 0; }
+    #btn-stop {
+      width: 100%; padding: 6px 8px; border-radius: 6px;
+      background: rgba(255,74,74,.09); border: 1px solid rgba(255,74,74,.18);
+      color: var(--red); font-size: 10px; font-weight: 700;
+      cursor: pointer; letter-spacing: .05em; text-transform: uppercase;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      font-family: var(--f); transition: background .1s, transform .07s;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
     }
-    .acp-chevron.open { transform: rotate(180deg); }
+    #btn-stop:hover  { background: rgba(255,74,74,.18); }
+    #btn-stop:active { transform: scale(.99); }
 
-    #acp-body {
-      display: none;
-      margin-top: 5px;
-      gap: 5px;
-      flex-direction: column;
-    }
-    #acp-body.open { display: flex; }
+    /* ── scrollbar ── */
+    ::-webkit-scrollbar { width: 2px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.07); border-radius: 1px; }
 
-    #acp-info {
-      font-size: 9.5px; color: var(--text-3); font-family: var(--mono);
-      padding: 2px 3px;
-    }
-
-    #acp-btn-toggle {
-      width: 100%; padding: 5px 10px;
-      border-radius: 6px;
-      border: 1px solid rgba(255,149,0,.22);
-      background: rgba(255,149,0,.08);
-      color: var(--orange); font-size: 10px; font-weight: 700;
-      cursor: pointer; letter-spacing: .06em; text-transform: uppercase;
-      transition: background .14s, border-color .14s, transform 80ms;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      font-family: var(--font);
-    }
-    #acp-btn-toggle:hover  { background: rgba(255,149,0,.18); border-color: rgba(255,149,0,.4); }
-    #acp-btn-toggle:active { transform: scale(.98); }
-    #acp-btn-toggle.running {
-      border-color: rgba(232,53,42,.3);
-      background:   rgba(232,53,42,.1);
-      color: #ff6060;
-    }
-    #acp-btn-toggle.running:hover { background: rgba(232,53,42,.22); }
-
-    #acp-config-hint {
-      font-size: 9px; color: var(--text-3); text-align: center;
-      padding: 1px 3px;
-    }
+    /* ── collapsed ── */
+    #root.col #body, #root.col #foot { display: none; }
   </style>
 </head>
 <body>
 <div id="root">
 
   <!-- Titlebar -->
-  <div id="titlebar">
-    <div class="title-dot" id="title-dot"></div>
-    <span class="title-label">Macro Engine</span>
-    <span class="title-count" id="run-count"></span>
-    <div class="title-btns">
-      <button class="title-btn btn-main" onclick="window.overlay.focusMain()" title="Ouvrir MacroEngine">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="11">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M9 9l6 6M15 9l-6 6"/>
+  <div id="tb">
+    <div id="tb-dot"></div>
+    <span id="tb-label">Macro Engine</span>
+    <span id="tb-count"></span>
+    <div class="tbb">
+      <button class="tb-btn" onclick="window.overlay.focusMain()" title="Ouvrir">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" width="10">
+          <rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M9 12h6M12 9v6"/>
         </svg>
       </button>
-      <button class="title-btn" onclick="window.overlay.hide()" title="Masquer">
+      <button class="tb-btn c-col" id="btn-col" onclick="toggleCol()" title="Réduire">
+        <svg id="ico-col" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10">
+          <polyline points="18 15 12 9 6 15"/>
+        </svg>
+      </button>
+      <button class="tb-btn" onclick="window.overlay.hide()" title="Masquer">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10">
           <line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
       </button>
-      <button class="title-btn btn-close" onclick="window.overlay.close()" title="Fermer">
+      <button class="tb-btn c-close" onclick="window.overlay.close()" title="Fermer">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
@@ -339,42 +282,48 @@
     </div>
   </div>
 
-  <!-- Macro list -->
-  <div class="section-header">Macros</div>
-  <div id="macros-list">
-    <div class="no-macros">Chargement…</div>
+  <!-- Kill bar -->
+  <div id="kill">
+    <button class="kk" onclick="doStop()" title="Tout arrêter">
+      <span class="kk-key" id="k-stop">F12</span>
+      <span class="kk-lbl">Stop tout</span>
+    </button>
+    <button class="kk kp" onclick="doPause()" title="Pause / Reprendre">
+      <span class="kk-key" id="k-pause">F11</span>
+      <span class="kk-lbl" id="k-pause-lbl">Pause</span>
+    </button>
   </div>
 
-  <!-- Log strip -->
-  <div id="log-strip"></div>
+  <!-- Body -->
+  <div id="body">
+    <div id="mlist"><div class="empty">Chargement…</div></div>
 
-  <!-- Auto Clicker section -->
-  <div id="acp-section">
-    <div id="acp-header" onclick="toggleAcpBody()">
-      <div class="acp-dot" id="acp-dot"></div>
-      <span id="acp-header-label">Auto Clicker</span>
-      <div class="acp-chevron" id="acp-chevron">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
+    <div id="acp">
+      <div id="acp-row1">
+        <div class="ad" id="acp-dot"></div>
+        <span id="acp-title">Auto Clicker</span>
+        <span id="acp-info">—</span>
       </div>
-    </div>
-    <div id="acp-body">
-      <div id="acp-info">Aucune config chargée</div>
-      <button id="acp-btn-toggle" onclick="acpToggle()">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="10"><polygon points="5,3 19,12 5,21"/></svg>
+      <div id="acp-hks">
+        <div class="ahk">
+          <span class="ahk-k" id="ahk-s">F6</span><span class="ahk-l">Start</span>
+        </div>
+        <div class="ahk">
+          <span class="ahk-k" id="ahk-e">F7</span><span class="ahk-l">Stop</span>
+        </div>
+      </div>
+      <div id="acp-cd"></div>
+      <button id="acp-btn" onclick="acpToggle()">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="9"><polygon points="5,3 19,12 5,21"/></svg>
         Démarrer
       </button>
-      <div id="acp-config-hint">Config depuis la page Auto Clicker</div>
     </div>
   </div>
 
   <!-- Footer -->
-  <div id="footer">
-    <button id="btn-stop" onclick="window.overlay.stopAll()">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="11">
-        <rect x="4" y="4" width="16" height="16" rx="2"/>
-      </svg>
+  <div id="foot">
+    <button id="btn-stop" onclick="doStop()">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="10"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
       Tout arrêter
     </button>
   </div>
@@ -383,263 +332,228 @@
 <script>
 'use strict';
 
-const ICON_PLAY = `<svg viewBox="0 0 24 24" fill="currentColor" width="11"><polygon points="5,3 19,12 5,21"/></svg>`;
-const ICON_STOP = `<svg viewBox="0 0 24 24" fill="currentColor" width="11"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+const R_PLAY = `<svg viewBox="0 0 24 24" fill="currentColor" width="10"><polygon points="5,3 19,12 5,21"/></svg>`;
+const R_STOP = `<svg viewBox="0 0 24 24" fill="currentColor" width="10"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
 
-const titleDot  = document.getElementById('title-dot');
-const macroList = document.getElementById('macros-list');
-const runCount  = document.getElementById('run-count');
-const logStrip  = document.getElementById('log-strip');
+const allM   = [];
+const run    = new Map();
+const logs   = [];
 
-// State
-const allMacros = [];          // string[] — all macro names
-const running   = new Map();   // name → startTime (ms)
-const LOG_MAX   = 4;
-const logs      = [];          // { msg, level }[]
+let _acpOn   = false;
+let _acpCfg  = null;
+let _cdTimer = null;
+let _paused  = false;
+let _col     = localStorage.getItem('ov-c') === '1';
 
-// ── Time formatting ──────────────────────────────────────────
-function fmt(ms) {
-  const s = Math.floor(ms / 1000), m = Math.floor(s / 60), h = Math.floor(m / 60);
-  if (h > 0) return `${h}h${String(m % 60).padStart(2,'0')}m`;
-  return `${String(m).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
-}
-setInterval(() => {
-  document.querySelectorAll('.macro-time[data-start]').forEach(el => {
-    el.textContent = fmt(Date.now() - parseInt(el.dataset.start, 10));
-  });
-}, 1000);
+const COL_H  = 66;
+const EXP_H  = 300;
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function fmt(ms) {
+  const s=Math.floor(ms/1000), m=Math.floor(s/60), h=Math.floor(m/60);
+  return h>0 ? `${h}h${String(m%60).padStart(2,'0')}m` : `${String(m).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
 
-// ── Render macros ────────────────────────────────────────────
+/* ── collapse ── */
+function applyCol() {
+  document.getElementById('root').classList.toggle('col', _col);
+  document.getElementById('ico-col').innerHTML = _col
+    ? '<polyline points="6 9 12 15 18 9"/>'
+    : '<polyline points="18 15 12 9 6 15"/>';
+  const h = _col ? COL_H : (parseInt(localStorage.getItem('ov-eh')) || EXP_H);
+  window.overlay.setSize(280, h);
+  localStorage.setItem('ov-c', _col ? '1' : '0');
+}
+function toggleCol() {
+  if (!_col) localStorage.setItem('ov-eh', String(window.outerHeight || EXP_H));
+  _col = !_col;
+  applyCol();
+}
+
+/* ── stop / pause ── */
+function doStop() {
+  window.overlay.stopAll();
+  _paused = false; updPause();
+}
+function doPause() {
+  window.overlay.pauseAll();
+  _paused = !_paused; updPause();
+}
+function updPause() {
+  document.getElementById('k-pause-lbl').textContent = _paused ? 'Reprendre' : 'Pause';
+}
+
+/* ── macros ── */
 function renderMacros() {
-  const runningCount = running.size;
+  const n = run.size;
+  const dot = document.getElementById('tb-dot');
+  const cnt = document.getElementById('tb-count');
+  dot.classList.toggle('on', n > 0);
+  cnt.textContent = n; cnt.classList.toggle('on', n > 0);
 
-  // Update title dot & count badge
-  if (runningCount > 0) {
-    titleDot.classList.add('running');
-    runCount.textContent = runningCount;
-    runCount.classList.add('visible');
-  } else {
-    titleDot.classList.remove('running');
-    runCount.classList.remove('visible');
-  }
+  const el = document.getElementById('mlist');
+  if (!allM.length) { el.innerHTML = '<div class="empty">Aucune macro</div>'; return; }
 
-  if (allMacros.length === 0) {
-    macroList.innerHTML = '<div class="no-macros">Aucune macro configurée</div>';
-    return;
-  }
-
-  macroList.innerHTML = allMacros.map(name => {
-    const isRunning = running.has(name);
-    const startTime = isRunning ? running.get(name) : null;
-    const state     = isRunning ? 'running' : 'idle';
-    const btnTitle  = isRunning ? 'Arrêter' : 'Démarrer';
-    const btnIcon   = isRunning ? ICON_STOP : ICON_PLAY;
-    const btnAction = isRunning
+  el.innerHTML = allM.map(name => {
+    const on  = run.has(name);
+    const st  = run.get(name);
+    const act = on
       ? `window.overlay.macroStop(${JSON.stringify(name)})`
       : `window.overlay.macroStart(${JSON.stringify(name)})`;
-    const timeHtml = isRunning
-      ? `<div class="macro-time" data-start="${startTime}">${fmt(Date.now() - startTime)}</div>`
-      : '';
-
-    return `<div class="macro-row ${state}">
-      <div class="macro-dot"></div>
-      <div class="macro-name" title="${esc(name)}">${esc(name)}</div>
-      ${timeHtml}
-      <button class="macro-btn" onclick="${btnAction}" title="${btnTitle}">${btnIcon}</button>
+    return `<div class="mr ${on?'r':'i'}">
+      <div class="md"></div>
+      <div class="mn" title="${esc(name)}">${esc(name)}</div>
+      ${on ? `<div class="mt" data-s="${st}">${fmt(Date.now()-st)}</div>` : ''}
+      <button class="mb" onclick="${act}">${on?R_STOP:R_PLAY}</button>
     </div>`;
   }).join('');
 }
 
-// ── Render logs ──────────────────────────────────────────────
-function renderLogs() {
-  logStrip.innerHTML = logs.map(l =>
-    `<div class="log-line level-${l.level}">${esc(l.msg)}</div>`
-  ).join('');
-}
+setInterval(() => {
+  document.querySelectorAll('.mt[data-s]').forEach(el => {
+    el.textContent = fmt(Date.now() - +el.dataset.s);
+  });
+}, 1000);
 
-// ── Load macro list ──────────────────────────────────────────
 async function loadMacros() {
+  try { const r = await window.overlay.getMacros(); allM.length=0; if(r?.macros) allM.push(...r.macros); } catch(_){}
+  renderMacros();
+}
+
+/* ── shortcuts ── */
+async function loadShortcuts() {
   try {
-    const r = await window.overlay.getMacros();
-    allMacros.length = 0;
-    if (r && r.macros) allMacros.push(...r.macros);
-  } catch (_) {}
-  renderMacros();
+    const r = await window.overlay.getShortcuts();
+    if (r?.ok) {
+      if (r.stop)  document.getElementById('k-stop').textContent  = r.stop;
+      if (r.pause) document.getElementById('k-pause').textContent = r.pause;
+    }
+  } catch(_){}
 }
 
-// ── Events ───────────────────────────────────────────────────
-window.overlay.onStatus((d) => {
-  const runningNames = new Set(d.running || []);
-
-  // Sync ACP state
-  const acpActive = runningNames.has('__auto_clicker__');
-  if (acpActive !== _acpRunning) _setAcpRunning(acpActive);
-
-  // Remove stopped macros (skip ACP)
-  for (const name of [...running.keys()]) {
-    if (!runningNames.has(name)) running.delete(name);
+/* ── events ── */
+window.overlay.onStatus(d => {
+  const rs = new Set(d.running||[]);
+  const acpNow = rs.has('__auto_clicker__');
+  if (acpNow !== _acpOn) setAcpOn(acpNow);
+  for (const n of [...run.keys()]) if (!rs.has(n)) run.delete(n);
+  for (const n of rs) {
+    if (n==='__auto_clicker__') continue;
+    if (!run.has(n)) run.set(n, Date.now());
+    if (!allM.includes(n)) allM.push(n);
   }
-  // Add newly started macros (skip ACP)
-  for (const name of runningNames) {
-    if (name === '__auto_clicker__') continue;
-    if (!running.has(name)) running.set(name, Date.now());
-  }
-  // If a running macro isn't in allMacros, add it
-  for (const name of runningNames) {
-    if (name === '__auto_clicker__') continue;
-    if (!allMacros.includes(name)) allMacros.push(name);
-  }
-
-  renderMacros();
+  _paused=false; updPause(); renderMacros();
 });
 
-window.overlay.onLog((d) => {
-  if (!d || !d.msg) return;
-  const msg = d.msg.trim();
-  if (!msg) return;
-  logs.push({ msg: msg.length > 52 ? msg.slice(0, 52) + '…' : msg, level: d.level || 'INFO' });
-  if (logs.length > LOG_MAX) logs.shift();
-  renderLogs();
-});
+window.overlay.onStopped(() => { run.clear(); _paused=false; updPause(); setAcpOn(false); renderMacros(); });
+window.overlay.onMacrosUpdated(() => loadMacros());
+window.overlay.onAcpStatus(d => { if (!d.running && _cdTimer) clearCd(); setAcpOn(!!d.running); });
 
-window.overlay.onStopped(() => {
-  running.clear();
-  _setAcpRunning(false);
-  renderMacros();
-});
-
-window.overlay.onMacrosUpdated(() => {
-  loadMacros();
-});
-
-// ── Init ─────────────────────────────────────────────────────
-loadMacros();
-
-// ═══════════════════════════════════════════════════════════════
-// AUTO CLICKER
-// ═══════════════════════════════════════════════════════════════
-const acpDot     = document.getElementById('acp-dot');
-const acpBtn     = document.getElementById('acp-btn-toggle');
-const acpInfo    = document.getElementById('acp-info');
-const acpBody    = document.getElementById('acp-body');
-const acpChevron = document.getElementById('acp-chevron');
-
-let _acpRunning = false;
-let _acpConfig  = null;  // raw field map from acp_settings.json
-
-const ICON_PLAY_ACP = `<svg viewBox="0 0 24 24" fill="currentColor" width="10"><polygon points="5,3 19,12 5,21"/></svg>`;
-const ICON_STOP_ACP = `<svg viewBox="0 0 24 24" fill="currentColor" width="10"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
-
-function toggleAcpBody() {
-  acpBody.classList.toggle('open');
-  acpChevron.classList.toggle('open', acpBody.classList.contains('open'));
-  if (acpBody.classList.contains('open')) loadAcpConfig();
+/* ── ACP ── */
+function acpSum(c) {
+  if (!c) return '—';
+  const h=+c['acp-h']||0, m=+c['acp-m']||0, s=+c['acp-s']||0, ms=+c['acp-ms']||100;
+  const t = h*3600000+m*60000+s*1000+ms;
+  const b=c['acp-button']||'left', ct=c['acp-click-type']||'single';
+  return `${b} ${ct==='double'?'dbl':ct==='triple'?'3×':'1×'} · ${t<1000?t+'ms':(t/1000).toFixed(1)+'s'}`;
 }
 
-async function loadAcpConfig() {
+function buildMacro(c) {
+  const h=+c['acp-h']||0, m=+c['acp-m']||0, s=+c['acp-s']||0, ms=+c['acp-ms']||100;
+  const iv = Math.max(0.001, h*3600+m*60+s+ms/1000);
+  const rand = c['acp-rand-offset']===true||c['acp-rand-offset']==='true';
+  const rm = (+c['acp-rand-ms']||40)/1000;
+  const btn=c['acp-button']||'left', ct=c['acp-click-type']||'single';
+  const rmode=c['acp-repeat-mode']||'until_stopped', rct=+c['acp-repeat-count']||1;
+  const pos=c['acp-pos-mode']||'current';
+  const xy=pos!=='current'?{x:+c['acp-x']||0,y:+c['acp-y']||0}:{};
+  const wait=rand?{type:'random_wait',min:Math.max(0.001,iv-rm),max:iv+rm}:{type:'wait',duration:iv};
+  const click=ct==='double'?{type:'mouse_double_click',button:btn,...xy}
+    :ct==='triple'?{type:'mouse_click',button:btn,count:3,...xy}
+    :{type:'mouse_click',button:btn,count:1,...xy};
+  const acts=rmode==='count'?[{type:'repeat',count:Math.max(1,rct),actions:[click,wait]}]:[click,wait];
+  return {name:'__auto_clicker__',loop:rmode!=='count',loop_delay:0,
+    rules:[{enabled:true,label:'click',conditions:[],actions:acts}]};
+}
+
+function setAcpOn(on) {
+  _acpOn = on;
+  document.getElementById('acp-dot').classList.toggle('on', on);
+  const btn = document.getElementById('acp-btn');
+  if (on) {
+    clearCd();
+    btn.className = 's'; btn.innerHTML = R_STOP + ' Arrêter';
+  } else {
+    btn.className = ''; btn.innerHTML = R_PLAY + ' Démarrer';
+  }
+}
+
+function clearCd() {
+  if (_cdTimer) { clearInterval(_cdTimer); _cdTimer = null; }
+  const cd  = document.getElementById('acp-cd');
+  const btn = document.getElementById('acp-btn');
+  cd.className = ''; cd.textContent = '';
+  btn.className = ''; btn.innerHTML = R_PLAY + ' Démarrer';
+}
+
+async function loadAcpCfg() {
   try {
     const r = await window.overlay.getAcpConfig();
-    if (r && r.ok && r.config) {
-      _acpConfig = r.config;
-      acpInfo.textContent = _acpConfigSummary(_acpConfig);
-      document.getElementById('acp-config-hint').textContent = 'Config synchronisée depuis Auto Clicker';
-    } else {
-      document.getElementById('acp-config-hint').textContent = 'Ouvrez Auto Clicker pour configurer';
+    if (r?.ok && r.config) {
+      _acpCfg = r.config;
+      document.getElementById('acp-info').textContent = acpSum(_acpCfg);
+      document.getElementById('ahk-s').textContent = _acpCfg['acp-key-start']||'F6';
+      document.getElementById('ahk-e').textContent = _acpCfg['acp-key-stop'] ||'F7';
     }
-  } catch (_) {}
-}
-
-function _acpConfigSummary(cfg) {
-  if (!cfg) return 'Aucune config';
-  const h  = parseInt(cfg['acp-h'])  || 0;
-  const m  = parseInt(cfg['acp-m'])  || 0;
-  const s  = parseInt(cfg['acp-s'])  || 0;
-  const ms = parseInt(cfg['acp-ms']) || 100;
-  const totalMs = h * 3600000 + m * 60000 + s * 1000 + ms;
-  const btn = cfg['acp-button'] || 'left';
-  const ct  = cfg['acp-click-type'] || 'single';
-  const ctLabel = ct === 'double' ? 'dbl' : ct === 'triple' ? '3×' : '1×';
-  return `${btn} ${ctLabel} · ${totalMs < 1000 ? totalMs + 'ms' : (totalMs/1000).toFixed(2) + 's'}`;
-}
-
-function _buildAcpMacro(cfg) {
-  const h  = parseInt(cfg['acp-h'])  || 0;
-  const m  = parseInt(cfg['acp-m'])  || 0;
-  const s  = parseInt(cfg['acp-s'])  || 0;
-  const ms = parseInt(cfg['acp-ms']) || 100;
-  const intervalS = Math.max(0.001, h * 3600 + m * 60 + s + ms / 1000);
-  const randOffset = cfg['acp-rand-offset'] === true || cfg['acp-rand-offset'] === 'true';
-  const randMs = parseInt(cfg['acp-rand-ms']) || 40;
-  const randS  = randMs / 1000;
-  const button    = cfg['acp-button']     || 'left';
-  const clickType = cfg['acp-click-type'] || 'single';
-  const repeatMode  = cfg['acp-repeat-mode']  || 'until_stopped';
-  const repeatCount = parseInt(cfg['acp-repeat-count']) || 1;
-  const posMode = cfg['acp-pos-mode'] || 'current';
-  const x = parseInt(cfg['acp-x']) || 0;
-  const y = parseInt(cfg['acp-y']) || 0;
-
-  const waitAction = randOffset
-    ? { type: 'random_wait', min: Math.max(0.001, intervalS - randS), max: intervalS + randS }
-    : { type: 'wait', duration: intervalS };
-
-  const coords = posMode !== 'current' ? { x, y } : {};
-  let clickAction;
-  switch (clickType) {
-    case 'double': clickAction = { type: 'mouse_double_click', button, ...coords }; break;
-    case 'triple': clickAction = { type: 'mouse_click', button, count: 3, ...coords }; break;
-    default:       clickAction = { type: 'mouse_click', button, count: 1, ...coords };
-  }
-
-  const ruleActions = (repeatMode === 'count')
-    ? [{ type: 'repeat', count: Math.max(1, repeatCount), actions: [clickAction, waitAction] }]
-    : [clickAction, waitAction];
-
-  return {
-    name: '__auto_clicker__',
-    loop: repeatMode !== 'count',
-    loop_delay: 0,
-    rules: [{ enabled: true, label: 'click', conditions: [], actions: ruleActions }]
-  };
-}
-
-function _setAcpRunning(r) {
-  _acpRunning = r;
-  acpDot.className = 'acp-dot' + (r ? ' running' : '');
-  if (r) {
-    acpBtn.className = 'running';
-    acpBtn.innerHTML = ICON_STOP_ACP + ' Arrêter';
-  } else {
-    acpBtn.className = '';
-    acpBtn.innerHTML = ICON_PLAY_ACP + ' Démarrer';
-  }
+  } catch(_){}
 }
 
 async function acpToggle() {
-  if (_acpRunning) {
-    window.overlay.acpStop();
-    _setAcpRunning(false);
-    return;
+  /* annuler le compte à rebours si en cours */
+  if (_cdTimer) { clearCd(); return; }
+
+  if (_acpOn) { window.overlay.acpStop(); setAcpOn(false); return; }
+
+  await loadAcpCfg();
+  if (!_acpCfg) { document.getElementById('acp-info').textContent = 'Config manquante'; return; }
+
+  const delay = +(_acpCfg['acp-start-delay']) || 0;
+  if (delay > 0) {
+    let rem = delay;
+    const cd  = document.getElementById('acp-cd');
+    const btn = document.getElementById('acp-btn');
+    cd.textContent = `Démarrage dans ${rem}s`; cd.className = 'on';
+    btn.className = 'cancel'; btn.innerHTML = '✕ Annuler';
+
+    _cdTimer = setInterval(() => {
+      rem--;
+      if (rem <= 0) {
+        clearCd();
+        window.overlay.acpStart(buildMacro(_acpCfg));
+        setAcpOn(true);
+      } else {
+        cd.textContent = `Démarrage dans ${rem}s`;
+      }
+    }, 1000);
+  } else {
+    window.overlay.acpStart(buildMacro(_acpCfg));
+    setAcpOn(true);
   }
-  // Reload config fresh each time
-  await loadAcpConfig();
-  if (!_acpConfig) {
-    document.getElementById('acp-config-hint').textContent = 'Configurez d\'abord dans Auto Clicker';
-    return;
-  }
-  const macro = _buildAcpMacro(_acpConfig);
-  window.overlay.acpStart(macro);
-  _setAcpRunning(true);
 }
 
-// Sync ACP status from dedicated IPC channel
-window.overlay.onAcpStatus((d) => {
-  _setAcpRunning(!!d.running);
+/* ── shortcuts live update ── */
+window.overlay.onShortcutsUpdated(d => {
+  if (d.stop)  document.getElementById('k-stop').textContent  = d.stop;
+  if (d.pause) document.getElementById('k-pause').textContent = d.pause;
 });
+
+/* ── init ── */
+applyCol();
+loadMacros();
+loadShortcuts();
+loadAcpCfg();
 </script>
 </body>
 </html>

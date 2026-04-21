@@ -19,4 +19,9 @@ contextBridge.exposeInMainWorld('overlay', {
   acpStop:         ()      => ipcRenderer.send('overlay:acp-stop'),
   onAcpStatus:     (cb)    => ipcRenderer.on('overlay:acp-status', (_, d) => cb(d)),
   getAcpConfig:    ()      => ipcRenderer.invoke('overlay:get-acp-config'),
+  // Window control
+  setSize:              (w, h) => ipcRenderer.send('overlay:set-size', { w, h }),
+  getShortcuts:         ()     => ipcRenderer.invoke('overlay:get-shortcuts'),
+  pauseAll:             ()     => ipcRenderer.send('overlay:pause-all'),
+  onShortcutsUpdated:   (cb)   => ipcRenderer.on('overlay:shortcuts-updated', (_, d) => cb(d)),
 });

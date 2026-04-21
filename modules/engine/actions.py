@@ -73,14 +73,33 @@ _kernel32 = ctypes.windll.kernel32
 # ══════════════════════════════════════════════════════════════════════════════
 #  HELPERS INTERNES
 # ══════════════════════════════════════════════════════════════════════════════
+def _interruptible_sleep(duration: float, stop_event=None, step: float = 0.05) -> bool:
+    """Sleep interruptible par stop_event. Retourne True si interrompu."""
+    if duration <= 0:
+        return False
+    if stop_event is None:
+        time.sleep(duration)
+        return False
+    end = time.monotonic() + duration
+    while True:
+        if stop_event.is_set():
+            return True
+        remaining = end - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(step, remaining))
+
+
 def _set_cursor(x: int, y: int) -> None:
     _user32.SetCursorPos(int(x), int(y))
 
 
-def _smooth_move(x: int, y: int, duration: float, use_bezier: bool = True) -> None:
+def _smooth_move(x: int, y: int, duration: float, use_bezier: bool = True,
+                 stop_event=None) -> None:
     """
     Déplace la souris vers (x, y).
     Si use_bezier=True et duration>0, utilise une courbe de Bézier naturelle.
+    Interrompt le mouvement si stop_event est setté.
     """
     if duration <= 0:
         _set_cursor(x, y)
@@ -95,12 +114,16 @@ def _smooth_move(x: int, y: int, duration: float, use_bezier: bool = True) -> No
                                    curve=0.25)
         delay = duration / len(points)
         for px, py in points:
+            if stop_event and stop_event.is_set():
+                return
             _set_cursor(px, py)
             time.sleep(delay)
     else:
         steps = max(20, int(duration * 200))
         delay = duration / steps
         for i in range(1, steps + 1):
+            if stop_event and stop_event.is_set():
+                return
             t = i / steps
             _set_cursor(int(sx + (x - sx) * t), int(sy + (y - sy) * t))
             time.sleep(delay)
@@ -164,22 +187,22 @@ def exec_action(action: dict, ctx: dict | None = None) -> None:
     t = action.get('type', '')
 
     # ── Clavier ────────────────────────────────────────────────────────────
-    if   t == 'key_tap':             _key_tap(action)
-    elif t == 'key_hold':            _key_hold(action)
+    if   t == 'key_tap':             _key_tap(action, ctx)
+    elif t == 'key_hold':            _key_hold(action, ctx)
     elif t == 'key_release':         _key_release(action)
     elif t == 'key_combo':           _key_combo(action)
     elif t == 'type_text':           _type_text(action)
 
     # ── Souris ─────────────────────────────────────────────────────────────
-    elif t == 'mouse_move':          _mouse_move(action)
+    elif t == 'mouse_move':          _mouse_move(action, ctx)
     elif t == 'mouse_click':         _mouse_click(action)
     elif t == 'mouse_double_click':  _mouse_double_click(action)
-    elif t == 'mouse_drag':          _mouse_drag(action)
+    elif t == 'mouse_drag':          _mouse_drag(action, ctx)
     elif t == 'scroll':              _scroll(action)
 
     # ── Temporisation ──────────────────────────────────────────────────────
-    elif t == 'wait':                _wait(action)
-    elif t == 'random_wait':         _random_wait(action)
+    elif t == 'wait':                _wait(action, ctx)
+    elif t == 'random_wait':         _random_wait(action, ctx)
 
     # ── Contrôle de macros ─────────────────────────────────────────────────
     elif t == 'macro_start':         _macro_start(action, ctx)
@@ -217,7 +240,7 @@ def exec_action(action: dict, ctx: dict | None = None) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 #  CLAVIER
 # ══════════════════════════════════════════════════════════════════════════════
-def _key_tap(a: dict) -> None:
+def _key_tap(a: dict, ctx: dict | None = None) -> None:
     """
     Appuie et relâche une touche.
     Paramètres :
@@ -227,32 +250,41 @@ def _key_tap(a: dict) -> None:
       delay_between  float — délai entre répétitions (défaut 0.05s)
       use_direct     bool  — pydirectinput (recommandé jeux) ou pyautogui
     """
-    key   = a.get('key', '')
-    dur   = float(a.get('duration', 0.05))
-    count = int(a.get('count', 1))
-    delay = float(a.get('delay_between', 0.05))
+    key    = a.get('key', '')
+    dur    = float(a.get('duration', 0.05))
+    count  = int(a.get('count', 1))
+    delay  = float(a.get('delay_between', 0.05))
     direct = a.get('use_direct', True)
+    stop   = (ctx or {}).get('_stop')
     for i in range(count):
+        if stop and stop.is_set():
+            break
         if direct:
             pydirectinput.keyDown(key); time.sleep(dur); pydirectinput.keyUp(key)
         else:
             pyautogui.keyDown(key);    time.sleep(dur); pyautogui.keyUp(key)
         if i < count - 1:
-            time.sleep(delay)
+            if _interruptible_sleep(delay, stop):
+                break
 
 
-def _key_hold(a: dict) -> None:
+def _key_hold(a: dict, ctx: dict | None = None) -> None:
     """
     Maintient une touche enfoncée pendant `duration` secondes.
     Paramètres : key, duration (défaut 1.0s), use_direct
     """
-    key   = a.get('key', '')
-    dur   = float(a.get('duration', 1.0))
+    key    = a.get('key', '')
+    dur    = float(a.get('duration', 1.0))
     direct = a.get('use_direct', True)
+    stop   = (ctx or {}).get('_stop')
     if direct:
-        pydirectinput.keyDown(key); time.sleep(dur); pydirectinput.keyUp(key)
+        pydirectinput.keyDown(key)
+        _interruptible_sleep(dur, stop)
+        pydirectinput.keyUp(key)
     else:
-        pyautogui.keyDown(key);    time.sleep(dur); pyautogui.keyUp(key)
+        pyautogui.keyDown(key)
+        _interruptible_sleep(dur, stop)
+        pyautogui.keyUp(key)
 
 
 def _key_release(a: dict) -> None:
@@ -302,7 +334,7 @@ def _type_text(a: dict) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 #  SOURIS
 # ══════════════════════════════════════════════════════════════════════════════
-def _mouse_move(a: dict) -> None:
+def _mouse_move(a: dict, ctx: dict | None = None) -> None:
     """
     Déplace la souris vers (x, y) ou de manière relative.
     Paramètres :
@@ -318,6 +350,7 @@ def _mouse_move(a: dict) -> None:
     duration = float(a.get('duration', 0.1))
     use_bez  = a.get('bezier', True)
     jitter_r = int(a.get('jitter', 0))
+    stop     = (ctx or {}).get('_stop')
 
     if relative:
         pt = ctypes.wintypes.POINT()
@@ -327,7 +360,7 @@ def _mouse_move(a: dict) -> None:
     if jitter_r > 0:
         x, y = hum.jitter(x, y, jitter_r)
 
-    _smooth_move(x, y, duration, use_bezier=use_bez)
+    _smooth_move(x, y, duration, use_bezier=use_bez, stop_event=stop)
 
 
 def _mouse_click(a: dict) -> None:
@@ -377,7 +410,7 @@ def _mouse_double_click(a: dict) -> None:
     pyautogui.doubleClick(button=button)
 
 
-def _mouse_drag(a: dict) -> None:
+def _mouse_drag(a: dict, ctx: dict | None = None) -> None:
     """
     Glisser-déposer de (x1, y1) vers (x2, y2).
     Paramètres : x1, y1, x2, y2, duration (défaut 0.3s), button, bezier, jitter
@@ -388,6 +421,7 @@ def _mouse_drag(a: dict) -> None:
     button   = a.get('button', 'left')
     jitter_r = int(a.get('jitter', 0))
     use_bez  = a.get('bezier', True)
+    stop     = (ctx or {}).get('_stop')
 
     if jitter_r > 0:
         x1, y1 = hum.jitter(x1, y1, jitter_r)
@@ -399,11 +433,12 @@ def _mouse_drag(a: dict) -> None:
         return
 
     _set_cursor(x1, y1)
-    time.sleep(0.05)
+    if _interruptible_sleep(0.05, stop): return
     pyautogui.mouseDown(button=button)
-    time.sleep(0.05)
-    _smooth_move(x2, y2, duration, use_bezier=use_bez)
-    time.sleep(0.05)
+    if _interruptible_sleep(0.05, stop):
+        pyautogui.mouseUp(button=button)
+        return
+    _smooth_move(x2, y2, duration, use_bezier=use_bez, stop_event=stop)
     pyautogui.mouseUp(button=button)
 
 
@@ -424,20 +459,21 @@ def _scroll(a: dict) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 #  TEMPORISATION
 # ══════════════════════════════════════════════════════════════════════════════
-def _wait(a: dict) -> None:
+def _wait(a: dict, ctx: dict | None = None) -> None:
     """
-    Attend `duration` secondes (fixe).
+    Attend `duration` secondes (fixe). Interruptible par le signal d'arrêt.
     Paramètres : duration (défaut 1.0s)
     """
-    time.sleep(float(a.get('duration', 1.0)))
+    _interruptible_sleep(float(a.get('duration', 1.0)), (ctx or {}).get('_stop'))
 
 
-def _random_wait(a: dict) -> None:
+def _random_wait(a: dict, ctx: dict | None = None) -> None:
     """
-    Attend une durée aléatoire entre `min` et `max` secondes (distribution gaussienne).
+    Attend une durée aléatoire entre `min` et `max` secondes. Interruptible.
     Paramètres : min (défaut 0.5s), max (défaut 2.0s)
     """
-    time.sleep(hum.vary_range(float(a.get('min', 0.5)), float(a.get('max', 2.0))))
+    dur = hum.vary_range(float(a.get('min', 0.5)), float(a.get('max', 2.0)))
+    _interruptible_sleep(dur, (ctx or {}).get('_stop'))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -518,7 +554,8 @@ def _repeat(a: dict, ctx: dict) -> None:
                 break
             exec_action(action, ctx)
         if delay > 0 and i < count - 1:
-            time.sleep(delay)
+            if _interruptible_sleep(delay, stop_ev):
+                break
 
 
 # ══════════════════════════════════════════════════════════════════════════════
