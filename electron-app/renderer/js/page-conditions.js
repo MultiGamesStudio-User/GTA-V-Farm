@@ -151,7 +151,18 @@ function buildCondTestForm(type) {
     return regionRow + `
       <div class="form-row">
         <div class="form-group flex-2"><label>Chemin du template (.png)</label><input type="text" id="ct-template" placeholder="C:\\templates\\image.png"></div>
-        <div class="form-group"><label>Seuil (0.0–1.0)</label><input type="number" id="ct-threshold" value="0.85" min="0" max="1" step="0.05" style="width:80px"></div>
+        <div class="form-group"><label>Seuil (0.0–1.0)</label><input type="number" id="ct-threshold" value="0.85" min="0" max="1" step="0.05" style="width:80px" oninput="updateThresholdLabel()"></div>
+        <div class="form-group" style="align-items:flex-end;min-width:40px">
+          <span id="ct-threshold-lbl" style="font-size:11px;color:var(--text-3)">0.85</span>
+        </div>
+      </div>
+      <div class="form-row" style="gap:6px;align-items:center;margin-top:4px">
+        <button class="btn btn-secondary btn-sm" onclick="previewTemplateRegion()">Capturer région</button>
+        <button class="btn btn-secondary btn-sm" onclick="testTemplateScore()">Tester score</button>
+        <span id="ct-score-result" style="font-size:12px;color:var(--text-3)"></span>
+      </div>
+      <div id="ct-template-preview" style="display:none;margin-top:6px">
+        <img id="ct-template-preview-img" style="max-width:100%;border-radius:4px;border:1px solid var(--border)">
       </div>`;
   }
 
@@ -443,4 +454,64 @@ function _setCoord(x, y) {
     const h = document.getElementById('ct-h')?.value || '?';
     zoneLbl.textContent = `🔲 ${x},${y} — ${w}×${h}`;
   }
+}
+
+async function previewTemplateRegion() {
+  const x = parseFloat(document.getElementById('ct-x')?.value || 0);
+  const y = parseFloat(document.getElementById('ct-y')?.value || 0);
+  const w = parseFloat(document.getElementById('ct-w')?.value || 300);
+  const h = parseFloat(document.getElementById('ct-h')?.value || 60);
+  const scoreEl = document.getElementById('ct-score-result');
+  const wrap    = document.getElementById('ct-template-preview');
+  const img     = document.getElementById('ct-template-preview-img');
+  if (scoreEl) scoreEl.textContent = 'Capture…';
+  try {
+    await ensureEngine();
+    const res = await window.api.previewRegion({ x, y, w, h });
+    if (res?.b64) {
+      if (img)  img.src = 'data:image/png;base64,' + res.b64;
+      if (wrap) wrap.style.display = '';
+      if (scoreEl) scoreEl.textContent = '';
+    } else {
+      if (scoreEl) scoreEl.textContent = 'Erreur capture';
+    }
+  } catch (e) {
+    if (scoreEl) scoreEl.textContent = 'Erreur: ' + e.message;
+  }
+}
+
+async function testTemplateScore() {
+  const x    = parseFloat(document.getElementById('ct-x')?.value    || 0);
+  const y    = parseFloat(document.getElementById('ct-y')?.value    || 0);
+  const w    = parseFloat(document.getElementById('ct-w')?.value    || 300);
+  const h    = parseFloat(document.getElementById('ct-h')?.value    || 60);
+  const tmpl = document.getElementById('ct-template')?.value?.trim() || '';
+  const thr  = parseFloat(document.getElementById('ct-threshold')?.value || 0.85);
+  const scoreEl = document.getElementById('ct-score-result');
+  if (!tmpl) { if (scoreEl) scoreEl.textContent = 'Chemin template manquant'; return; }
+  if (scoreEl) scoreEl.textContent = 'Test…';
+  try {
+    await ensureEngine();
+    const res = await window.api.testTemplateScore({ x, y, w, h, template_path: tmpl, threshold: thr });
+    if (!res?.ok) {
+      if (scoreEl) scoreEl.textContent = 'Erreur: ' + (res?.error || '?');
+      return;
+    }
+    const pct   = Math.round(res.score * 100);
+    const color = res.matched ? 'var(--green, #4caf50)' : 'var(--red, #f44336)';
+    if (scoreEl) {
+      scoreEl.textContent = `Score: ${pct}% ${res.matched ? '✅' : '❌'} (seuil ${Math.round(thr * 100)}%)`;
+      scoreEl.style.color = color;
+    }
+    // Auto-preview region on test
+    await previewTemplateRegion();
+  } catch (e) {
+    if (scoreEl) scoreEl.textContent = 'Erreur: ' + e.message;
+  }
+}
+
+function updateThresholdLabel() {
+  const val = document.getElementById('ct-threshold')?.value;
+  const lbl = document.getElementById('ct-threshold-lbl');
+  if (lbl && val !== undefined) lbl.textContent = parseFloat(val).toFixed(2);
 }

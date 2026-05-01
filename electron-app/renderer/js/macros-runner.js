@@ -25,19 +25,23 @@ async function runCurrentMacro() {
   if (currentMacroIdx < 0) return;
   if (macros[currentMacroIdx]) { try { flushEditorToMacro(); } catch (e) {} }
   const macro = macros[currentMacroIdx];
+  runningMacros.add(macro.name);
+  updateMacroRunButtons();
   try {
     await ensureEngine();
-    // Send webhook URL to engine before starting
     const settings = await window.api.readSettings().catch(() => ({}));
     if (settings && settings.webhookUrl) {
       await window.api.setWebhook({ url: settings.webhookUrl });
     }
     await window.api.macroStart({ macro, macro_id: macro.name });
-    runningMacros.add(macro.name);
-    updateMacroRunButtons();
     renderDashboard();
     appendLog('INFO', 'Macro démarrée: ' + macro.name);
-  } catch (e) { appendLog('ERROR', 'Erreur démarrage: ' + e.message); }
+  } catch (e) {
+    runningMacros.delete(macro.name);
+    updateMacroRunButtons();
+    renderDashboard();
+    appendLog('ERROR', 'Erreur démarrage: ' + e.message);
+  }
 }
 
 async function pauseCurrentMacro() {
@@ -51,16 +55,13 @@ async function pauseCurrentMacro() {
 }
 
 async function stopCurrentMacro() {
-  if (currentMacroIdx < 0) return;
-  const macro = macros[currentMacroIdx];
-  if (!macro) return;
-  const name = macro.name;
   try {
-    await window.api.macroStop({ macro_id: name });
-    runningMacros.delete(name);
+    // kill switch : arrête macro courante + auto-clicker d'un coup
+    await window.api.stopAll();
+    runningMacros.clear();
     updateMacroRunButtons();
     renderDashboard();
-    appendLog('INFO', 'Macro arrêtée: ' + name);
+    appendLog('INFO', 'Stop — toutes les macros arrêtées');
   } catch (e) { appendLog('ERROR', e.message); }
 }
 

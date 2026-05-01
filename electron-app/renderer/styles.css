@@ -1158,6 +1158,11 @@ select.cf, select.af {
 }
 .test-panel.active { display: flex; }
 
+/* settings page tabs */
+.settings-panel        { display: none; }
+.settings-panel.active { display: block; }
+#page-settings.active  { flex-direction: column; }
+
 /* page-tests needs column flex to contain tab-bar + panels */
 #page-tests.active {
   flex-direction: column;

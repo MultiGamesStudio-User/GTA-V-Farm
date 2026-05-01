@@ -177,3 +177,15 @@ def stats_clear(macro_id: str) -> None:
 def stats_clear_all() -> None:
     with _lock:
         _stats.clear()
+
+
+# ── Runner registry (partagé avec conditions.py, évite l'import lourd au démarrage) ──
+_runners_ref: dict = {}
+
+def set_runners_registry(registry: dict) -> None:
+    """Fourni par main.py — permet à macro_is_running d'accéder aux runners actifs."""
+    global _runners_ref
+    _runners_ref = registry
+
+def get_runners_registry() -> dict:
+    return _runners_ref

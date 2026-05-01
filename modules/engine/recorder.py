@@ -62,9 +62,8 @@ class MacroRecorder:
         if self._ms_listener:
             self._ms_listener.stop()
             self._ms_listener = None
-        # Flush drag en cours si le bouton était encore tenu au moment du stop
-        self._flush_drag()
         with self._lock:
+            self._flush_drag()
             return list(self._actions)
 
     def is_recording(self) -> bool:
@@ -108,7 +107,7 @@ class MacroRecorder:
 
     # ── Mouse ─────────────────────────────────────────────────
     def _flush_drag(self):
-        """Finalise un drag en cours — appelé sur release ou stop()."""
+        """Finalise un drag en cours — appelé sous self._lock."""
         if self._drag_start is None:
             return
         start = self._drag_start
@@ -132,7 +131,8 @@ class MacroRecorder:
     def _on_mouse_move(self, x, y):
         if not self._recording:
             return
-        self._current_pos = (x, y)
+        with self._lock:
+            self._current_pos = (x, y)
 
     def _on_mouse_click(self, x, y, button, pressed):
         if not self._recording:
@@ -144,17 +144,17 @@ class MacroRecorder:
             btn = 'middle'
 
         if pressed:
-            # Enregistrer le wait AVANT le press (timing correct)
             dt = self._elapsed()
             if dt > 0.05:
                 self._add({'type': 'wait', 'duration': dt})
-            self._drag_start = {'x': x, 'y': y, 'button': btn, 'time': time.time()}
-            self._current_pos = (x, y)
+            with self._lock:
+                self._drag_start = {'x': x, 'y': y, 'button': btn, 'time': time.time()}
+                self._current_pos = (x, y)
         else:
-            # Relâchement : décider clic simple ou drag
-            if self._drag_start is None:
-                return
-            self._flush_drag()
+            with self._lock:
+                if self._drag_start is None:
+                    return
+                self._flush_drag()
             self._last_time = time.time()
 
     def _on_mouse_scroll(self, x, y, dx, dy):
