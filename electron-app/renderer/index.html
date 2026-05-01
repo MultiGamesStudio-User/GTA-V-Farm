@@ -632,6 +632,33 @@
         <h1>Paramètres</h1>
       </div>
 
+      <!-- ── Tab bar ── -->
+      <div class="tests-tab-bar">
+        <button class="tests-tab active" data-tab="general" onclick="switchSettingsTab('general')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          Général
+        </button>
+        <button class="tests-tab" data-tab="shortcuts" onclick="switchSettingsTab('shortcuts')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4z"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9" y1="14.5" x2="15" y2="14.5"/></svg>
+          Raccourcis
+        </button>
+        <button class="tests-tab" data-tab="appearance" onclick="switchSettingsTab('appearance')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          Apparence
+        </button>
+        <button class="tests-tab" data-tab="system" onclick="switchSettingsTab('system')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Système
+        </button>
+        <button class="tests-tab" data-tab="logs" onclick="switchSettingsTab('logs')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Logs
+        </button>
+      </div>
+
+      <!-- ── Panel: Général ── -->
+      <div class="settings-panel active" id="settings-panel-general">
+
       <!-- Licence -->
       <div class="settings-card">
         <div class="settings-card-header">
@@ -665,6 +692,15 @@
           <label>URL du Webhook</label>
           <input type="text" id="set-webhook-url" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
         </div>
+        <div class="form-group" style="margin-top:.5rem">
+          <label style="margin-bottom:4px">Événements déclencheurs</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 16px;padding:4px 0">
+            <label class="check-label"><input type="checkbox" id="wh-ev-macro_start" checked> Démarrage macro</label>
+            <label class="check-label"><input type="checkbox" id="wh-ev-macro_stop" checked> Arrêt macro</label>
+            <label class="check-label"><input type="checkbox" id="wh-ev-macro_auto_stop" checked> Arrêt auto</label>
+            <label class="check-label"><input type="checkbox" id="wh-ev-rule_triggered"> Règle déclenchée</label>
+          </div>
+        </div>
         <div class="form-row" style="margin-top:.5rem">
           <button class="btn btn-primary btn-sm" onclick="saveWebhookSettings()" title="Sauvegarder webhook">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -675,6 +711,11 @@
           <span id="webhook-status" style="font-size:12px;margin-left:8px"></span>
         </div>
       </div>
+
+      </div><!-- /settings-panel-general -->
+
+      <!-- ── Panel: Raccourcis ── -->
+      <div class="settings-panel" id="settings-panel-shortcuts">
 
       <!-- Raccourcis globaux -->
       <div class="settings-card">
@@ -698,6 +739,11 @@
         </div>
       </div>
 
+      </div><!-- /settings-panel-shortcuts -->
+
+      <!-- ── Panel: Apparence ── -->
+      <div class="settings-panel" id="settings-panel-appearance">
+
       <!-- Apparence -->
       <div class="settings-card">
         <div class="settings-card-header">
@@ -718,6 +764,11 @@
           <div id="accent-status" style="font-size:11px;color:var(--text-3);min-height:16px;margin-top:6px"></div>
         </div>
       </div>
+
+      </div><!-- /settings-panel-appearance -->
+
+      <!-- ── Panel: Système ── -->
+      <div class="settings-panel" id="settings-panel-system">
 
       <!-- OCR -->
       <div class="settings-card">
@@ -767,6 +818,11 @@
         </div>
       </div>
 
+      </div><!-- /settings-panel-system -->
+
+      <!-- ── Panel: Logs ── -->
+      <div class="settings-panel" id="settings-panel-logs">
+
       <!-- Console -->
       <div class="settings-card">
         <div class="settings-card-header">
@@ -810,6 +866,8 @@
         <div id="syslog-path" style="font-size:11px;color:var(--text-3);font-family:var(--mono);margin-bottom:8px;padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm)">Chargement...</div>
         <div id="syslog-output" class="console-output" style="min-height:200px;max-height:380px;overflow-y:auto;font-size:11px;line-height:1.7"></div>
       </div>
+
+      </div><!-- /settings-panel-logs -->
     </section>
 
   </main>
@@ -956,6 +1014,30 @@
                 <div id="stop-conditions-list" class="cond-list" style="padding:4px 14px 10px"></div>
               </div>
 
+              <!-- Kill Switch -->
+              <div class="n8n-adv-section">
+                <div class="n8n-adv-header">
+                  <span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    Kill Switch</span>
+                  <label class="toggle-label" style="margin-left:auto;margin-right:0">
+                    <input type="checkbox" id="me-ks-enabled" onchange="killSwitchChanged()">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="n8n-adv-hint">Touche d'arrêt d'urgence — arrête la macro immédiatement</div>
+                <div id="kill-switch-config" style="padding:4px 14px 10px;display:none">
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <input type="text" id="me-ks-key" placeholder="ex: f12, ctrl+shift+s" readonly
+                      style="flex:1;cursor:pointer;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text-1);font-size:12px"
+                      onclick="captureKillSwitchKey(this)" title="Cliquez puis appuyez sur la touche souhaitée">
+                    <button class="btn btn-xs btn-secondary" onclick="captureKillSwitchKey(document.getElementById('me-ks-key'))">Capturer</button>
+                    <button class="btn btn-xs" onclick="clearKillSwitchKey()" title="Effacer">✕</button>
+                  </div>
+                  <div id="ks-capture-hint" style="font-size:11px;color:var(--text-3);margin-top:4px;display:none">Appuyez sur une touche…</div>
+                </div>
+              </div>
+
               <!-- Cleanup -->
               <div class="n8n-adv-section" style="border-bottom:none">
                 <div class="n8n-adv-header">
@@ -1001,18 +1083,18 @@
 </div>
 
 <!-- Split modules — load order matters (utils first, app.js last) -->
-<script src="js/utils.js"></script>
-<script src="js/app.js"></script>
-<script src="js/console.js"></script>
-<script src="js/engine.js"></script>
-<script src="js/macros-data.js"></script>
-<script src="js/macros-editor.js"></script>
-<script src="js/macros-runner.js"></script>
-<script src="js/page-dashboard.js"></script>
-<script src="js/page-conditions.js"></script>
-<script src="js/page-actions.js"></script>
-<script src="js/page-windows.js"></script>
-<script src="js/page-autoclicker.js"></script>
+<script defer src="js/utils.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/console.js"></script>
+<script defer src="js/engine.js"></script>
+<script defer src="js/macros-data.js"></script>
+<script defer src="js/macros-editor.js"></script>
+<script defer src="js/macros-runner.js"></script>
+<script defer src="js/page-dashboard.js"></script>
+<script defer src="js/page-conditions.js"></script>
+<script defer src="js/page-actions.js"></script>
+<script defer src="js/page-windows.js"></script>
+<script defer src="js/page-autoclicker.js"></script>
 
 <!-- Patch : expose toutes les fonctions critiques sur window APRÈS chargement de tous les scripts -->
 <script>

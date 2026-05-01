@@ -252,33 +252,31 @@ function _acpCapKey(el, fieldId) {
 }
 
 function _acpRegisterHotkeys() {
-  document.removeEventListener('keydown', _acpHotkeyHandler, true);
-  document.addEventListener('keydown', _acpHotkeyHandler, true);
+  // Capture listener stays on document (only needed when window is focused, during key capture)
+  document.removeEventListener('keydown', _acpCaptureHandler, true);
+  document.addEventListener('keydown', _acpCaptureHandler, true);
+  // Actual start/stop hotkeys → Electron globalShortcut (works when app not focused)
+  const startKey = _acpHotkeys['acp-key-start'] || '';
+  const stopKey  = _acpHotkeys['acp-key-stop']  || '';
+  if (window._setGlobalShortcuts) {
+    const toAcc = window.keyToAccelerator || (k => k);
+    window._setGlobalShortcuts({
+      acp_start: startKey ? toAcc(startKey) : null,
+      acp_stop:  stopKey  ? toAcc(stopKey)  : null,
+    });
+  }
 }
 
-function _acpHotkeyHandler(e) {
+function _acpCaptureHandler(e) {
+  if (!_acpCapturing) return;
   const key = e.key === ' ' ? 'Space' : e.key;
-
-  // Capture mode: assign key to focused field
-  if (_acpCapturing) {
-    e.preventDefault();
-    e.stopPropagation();
-    _acpCapturing.el.value      = key;
-    _acpCapturing.el.style.color = '';
-    _acpHotkeys[_acpCapturing.fieldId] = key;
-    _acpCapturing = null;
-    _acpSave();
-    return;
-  }
-
-  // Hotkey trigger
-  if (_acpHotkeys['acp-key-start'] && key === _acpHotkeys['acp-key-start']) {
-    e.preventDefault();
-    if (!_acpRunning) startAutoClicker();
-  } else if (_acpHotkeys['acp-key-stop'] && key === _acpHotkeys['acp-key-stop']) {
-    e.preventDefault();
-    stopAutoClicker();
-  }
+  e.preventDefault();
+  e.stopPropagation();
+  _acpCapturing.el.value       = key;
+  _acpCapturing.el.style.color = '';
+  _acpHotkeys[_acpCapturing.fieldId] = key;
+  _acpCapturing = null;
+  _acpSave();
 }
 
 /* ── Licence settings helpers ────────────────────────────── */

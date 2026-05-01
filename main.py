@@ -56,8 +56,9 @@ _root.setLevel(logging.DEBUG)
 _root.addHandler(_JsonLogHandler())
 
 # ── Runner registry ───────────────────────────────────────────────────────────
-_runners: dict = {}   # macro_id → MacroRunner
-_recorder = None      # MacroRecorder instance
+_runners: dict = {}             # macro_id → MacroRunner
+_runners_lock = threading.Lock()
+_recorder = None                # MacroRecorder instance
 _webhook_url: str = ''  # Discord webhook URL
 
 # ── Webhook rate-limiter & circuit-breaker ─────────────────────────────────────
@@ -66,22 +67,24 @@ _webhook_last_sent: float = 0.0       # timestamp du dernier envoi réussi
 _webhook_min_interval  = 2.0          # secondes minimum entre deux envois
 _webhook_fail_count    = 0            # échecs consécutifs
 _webhook_disabled      = False        # désactivé après trop d'échecs 403
+_webhook_events: set   = {'macro_start', 'macro_stop', 'macro_auto_stop', 'rule_triggered'}
 _WEBHOOK_MAX_FAILS     = 3            # désactiver après N échecs consécutifs
 _webhook_log           = logging.getLogger('engine')
 
 def _init_condition_registry():
     """
-    Donne aux conditions l'accès au registre des runners.
-    Appelé une fois au démarrage — permet à macro_is_running de fonctionner.
+    Enregistre le dict runners dans state.py.
+    N'importe PAS conditions.py (numpy/cv2) — ceux-ci chargent au 1er macro_start.
     """
-    from modules.engine.conditions import set_runners_registry
-    set_runners_registry(_runners)
+    from modules.engine import state
+    state.set_runners_registry(_runners)
 
 def _reply(req_id: str, ok: bool, **kw):
     _send({'type': 'response', 'id': req_id, 'ok': ok, **kw})
 
 def _send_status():
-    running = [mid for mid, r in _runners.items() if r.is_running()]
+    with _runners_lock:
+        running = [mid for mid, r in _runners.items() if r.is_running()]
     _send({'type': 'status', 'running': running})
 
 def _send_webhook(event: str, data: dict):
@@ -99,6 +102,9 @@ def _send_webhook(event: str, data: dict):
     if not _webhook_url:
         return
 
+    if event not in _webhook_events:
+        return
+
     with _webhook_lock:
         if _webhook_disabled:
             return
@@ -114,21 +120,24 @@ def _send_webhook(event: str, data: dict):
     def _do_send():
         global _webhook_fail_count, _webhook_disabled
         try:
-            # Afficher le message texte directement si présent, sinon JSON des données
-            extra = {k: v for k, v in data.items() if k != 'message'}
-            if data.get('message'):
-                desc = str(data['message'])[:2000]
-                if extra:
-                    desc += '\n```json\n' + json.dumps(extra, ensure_ascii=False, indent=2)[:1800] + '\n```'
+            is_discord = 'discord.com/api/webhooks' in _webhook_url
+            if is_discord:
+                extra = {k: v for k, v in data.items() if k != 'message'}
+                if data.get('message'):
+                    desc = str(data['message'])[:2000]
+                    if extra:
+                        desc += '\n```json\n' + json.dumps(extra, ensure_ascii=False, indent=2)[:1800] + '\n```'
+                else:
+                    desc = json.dumps(data, ensure_ascii=False, indent=2)[:2000] if data else '—'
+                embed = {
+                    'title':       f'MacroEngine — {event}',
+                    'description': desc,
+                    'color':       0x5865F2,
+                    'footer':      {'text': 'MacroEngine'},
+                }
+                payload = json.dumps({'embeds': [embed]}).encode('utf-8')
             else:
-                desc = json.dumps(data, ensure_ascii=False, indent=2)[:2000] if data else '—'
-            embed = {
-                'title':       f'MacroEngine — {event}',
-                'description': desc,
-                'color':       0x5865F2,
-                'footer':      {'text': 'MacroEngine'},
-            }
-            payload = json.dumps({'embeds': [embed]}).encode('utf-8')
+                payload = json.dumps({'event': event, 'data': data, 'source': 'MacroEngine'}, ensure_ascii=False).encode('utf-8')
             req = urllib.request.Request(
                 _webhook_url,
                 data=payload,
@@ -220,8 +229,9 @@ def _cmd_macro_start(cmd, rid):
     from modules.engine.macro_runner import MacroRunner
     macro    = cmd['macro']
     macro_id = cmd.get('macro_id', macro.get('name', 'macro'))
-    if macro_id in _runners and _runners[macro_id].is_running():
-        _reply(rid, False, error='Déjà en cours'); return
+    with _runners_lock:
+        if macro_id in _runners and _runners[macro_id].is_running():
+            _reply(rid, False, error='Déjà en cours'); return
 
     def on_log(msg, level):
         _send({'type': 'log', 'level': level, 'msg': f'[{macro_id}] {msg}'})
@@ -233,13 +243,13 @@ def _cmd_macro_start(cmd, rid):
         """Callback pour l'action macro_start — lance une autre macro."""
         if not target_id:
             return
-        if target_id in _runners and _runners[target_id].is_running():
+        with _runners_lock:
+            already = target_id in _runners and _runners[target_id].is_running()
+        if already:
             logging.getLogger('engine').debug(
                 f'macro_start: "{target_id}" déjà en cours, ignoré'
             )
             return
-        # Chercher la macro dans la liste gérée par l'UI
-        # L'action macro_start ne peut lancer que des macros déjà connues du runner
         logging.getLogger('engine').info(
             f'Action macro_start: "{target_id}" demandé — '
             f'envoyer commande macro_start depuis l\'UI pour un démarrage complet'
@@ -248,13 +258,15 @@ def _cmd_macro_start(cmd, rid):
 
     def on_macro_stop_cb(target_id: str):
         """Callback pour l'action macro_stop — arrête une autre macro."""
-        r = _runners.get(target_id)
-        if r and r.is_running():
-            r.stop()
-            _runners.pop(target_id, None)
-            logging.getLogger('engine').info(
-                f'Action macro_stop: "{target_id}" arrêtée'
-            )
+        with _runners_lock:
+            r = _runners.get(target_id)
+            if r and r.is_running():
+                r.stop()
+                _runners.pop(target_id, None)
+            else:
+                r = None
+        if r:
+            logging.getLogger('engine').info(f'Action macro_stop: "{target_id}" arrêtée')
             _send_status()
         else:
             logging.getLogger('engine').warning(
@@ -268,34 +280,42 @@ def _cmd_macro_start(cmd, rid):
         on_macro_start=on_macro_start_cb,
         on_macro_stop=on_macro_stop_cb,
     )
-    _runners[macro_id] = runner
+    with _runners_lock:
+        _runners[macro_id] = runner
     runner.start()
     _reply(rid, True); _send_status()
 
 def _cmd_macro_stop(cmd, rid):
     macro_id = cmd.get('macro_id', '')
-    r = _runners.pop(macro_id, None)
+    with _runners_lock:
+        r = _runners.pop(macro_id, None)
     if r: r.stop(); _reply(rid, True)
     else: _reply(rid, False, error='Not running')
     _send_status()
 
 def _cmd_macro_pause(cmd, rid):
-    r = _runners.get(cmd.get('macro_id', ''))
+    with _runners_lock:
+        r = _runners.get(cmd.get('macro_id', ''))
     if r: r.pause(); _reply(rid, True)
     else: _reply(rid, False, error='Not running')
 
 def _cmd_macro_resume(cmd, rid):
-    r = _runners.get(cmd.get('macro_id', ''))
+    with _runners_lock:
+        r = _runners.get(cmd.get('macro_id', ''))
     if r: r.resume(); _reply(rid, True)
     else: _reply(rid, False, error='Not running')
 
 def _cmd_stop_all(cmd, rid):
-    for r in list(_runners.values()): r.stop()
-    _runners.clear()
+    with _runners_lock:
+        runners = list(_runners.values())
+        _runners.clear()
+    for r in runners: r.stop()
     _reply(rid, True); _send_status()
 
 def _cmd_status(cmd, rid):
-    _reply(rid, True, running=[mid for mid, r in _runners.items() if r.is_running()])
+    with _runners_lock:
+        running = [mid for mid, r in _runners.items() if r.is_running()]
+    _reply(rid, True, running=running)
 
 def _cmd_focus_window(cmd, rid):
     from modules.engine.window_manager import focus_window
@@ -345,16 +365,18 @@ def _cmd_ocr_text(cmd, rid):
             _ocrmod._DEBUG_OCR = False
 
 def _cmd_set_webhook(cmd, rid):
-    global _webhook_url, _webhook_fail_count, _webhook_disabled
+    global _webhook_url, _webhook_fail_count, _webhook_disabled, _webhook_events
     new_url = cmd.get('url', '')
     if new_url != _webhook_url:
-        # Nouvelle URL → réinitialiser le circuit-breaker
         with _webhook_lock:
             _webhook_fail_count = 0
             _webhook_disabled   = False
         if new_url:
             _webhook_log.info('Webhook URL mise à jour — circuit-breaker réinitialisé.')
     _webhook_url = new_url
+    events = cmd.get('events')
+    if events is not None:
+        _webhook_events = set(events)
     _reply(rid, True, disabled=_webhook_disabled)
 
 def _cmd_send_webhook(cmd, rid):
@@ -362,6 +384,32 @@ def _cmd_send_webhook(cmd, rid):
     data = cmd.get('data', {})
     _send_webhook(event, data)
     _reply(rid, True)
+
+def _cmd_test_template_score(cmd, rid):
+    import os as _os
+    try:
+        import cv2 as _cv2
+        from modules.engine.conditions import _load_template
+        from modules.engine.screen_reader import capture_region
+        x, y = int(cmd.get('x', 0)), int(cmd.get('y', 0))
+        w, h = int(cmd.get('w', 100)), int(cmd.get('h', 100))
+        tmpl_path = cmd.get('template_path', '')
+        if not _os.path.exists(tmpl_path):
+            _reply(rid, False, error='Template introuvable'); return
+        tmpl = _load_template(tmpl_path)
+        if tmpl is None:
+            _reply(rid, False, error='Impossible de charger le template'); return
+        scene = capture_region(x, y, w, h)
+        sg = _cv2.cvtColor(scene, _cv2.COLOR_BGR2GRAY)
+        tg = _cv2.cvtColor(tmpl,  _cv2.COLOR_BGR2GRAY)
+        if tg.shape[0] > sg.shape[0] or tg.shape[1] > sg.shape[1]:
+            _reply(rid, True, score=0.0, matched=False); return
+        res = _cv2.matchTemplate(sg, tg, _cv2.TM_CCOEFF_NORMED)
+        _, max_val, _, _ = _cv2.minMaxLoc(res)
+        threshold = float(cmd.get('threshold', 0.85))
+        _reply(rid, True, score=round(float(max_val), 4), matched=bool(max_val >= threshold))
+    except Exception as e:
+        _reply(rid, False, error=str(e))
 
 def _cmd_is_window_focused(cmd, rid):
     from modules.engine.window_manager import is_window_focused
@@ -671,6 +719,7 @@ _DISPATCH = {
     'ocr_text':             _cmd_ocr_text,
     'set_webhook':          _cmd_set_webhook,
     'send_webhook':         _cmd_send_webhook,
+    'test_template_score':  _cmd_test_template_score,
 }
 
 def _handle(cmd: dict):
@@ -684,9 +733,23 @@ def _handle(cmd: dict):
         _reply(rid, False, error=f'Unknown command: {c}')
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
+def _prewarm_ocr():
+    """Charge le modèle OCR en arrière-plan pour éviter le gel au premier appel."""
+    try:
+        from modules.engine.ocr_engine import ocr_status, read_text
+        if not ocr_status().get('available'):
+            return
+        import numpy as np
+        read_text(np.zeros((32, 128, 3), dtype=np.uint8))
+        _send({'type': 'log', 'level': 'INFO', 'msg': 'OCR prêt'})
+    except Exception:
+        pass
+
+
 if __name__ == '__main__':
     _init_condition_registry()   # donne aux conditions l'accès aux runners
     threading.Thread(target=_ram_monitor, daemon=True, name='ram-monitor').start()
+    threading.Thread(target=_prewarm_ocr,  daemon=True, name='ocr-prewarm').start()
     _send({'type': 'log', 'level': 'INFO', 'msg': 'MacroEngine ready'})
     for raw in sys.stdin:
         raw = raw.strip()

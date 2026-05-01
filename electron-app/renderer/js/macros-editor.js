@@ -34,6 +34,7 @@ function closeMacroModal() {
     try { flushEditorToMacro(); } catch (e) { console.error('[closeMacroModal] flush error:', e); }
   }
   modal.style.display = 'none';
+  _cancelKsCapture();
   document.removeEventListener('keydown', _modalEscHandler);
   try { renderMacroList(); } catch (e) { console.error('[closeMacroModal] renderMacroList error:', e); }
   try { renderDashboard(); } catch (e) {}
@@ -663,6 +664,12 @@ function renderMacroEditor() {
   _setEl('me-humanize',       'checked', !!macro.humanize);
   _setEl('me-humanize-factor','value',   macro.humanize_factor != null ? macro.humanize_factor : 0.12);
 
+  const ks = macro.kill_switch || {};
+  _setEl('me-ks-enabled', 'checked', !!ks.enabled);
+  _setEl('me-ks-key',     'value',   ks.key || '');
+  const ksConfig = document.getElementById('kill-switch-config');
+  if (ksConfig) ksConfig.style.display = ks.enabled ? '' : 'none';
+
   const scopeEl = document.getElementById('me-target-window');
   if (scopeEl) {
     scopeEl.innerHTML = '<option value="">Aucune (toutes les fenêtres)</option>';
@@ -724,6 +731,9 @@ function macroFieldChanged() {
     m.humanize_factor = parseFloat(document.getElementById('me-humanize-factor')?.value) || 0.12;
     const scopeEl = document.getElementById('me-target-window');
     if (scopeEl) m.target_hwnd = scopeEl.value || null;
+    const ksEnabled = !!document.getElementById('me-ks-enabled')?.checked;
+    const ksKey     = document.getElementById('me-ks-key')?.value?.trim() || '';
+    m.kill_switch = { enabled: ksEnabled, key: ksKey };
     const items = document.querySelectorAll('.macro-list-item, .wf-card');
     if (items[currentMacroIdx]) {
       const nameEl = items[currentMacroIdx].querySelector('.macro-list-name, .wf-card-name');
@@ -1952,6 +1962,60 @@ function renderAdvancedSections() {
         renderSectionActRow(a, ai, 'pre_stop_actions', 'parow')).join('');
     }
   }
+}
+
+/* ── Kill Switch helpers ──────────────────────────────────────── */
+function killSwitchChanged() {
+  if (currentMacroIdx < 0) return;
+  const m       = macros[currentMacroIdx];
+  const enabled = !!document.getElementById('me-ks-enabled')?.checked;
+  m.kill_switch = m.kill_switch || {};
+  m.kill_switch.enabled = enabled;
+  const cfg = document.getElementById('kill-switch-config');
+  if (cfg) cfg.style.display = enabled ? '' : 'none';
+}
+
+let _ksKeyListener = null;
+function captureKillSwitchKey(inputEl) {
+  if (_ksKeyListener) return;
+  const hint = document.getElementById('ks-capture-hint');
+  if (hint) hint.style.display = '';
+  if (inputEl) inputEl.style.borderColor = 'var(--accent)';
+
+  _ksKeyListener = function onKey(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const parts = [];
+    if (e.ctrlKey)  parts.push('ctrl');
+    if (e.altKey)   parts.push('alt');
+    if (e.shiftKey) parts.push('shift');
+    const k = e.key.toLowerCase();
+    if (!['control','alt','shift','meta'].includes(k)) parts.push(k);
+    const combo = parts.join('+');
+    if (inputEl) { inputEl.value = combo; inputEl.style.borderColor = ''; }
+    if (hint) hint.style.display = 'none';
+    _cancelKsCapture();
+    macroFieldChanged();
+  };
+  document.addEventListener('keydown', _ksKeyListener, true);
+}
+
+function _cancelKsCapture() {
+  if (_ksKeyListener) {
+    document.removeEventListener('keydown', _ksKeyListener, true);
+    _ksKeyListener = null;
+  }
+  const hint = document.getElementById('ks-capture-hint');
+  if (hint) hint.style.display = 'none';
+  const inp = document.getElementById('me-ks-key');
+  if (inp) inp.style.borderColor = '';
+}
+
+function clearKillSwitchKey() {
+  _cancelKsCapture();
+  const inputEl = document.getElementById('me-ks-key');
+  if (inputEl) inputEl.value = '';
+  macroFieldChanged();
 }
 
 function renderSectionCondRow(c, idx, section, prefix) {

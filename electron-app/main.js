@@ -85,14 +85,14 @@ function resolvePython() {
 
   // 2. where python (skip Windows Store stub)
   try {
-    const out = execSync('where python', { windowsHide: true, timeout: 4000 }).toString();
+    const out = execSync('where python', { windowsHide: true, timeout: 1000 }).toString();
     const real = out.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
                     .find(p => !p.toLowerCase().includes('windowsapps'));
     if (real) return real;
   } catch (_) {}
   // 3. py launcher
   try {
-    const exe = execSync('py -3 -c "import sys;print(sys.executable)"', { windowsHide: true, timeout: 4000 })
+    const exe = execSync('py -3 -c "import sys;print(sys.executable)"', { windowsHide: true, timeout: 1000 })
                   .toString().trim();
     if (exe && fs.existsSync(exe)) return exe;
   } catch (_) {}
@@ -121,7 +121,7 @@ function readSettings() {
 
 function saveSettings(data) {
   fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  _atomicWrite(SETTINGS_PATH, JSON.stringify(data, null, 2));
 }
 
 // ── Global shortcuts state ───────────────────────────────────────────────────
@@ -145,7 +145,7 @@ function readLicense() {
 
 function saveLicense(key) {
   fs.mkdirSync(path.dirname(LICENSE_PATH), { recursive: true });
-  fs.writeFileSync(LICENSE_PATH, JSON.stringify({ key, validatedAt: Date.now() }), 'utf-8');
+  _atomicWrite(LICENSE_PATH, JSON.stringify({ key, validatedAt: Date.now() }));
 }
 
 function verifyLicenseOnline(key) {
@@ -192,6 +192,12 @@ function verifyLicenseOnline(key) {
 function _debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+function _atomicWrite(filePath, content) {
+  const tmp = filePath + '.tmp';
+  fs.writeFileSync(tmp, content, 'utf-8');
+  fs.renameSync(tmp, filePath);
 }
 
 // ── État global ───────────────────────────────────────────────────────────────
@@ -348,6 +354,7 @@ app.whenReady().then(() => {
     }
     writeLog('INFO', 'Python OK →', PYTHON_EXE);
     mainWindow?.webContents.send('setup:done');
+    startEngine(); // pré-démarre Python dès que l'UI est prête
 
     // ── Vérification automatique des mises à jour ──────────────
     _runAutoUpdate();
@@ -512,7 +519,7 @@ for (const cmd of [
   // Coords
   'validate_point', 'validate_region', 'scale_coords',
   // Vision & OCR
-  'preview_region', 'pick_color', 'check_ocr', 'ocr_text',
+  'preview_region', 'pick_color', 'check_ocr', 'ocr_text', 'test_template_score',
   // Macros
   'macro_start', 'macro_stop', 'macro_pause', 'macro_resume', 'stop_all',
   // Conditions / Actions testing
@@ -532,9 +539,9 @@ for (const cmd of [
     if (!engineProc) {
       // auto-start engine on first use; poll up to 3 s for stdin readiness
       startEngine();
-      for (let _i = 0; _i < 30; _i++) {
+      for (let _i = 0; _i < 300; _i++) {
         if (engineProc?.stdin?.writable) break;
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 10));
       }
     }
     try {
@@ -801,7 +808,7 @@ ipcMain.handle('macros:read', () => {
 ipcMain.handle('macros:write', (_evt, macros) => {
   try {
     fs.mkdirSync(path.dirname(MACROS_PATH), { recursive: true });
-    fs.writeFileSync(MACROS_PATH, JSON.stringify(macros, null, 2), 'utf-8');
+    _atomicWrite(MACROS_PATH, JSON.stringify(macros, null, 2));
     _sendToOverlay('overlay:macros-updated', {});
     return { ok: true };
   } catch (e) {
@@ -812,7 +819,7 @@ ipcMain.handle('macros:write', (_evt, macros) => {
 // ── IPC: Auto Clicker config (shared with overlay) ───────────────────────────
 ipcMain.handle('acp:save-config', (_evt, data) => {
   try {
-    fs.writeFileSync(ACP_CONFIG_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    _atomicWrite(ACP_CONFIG_PATH, JSON.stringify(data, null, 2));
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
@@ -940,12 +947,19 @@ ipcMain.handle('settings:write', (_evt, data) => {
 
 // ── IPC: global shortcuts ────────────────────────────────────────────────────
 function registerGlobalShortcuts(shortcuts) {
-  // Unregister all existing
-  globalShortcut.unregisterAll();
-  registeredShortcuts = {};
+  const next = shortcuts || {};
 
-  for (const [action, accelerator] of Object.entries(shortcuts)) {
-    if (!accelerator) continue;
+  // Unregister removed or changed shortcuts only
+  for (const [action, accelerator] of Object.entries(registeredShortcuts)) {
+    if (next[action] !== accelerator) {
+      try { globalShortcut.unregister(accelerator); } catch (_) {}
+      delete registeredShortcuts[action];
+    }
+  }
+
+  // Register new or changed shortcuts
+  for (const [action, accelerator] of Object.entries(next)) {
+    if (!accelerator || registeredShortcuts[action] === accelerator) continue;
     try {
       const ok = globalShortcut.register(accelerator, () => {
         mainWindow?.webContents.send('shortcut:triggered', { action });

@@ -4,6 +4,7 @@ macro_runner.py — Exécute une macro dans un thread de fond.
 Couches configurables (toutes optionnelles dans le JSON de la macro) :
   humanize          bool  — variation gaussienne des timings (défaut false)
   humanize_factor   float — intensité de la variation 0.0–1.0 (défaut 0.12)
+  kill_switch       dict  — {enabled: bool, key: str} touche d'arrêt d'urgence
   stop_conditions   list  — arrêt auto quand l'une est vraie
   start_guard       list  — attend que toutes soient vraies avant de boucler
   max_iterations    int   — arrêt après N boucles (0 = illimité)
@@ -63,14 +64,17 @@ class MacroRunner:
         self._pause_lock.set()
 
         # Couches configurables
-        self._target_hwnd      = macro.get('target_hwnd',    None)
-        self._stop_conditions  = macro.get('stop_conditions', [])
-        self._start_guard      = macro.get('start_guard',     [])
-        self._max_iterations   = int(macro.get('max_iterations', 0))
-        self._timeout_s        = float(macro.get('timeout_s',   0))
-        self._pre_stop_actions = macro.get('pre_stop_actions', [])
-        self._humanize         = bool(macro.get('humanize',        False))
-        self._humanize_factor  = float(macro.get('humanize_factor', 0.12))
+        self._target_hwnd           = macro.get('target_hwnd',           None)
+        self._stop_conditions       = macro.get('stop_conditions',       [])
+        self._start_guard           = macro.get('start_guard',           [])
+        self._start_guard_timeout_s = float(macro.get('start_guard_timeout_s', 0))
+        self._max_iterations        = int(macro.get('max_iterations',    0))
+        self._timeout_s             = float(macro.get('timeout_s',       0))
+        self._pre_stop_actions      = macro.get('pre_stop_actions',      [])
+        self._humanize              = bool(macro.get('humanize',         False))
+        self._humanize_factor       = float(macro.get('humanize_factor', 0.12))
+        self._kill_switch           = macro.get('kill_switch',           {})
+        self._ks_hook: object | None = None
 
     # ── Cycle de vie public ────────────────────────────────────────────────────
     def start(self):
@@ -79,13 +83,39 @@ class MacroRunner:
         self._pause_lock.set()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
+        ks = self._kill_switch
+        if ks.get('enabled') and ks.get('key'):
+            self._register_kill_switch(ks['key'].strip())
+
+    def _register_kill_switch(self, key: str) -> None:
+        import keyboard as _kb
+        try:
+            _kb.parse_hotkey(key)  # validate before registering
+            self._ks_hook = _kb.add_hotkey(key, self._on_kill_switch_triggered, suppress=False)
+            self._log(f'Kill switch [{key}] enregistré.', 'INFO')
+        except Exception as e:
+            self._log(f'Kill switch clé invalide [{key}] : {e}', 'WARNING')
+
+    def _on_kill_switch_triggered(self) -> None:
+        if not self._stop.is_set():
+            key = self._kill_switch.get('key', '')
+            self._log(f'Kill switch [{key}] activé — arrêt forcé.', 'WARNING')
+            self.stop()
+
+    def _unregister_kill_switch(self) -> None:
+        if self._ks_hook is not None:
+            try:
+                import keyboard as _kb
+                _kb.remove_hotkey(self._ks_hook)
+            except Exception:
+                pass
+            self._ks_hook = None
 
     def stop(self):
         self._stop.set()
         self._pause_lock.set()   # débloquer un éventuel pause.wait()
-        if self._thread:
-            self._thread.join(timeout=2)
-            self._thread = None
+        self._unregister_kill_switch()
+        self._thread = None      # thread est daemon — mourra seul, pas de join bloquant
 
     def pause(self):
         self._paused = True
@@ -142,25 +172,35 @@ class MacroRunner:
         )
         self.on_webhook('macro_start', {'name': name})
 
-        start_time = time.time()
-        iteration  = 0
+        start_time       = time.time()
+        iteration        = 0
+        _guard_wait_start = time.time()
 
         while not self._stop.is_set():
-            self._pause_lock.wait()
+            if not self._pause_lock.wait(timeout=0.5):
+                continue  # timeout → re-check stop, ne bloque pas indéfiniment
             if self._stop.is_set():
                 break
 
             # ── Garde de démarrage ──────────────────────────────────────────
             if self._start_guard:
                 if not all(eval_condition(c) for c in self._start_guard):
-                    time.sleep(loop_delay)
+                    if self._start_guard_timeout_s > 0:
+                        if time.time() - _guard_wait_start >= self._start_guard_timeout_s:
+                            self._log(
+                                f'start_guard timeout ({self._start_guard_timeout_s:.0f}s) — arrêt.',
+                                'WARNING'
+                            )
+                            break
+                    self._stop.wait(timeout=loop_delay)
                     continue
+                _guard_wait_start = time.time()  # reset timer dès que guard passe
 
             # ── Fenêtre cible ───────────────────────────────────────────────
             if self._target_hwnd:
                 try:
                     if not is_window_focused(int(self._target_hwnd)):
-                        time.sleep(loop_delay)
+                        self._stop.wait(timeout=loop_delay)
                         continue
                 except Exception as e:
                     self._log(f'Erreur window scope : {e}', 'WARNING')
@@ -247,7 +287,7 @@ class MacroRunner:
             if not loop:
                 break
 
-            time.sleep(loop_delay)
+            self._stop.wait(timeout=loop_delay)
 
         # ── Actions de pré-arrêt ───────────────────────────────────────────
         if self._pre_stop_actions:
@@ -270,6 +310,11 @@ class MacroRunner:
             'elapsed_s':  elapsed,
             'errors':     stats.get('errors', 0),
         })
+        try:
+            from .screen_reader import release_thread_sct
+            release_thread_sct()
+        except Exception:
+            pass
 
     # ── Helpers ────────────────────────────────────────────────────────────────
     def _eval_rule(self, rule: dict) -> bool:
@@ -284,7 +329,10 @@ class MacroRunner:
         for action in actions:
             if self._stop.is_set():
                 return
-            self._pause_lock.wait()
+            if not self._pause_lock.wait(timeout=0.5):
+                if self._stop.is_set():
+                    return
+                continue
             if self._stop.is_set():
                 return
             exec_action(action, ctx)

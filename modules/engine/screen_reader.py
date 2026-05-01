@@ -21,6 +21,16 @@ def _get_sct():
     return _tls.sct
 
 
+def release_thread_sct() -> None:
+    """Libère l'instance mss du thread courant (évite la fuite GDI sur fin de thread)."""
+    if hasattr(_tls, 'sct'):
+        try:
+            _tls.sct.close()
+        except Exception:
+            pass
+        del _tls.sct
+
+
 def capture_region(x: int, y: int, w: int, h: int) -> np.ndarray:
     """Capture a screen region and return BGR numpy array."""
     mon = {'left': x, 'top': y, 'width': w, 'height': h}

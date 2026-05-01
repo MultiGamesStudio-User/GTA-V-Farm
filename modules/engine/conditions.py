@@ -48,6 +48,7 @@ from __future__ import annotations
 import re
 import os
 import ctypes
+import threading
 
 import numpy as np
 import cv2
@@ -55,13 +56,10 @@ import cv2
 from .screen_reader import capture_region, get_pixel_color
 from . import state
 
-# ── Registre des macros en cours ───────────────────────────────────────────────
-_runners_ref: dict = {}
-
+# ── Registre des macros en cours (stocké dans state.py pour éviter l'import lourd) ──
 def set_runners_registry(registry: dict) -> None:
-    """Donne aux conditions l'accès au dict des runners actifs (fourni par main.py)."""
-    global _runners_ref
-    _runners_ref = registry
+    """Proxy vers state.set_runners_registry — conservé pour compatibilité."""
+    state.set_runners_registry(registry)
 
 
 # ── OCR — délégué au module ocr_engine ────────────────────────────────────────
@@ -330,6 +328,27 @@ def _pixel_changed(cond: dict) -> bool:
 # ══════════════════════════════════════════════════════════════════════════════
 #  TEMPLATE MATCHING
 # ══════════════════════════════════════════════════════════════════════════════
+_template_cache: dict = {}
+_template_cache_lock = threading.Lock()
+
+
+def _load_template(path: str):
+    """Charge et cache un template cv2 depuis le disque (une seule fois par path)."""
+    with _template_cache_lock:
+        if path not in _template_cache:
+            img = cv2.imread(path)
+            if img is None:
+                return None
+            _template_cache[path] = img
+        return _template_cache[path]
+
+
+def clear_template_cache() -> None:
+    """Vide le cache de templates (utile après modification de fichiers template)."""
+    with _template_cache_lock:
+        _template_cache.clear()
+
+
 def _template_match(cond: dict) -> bool:
     """
     True si le template est trouvé dans la région avec un score ≥ threshold.
@@ -338,11 +357,11 @@ def _template_match(cond: dict) -> bool:
     tmpl_path = cond.get('template_path', '')
     if not os.path.exists(tmpl_path):
         return False
-    x, y, w, h = _get_region(cond)
-    scene = capture_region(x, y, w, h)
-    tmpl  = cv2.imread(tmpl_path)
+    tmpl = _load_template(tmpl_path)
     if tmpl is None:
         return False
+    x, y, w, h = _get_region(cond)
+    scene = capture_region(x, y, w, h)
     sg = cv2.cvtColor(scene, cv2.COLOR_BGR2GRAY)
     tg = cv2.cvtColor(tmpl,  cv2.COLOR_BGR2GRAY)
     if tg.shape[0] > sg.shape[0] or tg.shape[1] > sg.shape[1]:
@@ -362,7 +381,7 @@ def _macro_is_running(cond: dict) -> bool:
 
     Exemple : {"type":"macro_is_running","macro_id":"mon_farm"}
     """
-    runner = _runners_ref.get(cond.get('macro_id', ''))
+    runner = state.get_runners_registry().get(cond.get('macro_id', ''))
     return runner is not None and runner.is_running()
 
 

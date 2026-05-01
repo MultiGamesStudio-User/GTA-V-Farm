@@ -24,11 +24,11 @@ function navigate(page, testTab) {
   if (pageEl) pageEl.classList.add('active');
   if (navEl)  navEl.classList.add('active');
 
-  if (page === 'tests')      switchTestTab(testTab || null);
-  if (page === 'macros')     renderMacroList();
-  if (page === 'dashboard')  renderDashboard();
-  if (page === 'syslog')     refreshSyslog();
-  if (page === 'settings')   refreshSyslog();
+  if (page === 'tests')       switchTestTab(testTab || null);
+  if (page === 'macros')      renderMacroList();
+  if (page === 'dashboard')   renderDashboard();
+  if (page === 'syslog')      refreshSyslog();
+  if (page === 'settings')    switchSettingsTab(null);
   if (page === 'autoclicker') initAutoClicker();
 
   _saveUiPref('lastPage', page);
@@ -61,6 +61,20 @@ function switchTestTab(tab) {
   if (tab === 'windows')    refreshWindows();
 
   _saveUiPref('lastTestTab', tab);
+}
+
+/* ── Settings page tab switching ─────────────────────────── */
+function switchSettingsTab(tab) {
+  if (!tab) tab = window._lastSettingsTab || 'general';
+  window._lastSettingsTab = tab;
+  document.querySelectorAll('#page-settings .tests-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  const tabBtn = document.querySelector(`#page-settings .tests-tab[data-tab="${tab}"]`);
+  const panel  = document.getElementById(`settings-panel-${tab}`);
+  if (tabBtn) tabBtn.classList.add('active');
+  if (panel)  panel.classList.add('active');
+  if (tab === 'logs') refreshSyslog();
+  _saveUiPref('lastSettingsTab', tab);
 }
 
 /* ── Syslog page ──────────────────────────────────────────── */
@@ -276,9 +290,6 @@ function _updateOverlayBtn() {
 
 /* ── Init ─────────────────────────────────────────────────── */
 async function init() {
-  /* Show splash for a minimum time so it feels polished */
-  const splashStart = Date.now();
-
   /* Load app config and set version strings dynamically */
   try {
     // Lecture version courante depuis package.json à la racine du build (pas cache)
@@ -290,11 +301,16 @@ async function init() {
     window._macroEngineVersion = appCfg.version;
   } catch (e) { console.warn('Erreur lecture version courante:', e); }
 
-  setSplashMsg('Vérification de la licence...');
-  /* License check — block everything until valid */
-  await checkLicense();
+  setSplashMsg('Chargement...');
 
-  setSplashMsg('Chargement des macros...');
+  /* License check + macros + settings en parallèle */
+  await Promise.all([
+    checkLicense(),
+    loadMacros(),
+    loadAppSettings(),
+  ]);
+
+  console.log('[MacroEngine] Version courante UI:', window._macroEngineVersion);
 
   /* Nav */
   document.querySelectorAll('.nav-item').forEach(n => {
@@ -304,19 +320,13 @@ async function init() {
   /* Engine events */
   setupEngineEvents();
   setupRecordingEvents();
-  /* Load macros */
-  await loadMacros();
-  // Log version courante pour debug update
-  console.log('[MacroEngine] Version courante UI:', window._macroEngineVersion);
-
-  setSplashMsg('Chargement des paramètres...');
-  /* Load settings & register shortcuts */
-  await loadAppSettings();
 
   /* Global shortcut handler */
   window.api.onShortcutTriggered((action) => {
-    if (action === 'stop')  { stopAllMacros(); appendLog('INFO', 'Raccourci: arrêt de toutes les macros'); }
-    if (action === 'pause') { if (currentMacroIdx >= 0) pauseCurrentMacro(); }
+    if (action === 'stop')      { stopAllMacros(); appendLog('INFO', 'Raccourci: arrêt de toutes les macros'); }
+    if (action === 'pause')     { if (currentMacroIdx >= 0) pauseCurrentMacro(); }
+    if (action === 'acp_start') { if (typeof startAutoClicker === 'function') startAutoClicker(); }
+    if (action === 'acp_stop')  { if (typeof stopAutoClicker  === 'function') stopAutoClicker();  }
   });
 
   /* Overlay closed externally */
@@ -380,21 +390,30 @@ async function init() {
     };
   }
 
-  setSplashMsg('Démarrage du moteur Python...');
   appendLog('INFO', 'MacroEngine UI démarrée');
 
-  /* Auto-start engine */
-  try {
-    await window.api.startEngine();
-    appendLog('INFO', 'Engine Python démarré');
-    updateStatusBadge(true);
-    startUptimeClock();
-  } catch (_) {}
+  /* Engine déjà démarré par le main process — synchroniser le badge */
+  window.api.startEngine().catch(() => {});
+  updateStatusBadge(true);
+  startUptimeClock();
 
-  /* Hide splash — ensure at least 2s of display */
-  const elapsed = Date.now() - splashStart;
-  setTimeout(hideSplash, Math.max(0, 2000 - elapsed));
+  hideSplash();
 }
+
+/* ── Global shortcut map (merges stop/pause + ACP hotkeys) ────── */
+let _globalShortcutMap = {};
+
+async function _applyGlobalShortcuts() {
+  try { await window.api.registerShortcuts(_globalShortcutMap); } catch (_) {}
+}
+
+window._setGlobalShortcuts = async function(additions) {
+  for (const [k, v] of Object.entries(additions)) {
+    if (v) _globalShortcutMap[k] = v;
+    else   delete _globalShortcutMap[k];
+  }
+  await _applyGlobalShortcuts();
+};
 
 /* ── Settings page functions ──────────────────────────────── */
 async function loadAppSettings() {
@@ -405,8 +424,14 @@ async function loadAppSettings() {
     const urlEl = document.getElementById('set-webhook-url');
     if (urlEl && s.webhookUrl) {
       urlEl.value = s.webhookUrl;
-      // Restore webhook URL to engine
-      try { await window.api.setWebhook({ url: s.webhookUrl }); } catch (_) {}
+    }
+    const webhookEvents = s.webhookEvents || ['macro_start', 'macro_stop', 'macro_auto_stop'];
+    for (const ev of ['macro_start', 'macro_stop', 'macro_auto_stop', 'rule_triggered']) {
+      const cb = document.getElementById(`wh-ev-${ev}`);
+      if (cb) cb.checked = webhookEvents.includes(ev);
+    }
+    if (s.webhookUrl) {
+      try { await window.api.setWebhook({ url: s.webhookUrl, events: webhookEvents }); } catch (_) {}
     }
 
     // Shortcuts
@@ -414,12 +439,15 @@ async function loadAppSettings() {
     const pauseEl = document.getElementById('set-shortcut-pause');
     if (stopEl  && s.shortcutStop)  stopEl.value  = s.shortcutStop;
     if (pauseEl && s.shortcutPause) pauseEl.value = s.shortcutPause;
-    if (s.shortcutStop || s.shortcutPause) {
-      const map = {};
-      if (s.shortcutStop)  map.stop  = keyToAccelerator(s.shortcutStop);
-      if (s.shortcutPause) map.pause = keyToAccelerator(s.shortcutPause);
-      await window.api.registerShortcuts(map);
-    }
+    if (s.shortcutStop)  _globalShortcutMap.stop  = keyToAccelerator(s.shortcutStop);
+    if (s.shortcutPause) _globalShortcutMap.pause = keyToAccelerator(s.shortcutPause);
+    // Also load ACP hotkeys saved in localStorage
+    try {
+      const acp = JSON.parse(localStorage.getItem('acp_settings') || '{}');
+      if (acp['acp-key-start']) _globalShortcutMap.acp_start = keyToAccelerator(acp['acp-key-start']);
+      if (acp['acp-key-stop'])  _globalShortcutMap.acp_stop  = keyToAccelerator(acp['acp-key-stop']);
+    } catch (_) {}
+    if (Object.keys(_globalShortcutMap).length) await _applyGlobalShortcuts();
 
     // Console filter
     if (s.consoleFilter) {
@@ -442,7 +470,8 @@ async function loadAppSettings() {
     if (ocrEl && s.ocrEngine) ocrEl.value = s.ocrEngine;
 
     // Last page — navigate after short delay so DOM is ready
-    if (s.lastTestTab) window._lastTestTab = s.lastTestTab;
+    if (s.lastTestTab)     window._lastTestTab     = s.lastTestTab;
+    if (s.lastSettingsTab) window._lastSettingsTab = s.lastSettingsTab;
     if (s.lastPage) {
       setTimeout(() => navigate(s.lastPage), 50);
     }
@@ -476,6 +505,7 @@ function keyToAccelerator(key) {
   if (key.length === 1) return key.toUpperCase();
   return key;
 }
+window.keyToAccelerator = keyToAccelerator;
 
 async function saveWebhookSettings() {
   const url = document.getElementById('set-webhook-url').value.trim();
@@ -483,8 +513,10 @@ async function saveWebhookSettings() {
   try {
     const s = (await window.api.readSettings()) || {};
     s.webhookUrl = url;
+    const evIds = ['macro_start', 'macro_stop', 'macro_auto_stop', 'rule_triggered'];
+    s.webhookEvents = evIds.filter(ev => document.getElementById(`wh-ev-${ev}`)?.checked);
     await window.api.writeSettings(s);
-    if (url) await window.api.setWebhook({ url });
+    if (url) await window.api.setWebhook({ url, events: s.webhookEvents });
     statusEl.textContent = '✅ Sauvegardé';
     statusEl.style.color = 'var(--success)';
   } catch (e) {
@@ -515,10 +547,11 @@ async function saveShortcutSettings() {
     s.shortcutStop  = stopKey;
     s.shortcutPause = pauseKey;
     await window.api.writeSettings(s);
-    const map = {};
-    if (stopKey)  map.stop  = keyToAccelerator(stopKey);
-    if (pauseKey) map.pause = keyToAccelerator(pauseKey);
-    await window.api.registerShortcuts(map);
+    if (stopKey)  _globalShortcutMap.stop  = keyToAccelerator(stopKey);
+    else          delete _globalShortcutMap.stop;
+    if (pauseKey) _globalShortcutMap.pause = keyToAccelerator(pauseKey);
+    else          delete _globalShortcutMap.pause;
+    await _applyGlobalShortcuts();
     statusEl.textContent = '✅ Raccourcis activés';
     statusEl.style.color = 'var(--success)';
   } catch (e) {

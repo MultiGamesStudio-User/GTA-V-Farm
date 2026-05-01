@@ -80,14 +80,7 @@ def _interruptible_sleep(duration: float, stop_event=None, step: float = 0.05) -
     if stop_event is None:
         time.sleep(duration)
         return False
-    end = time.monotonic() + duration
-    while True:
-        if stop_event.is_set():
-            return True
-        remaining = end - time.monotonic()
-        if remaining <= 0:
-            return False
-        time.sleep(min(step, remaining))
+    return stop_event.wait(timeout=duration)
 
 
 def _set_cursor(x: int, y: int) -> None:
@@ -323,12 +316,52 @@ def _key_combo(a: dict) -> None:
         up(k)
 
 
+_KEYBDINPUT_FIELDS = [
+    ('wVk',         ctypes.c_ushort),
+    ('wScan',       ctypes.c_ushort),
+    ('dwFlags',     ctypes.c_ulong),
+    ('time',        ctypes.c_ulong),
+    ('dwExtraInfo', ctypes.POINTER(ctypes.c_ulong)),
+]
+
+class _KEYBDINPUT(ctypes.Structure):
+    _fields_ = _KEYBDINPUT_FIELDS
+
+class _INPUT_KB(ctypes.Structure):
+    class _U(ctypes.Union):
+        _fields_ = [('ki', _KEYBDINPUT)]
+    _anonymous_ = ('_u',)
+    _fields_    = [('type', ctypes.c_ulong), ('_u', _U), ('_pad', ctypes.c_ubyte * 8)]
+
+_KEYEVENTF_UNICODE = 0x0004
+_KEYEVENTF_KEYUP   = 0x0002
+
+
+def _send_unicode_char(char: str) -> None:
+    """SendInput with KEYEVENTF_UNICODE — layout-independent character injection."""
+    code = ord(char)
+    inp = _INPUT_KB()
+    inp.type       = 1  # INPUT_KEYBOARD
+    inp.ki.wVk     = 0
+    inp.ki.wScan   = code
+    inp.ki.dwFlags = _KEYEVENTF_UNICODE
+    _user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
+    inp.ki.dwFlags = _KEYEVENTF_UNICODE | _KEYEVENTF_KEYUP
+    _user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
+
+
 def _type_text(a: dict) -> None:
     """
-    Tape du texte caractère par caractère.
+    Tape du texte caractère par caractère via SendInput KEYEVENTF_UNICODE.
+    Layout-indépendant : fonctionne sur AZERTY, QWERTY, etc.
     Paramètres : text, interval (défaut 0.05s entre chaque caractère)
     """
-    pyautogui.typewrite(a.get('text', ''), interval=float(a.get('interval', 0.05)))
+    text     = a.get('text', '')
+    interval = float(a.get('interval', 0.05))
+    for ch in text:
+        _send_unicode_char(ch)
+        if interval > 0:
+            time.sleep(interval)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

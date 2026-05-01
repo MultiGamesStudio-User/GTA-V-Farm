@@ -23,10 +23,11 @@ contextBridge.exposeInMainWorld('api', {
   scaleCoords:    (p) => ipcRenderer.invoke('engine:scale_coords',    p),
 
   // ── Vision & OCR ─────────────────────────────────────────
-  previewRegion:  (p) => ipcRenderer.invoke('engine:preview_region', p),
-  pickColor:      (p) => ipcRenderer.invoke('engine:pick_color', p),
-  checkOcr:       ()  => ipcRenderer.invoke('engine:check_ocr'),
-  ocrText:        (p) => ipcRenderer.invoke('engine:ocr_text', p),
+  previewRegion:     (p) => ipcRenderer.invoke('engine:preview_region', p),
+  pickColor:         (p) => ipcRenderer.invoke('engine:pick_color', p),
+  checkOcr:          ()  => ipcRenderer.invoke('engine:check_ocr'),
+  ocrText:           (p) => ipcRenderer.invoke('engine:ocr_text', p),
+  testTemplateScore: (p) => ipcRenderer.invoke('engine:test_template_score', p),
 
   // ── Conditions / Actions testing ─────────────────────────
   testCondition:  (p) => ipcRenderer.invoke('engine:test_condition', p),
