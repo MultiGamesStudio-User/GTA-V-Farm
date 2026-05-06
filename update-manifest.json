@@ -1,9 +1,9 @@
 {
-  "version": "2.4.2",
-  "date": "2026-05-01",
+  "version": "2.4.3",
+  "date": "2026-05-06",
   "files": {
     "main.py": "05bdcb85e46be125f6f463edf89c9e597bf8eac8d0f352f1fddfcd7aa2b4a09b",
-    "config.py": "6652c4a3760d6aabee709c32487c393af875b4f52dd926650edcbab95bac1f47",
+    "config.py": "7e68e06d8acc15a9eae3f0222a8d4e8efce4f6e7ffea075f84f6d1ed6982d298",
     "requirements.txt": "040374fb15e0f4887cf40ccb5387f7045ee5ab1a3acb5afc7e42b726b9f63a93",
     "modules/engine/actions.py": "bccbab67a4850bc60218fac5ace9833ac87b4167214a5ca3dfe4acb01a992628",
     "modules/engine/conditions.py": "55cdd911f463cfbd2dad558ced857785f4b9cc7665c8b48263cf24bd6db7847e",
@@ -11,14 +11,14 @@
     "modules/engine/humanizer.py": "ea58f0de9adfd3b68835145ef5837390ba44201bf6f63f7c8056b67403beb981",
     "modules/engine/macro_runner.py": "ccb76bd6b5a2528ed849c9f57d1a5131a3cb69ab53a68d27b015290b5f778fdd",
     "modules/engine/ocr_engine.py": "4bf452cbdd5a70a191b75e23fbe90aba011004b9d47bcd6d6ee5c3138e0be76b",
-    "modules/engine/recorder.py": "0d2b9329a8f6f7f3dc5e49350a694403486737ff1f63a16fe70465cb3a7f6b4a",
+    "modules/engine/recorder.py": "ed64507d3701c306026b1d7f22df22c1edd328ad14f71ae5fca163432022932f",
     "modules/engine/screen_reader.py": "faafa901c620d96d8de523646a555197783f93bb36b72d4d4a4b068b4aead79a",
     "modules/engine/state.py": "b337150b545cb3975a75c4561c3ce55e98802b84ae4ad4fe639e2b7609f79987",
     "modules/engine/window_manager.py": "c2203c6654203e64b9bf12759949830462a2014505053e69de8083710feb7881",
     "modules/engine/__init__.py": "7c4621ac5cf352d2e76cc8b82fa45f7925dc610d4a7873763ab007324e321962",
     "modules/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "electron-app/renderer/index.html": "e2336576df1b6c6121a39a6b3ca7a610e3546f3d33c9b3db1288d5e6f2a722cd",
-    "electron-app/renderer/js/app.js": "5b19e0d8d3f7ba0f44d5c34f90e970a7b22a4ac97902082d7d36ba6fe192122b",
+    "electron-app/renderer/index.html": "ac22d56a49b76dd9285fac57a39e78219e4b86ce8b5459234432c42492e1701e",
+    "electron-app/renderer/js/app.js": "afda770350f52fdadf5e1ecd5c07fcc5ff1a59f3ac276d9b3e6e7384054f57de",
     "electron-app/renderer/js/console.js": "e65c873e276af41b00ebb5095bcc97cf3c06e3a138ff8d5da21ef25855bdb00a",
     "electron-app/renderer/js/engine.js": "7e3177365dc5c76f2d1c4608e2ec02c67bd9c7f27d47647d24d4102f04c62ec9",
     "electron-app/renderer/js/macros-data.js": "efe1f0ee1ab8cc21ef1f2dd19d1d0029570e12b3f7c9688e78591d3e1f7fe3ae",
@@ -33,6 +33,6 @@
     "electron-app/renderer/overlay.html": "f74be1051d2d85758c0ab6eab1fff75ac85ad180e0099b467d73ca8429264c28",
     "electron-app/renderer/picker.html": "f229286c0cd62dd8ebc95be9acbb31ecac920a66c413290d02e059092035dc26",
     "electron-app/renderer/styles.css": "60e2bc415a3121ca03cd5131687db8361ea323b79e59d11149c6fd92f8c98873",
-    "electron-app/package.json": "c08132debf2b544257cc0b65feffe7ee7d51d4a446c6db8b077d0df638f54a02"
+    "electron-app/package.json": "da7bbd2ef0ab7cd7817be49020695ebf6d45b735272d0fcb4cc3fd36557783a7"
   }
 }
