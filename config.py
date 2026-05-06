@@ -18,6 +18,7 @@ CAPTURE_REGION = {
 # --- Sécurité -----------------------------------------------
 EMERGENCY_STOP_KEY = "f12"   # arrêt d'urgence
 PAUSE_KEY          = "f11"   # pause / reprise
+RECORD_STOP_KEY    = "f6"    # arrêt enregistrement macro
 
 # --- Timings (secondes) -------------------------------------
 LOOP_DELAY          = 0.05
@@ -192,6 +193,27 @@ TEMPLATES = {
     "loading_screen"    : "loading_screen.png",
     "in_vehicle"        : "in_vehicle.png",
 }
+
+# ────────────────────────────────────────────────────────────
+#  QTE (Quick Time Events) — cheat auto-QTE pour tests anticheat
+# ────────────────────────────────────────────────────────────
+
+# Zone de détection du prompt QTE à l'écran (à calibrer selon le serveur)
+QTE_REGION = {'x': 760, 'y': 380, 'w': 400, 'h': 320}
+
+# Couleur de l'arc orange du cercle QTE [R, G, B]
+QTE_DETECT_COLOR     = [215, 95, 45]
+QTE_DETECT_TOLERANCE = 40
+
+# Mode spam : fréquence de pression (Hz) et durée max (secondes)
+QTE_SPAM_RATE_HZ  = 30
+QTE_SPAM_DURATION = 4.0
+
+# Mode hold : durée du maintien de touche (secondes)
+QTE_HOLD_DURATION = 2.0
+
+# Délai de réaction artificiel en ms (0 = instantané, surhumain)
+QTE_REACTION_MS = 0
 
 # --- Logging -------------------------------------------------
 LOG_DIR   = "logs"

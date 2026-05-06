@@ -2,6 +2,7 @@
 recorder.py — Record keyboard + mouse events into macro action steps
 """
 from __future__ import annotations
+import queue
 import time
 import threading
 from typing import Callable
@@ -27,7 +28,9 @@ class MacroRecorder:
         self._last_time = 0.0
         self._kb_listener = None
         self._ms_listener = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._event_queue: queue.Queue = queue.Queue()
+        self._sender_thread: threading.Thread | None = None
         # drag tracking
         self._drag_start: dict | None = None   # {x, y, button, time}
         self._current_pos: tuple[int, int] = (0, 0)
@@ -41,6 +44,9 @@ class MacroRecorder:
         self._actions = []
         self._start_time = time.time()
         self._last_time = self._start_time
+
+        self._sender_thread = threading.Thread(target=self._sender_loop, daemon=True)
+        self._sender_thread.start()
 
         self._kb_listener = keyboard.Listener(
             on_press=self._on_key_press,
@@ -64,21 +70,41 @@ class MacroRecorder:
             self._ms_listener = None
         with self._lock:
             self._flush_drag()
+        # drain queue before returning so on_event flushes all pending events
+        self._event_queue.join()
+        if self._sender_thread:
+            self._event_queue.put(None)  # sentinel to stop sender
+            self._sender_thread.join(timeout=2)
+            self._sender_thread = None
+        with self._lock:
             return list(self._actions)
 
     def is_recording(self) -> bool:
         return self._recording
 
     def _elapsed(self) -> float:
-        now = time.time()
-        dt = round(now - self._last_time, 3)
-        self._last_time = now
+        with self._lock:
+            now = time.time()
+            dt = round(now - self._last_time, 3)
+            self._last_time = now
         return dt
+
+    def _sender_loop(self):
+        """Drain event queue on dedicated thread so listener threads never block on I/O."""
+        while True:
+            item = self._event_queue.get()
+            if item is None:
+                self._event_queue.task_done()
+                break
+            try:
+                self.on_event(item)
+            finally:
+                self._event_queue.task_done()
 
     def _add(self, action: dict):
         with self._lock:
             self._actions.append(action)
-        self.on_event(action)
+        self._event_queue.put(action)
 
     # ── Keyboard ──────────────────────────────────────────────
     def _key_name(self, key) -> str | None:
@@ -87,8 +113,6 @@ class MacroRecorder:
             return key.char
         if hasattr(key, 'name') and key.name:
             return key.name
-        if hasattr(key, 'vk'):
-            return str(key.vk)
         return None
 
     def _on_key_press(self, key):
@@ -155,7 +179,7 @@ class MacroRecorder:
                 if self._drag_start is None:
                     return
                 self._flush_drag()
-            self._last_time = time.time()
+                self._last_time = time.time()
 
     def _on_mouse_scroll(self, x, y, dx, dy):
         if not self._recording:

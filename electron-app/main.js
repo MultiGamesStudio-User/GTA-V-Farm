@@ -553,66 +553,110 @@ for (const cmd of [
 }
 
 // ── IPC: Screen picker overlay ───────────────────────────────────────────────
-let pickerWindow = null;
+// One BrowserWindow per display — avoids Windows DPI clipping of transparent
+// windows that span monitors with different scale factors.
+let _pickerWindows = [];
+
+function _closeAllPickers() {
+  _pickerWindows.forEach(w => { try { if (!w.isDestroyed()) w.close(); } catch (_) {} });
+  _pickerWindows = [];
+}
+
+function _logicalToPhysical(screen, result) {
+  if (!result || result.x === undefined) return result;
+  const allDisplays = screen.getAllDisplays();
+  const display = screen.getDisplayNearestPoint({ x: result.x, y: result.y });
+  const sf = display.scaleFactor || 1;
+
+  // Sum physical widths of all displays strictly to the left/above the target display.
+  // This gives the physical pixel offset from the virtual screen's leftmost edge.
+  let physX = 0, physY = 0;
+  for (const d of allDisplays) {
+    if (d.bounds.x + d.bounds.width <= display.bounds.x)
+      physX += Math.round(d.bounds.width * d.scaleFactor);
+    if (d.bounds.y + d.bounds.height <= display.bounds.y)
+      physY += Math.round(d.bounds.height * d.scaleFactor);
+  }
+  physX += Math.round((result.x - display.bounds.x) * sf);
+  physY += Math.round((result.y - display.bounds.y) * sf);
+
+  // mss / Win32 physical coords have origin at primary monitor (0,0), not at
+  // the leftmost pixel. Subtract the physical offset of the primary itself.
+  // Primary is always at logical (0,0); monitors with logical right-edge <= 0
+  // are physically to its left and contribute a positive offset to subtract.
+  let primaryOffsetX = 0, primaryOffsetY = 0;
+  for (const d of allDisplays) {
+    if (d.bounds.x + d.bounds.width <= 0)
+      primaryOffsetX += Math.round(d.bounds.width * d.scaleFactor);
+    if (d.bounds.y + d.bounds.height <= 0)
+      primaryOffsetY += Math.round(d.bounds.height * d.scaleFactor);
+  }
+
+  result.x = physX - primaryOffsetX;
+  result.y = physY - primaryOffsetY;
+  if (result.w !== undefined) result.w = Math.round(result.w * sf);
+  if (result.h !== undefined) result.h = Math.round(result.h * sf);
+  return result;
+}
 
 ipcMain.handle('picker:start', (_evt, opts) => {
   return new Promise((resolve) => {
-    if (pickerWindow) {
-      pickerWindow.close();
-      pickerWindow = null;
-    }
+    _closeAllPickers();
 
     const { screen } = require('electron');
     const displays = screen.getAllDisplays();
-    // Get the bounds covering all displays
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const d of displays) {
-      minX = Math.min(minX, d.bounds.x);
-      minY = Math.min(minY, d.bounds.y);
-      maxX = Math.max(maxX, d.bounds.x + d.bounds.width);
-      maxY = Math.max(maxY, d.bounds.y + d.bounds.height);
-    }
+    let resolved = false;
 
-    pickerWindow = new BrowserWindow({
-      x: minX, y: minY,
-      width: maxX - minX, height: maxY - minY,
-      frame: false,
-      transparent: true,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-      resizable: false,
-      focusable: true,
-      webPreferences: {
-        preload: path.join(__dirname, 'picker-preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    });
+    const _resultListener = (_e, result) => {
+      if (resolved) return;
+      resolved = true;
+      ipcMain.removeListener('picker:result', _resultListener);
+      _closeAllPickers();
+      resolve(_logicalToPhysical(screen, result));
+    };
+    ipcMain.on('picker:result', _resultListener);
 
-    pickerWindow.loadFile(path.join(__dirname, 'renderer', 'picker.html'));
-    pickerWindow.once('ready-to-show', () => {
-      pickerWindow.webContents.send('picker:init', {
-        mode: opts?.mode || 'point', // 'point' or 'region'
-        offsetX: minX,
-        offsetY: minY,
+    for (const display of displays) {
+      const win = new BrowserWindow({
+        x:      display.bounds.x,
+        y:      display.bounds.y,
+        width:  display.bounds.width,
+        height: display.bounds.height,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        focusable: true,
+        webPreferences: {
+          preload: path.join(__dirname, 'picker-preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+        },
       });
-    });
 
-    // Listen for result
-    ipcMain.once('picker:result', (_e, result) => {
-      if (pickerWindow) {
-        pickerWindow.close();
-        pickerWindow = null;
-      }
-      resolve(result);
-    });
+      win.loadFile(path.join(__dirname, 'renderer', 'picker.html'));
+      const _win = win;
+      win.once('ready-to-show', () => {
+        if (_win.isDestroyed()) return;
+        _win.webContents.send('picker:init', {
+          mode:    opts?.mode || 'point',
+          offsetX: display.bounds.x,
+          offsetY: display.bounds.y,
+        });
+      });
 
-    pickerWindow.on('closed', () => {
-      pickerWindow = null;
-      // If no result sent yet, resolve with null
-      ipcMain.removeAllListeners('picker:result');
-      resolve(null);
-    });
+      win.on('closed', () => {
+        if (!resolved) {
+          resolved = true;
+          ipcMain.removeListener('picker:result', _resultListener);
+          _closeAllPickers();
+          resolve(null);
+        }
+      });
+
+      _pickerWindows.push(win);
+    }
   });
 });
 
