@@ -30,6 +30,7 @@ function navigate(page, testTab) {
   if (page === 'syslog')      refreshSyslog();
   if (page === 'settings')    switchSettingsTab(null);
   if (page === 'autoclicker') initAutoClicker();
+  if (page === 'qte')         initQtePage();
 
   _saveUiPref('lastPage', page);
 }
@@ -323,10 +324,11 @@ async function init() {
 
   /* Global shortcut handler */
   window.api.onShortcutTriggered((action) => {
-    if (action === 'stop')      { stopAllMacros(); appendLog('INFO', 'Raccourci: arrêt de toutes les macros'); }
-    if (action === 'pause')     { if (currentMacroIdx >= 0) pauseCurrentMacro(); }
-    if (action === 'acp_start') { if (typeof startAutoClicker === 'function') startAutoClicker(); }
-    if (action === 'acp_stop')  { if (typeof stopAutoClicker  === 'function') stopAutoClicker();  }
+    if (action === 'stop')        { stopAllMacros(); appendLog('INFO', 'Raccourci: arrêt de toutes les macros'); }
+    if (action === 'pause')       { if (currentMacroIdx >= 0) pauseCurrentMacro(); }
+    if (action === 'acp_start')   { if (typeof startAutoClicker === 'function') startAutoClicker(); }
+    if (action === 'acp_stop')    { if (typeof stopAutoClicker  === 'function') stopAutoClicker();  }
+    if (action === 'record_stop') { if (typeof isRecording !== 'undefined' && isRecording) toggleRecording(); }
   });
 
   /* Overlay closed externally */
@@ -435,12 +437,16 @@ async function loadAppSettings() {
     }
 
     // Shortcuts
-    const stopEl  = document.getElementById('set-shortcut-stop');
-    const pauseEl = document.getElementById('set-shortcut-pause');
-    if (stopEl  && s.shortcutStop)  stopEl.value  = s.shortcutStop;
-    if (pauseEl && s.shortcutPause) pauseEl.value = s.shortcutPause;
-    if (s.shortcutStop)  _globalShortcutMap.stop  = keyToAccelerator(s.shortcutStop);
-    if (s.shortcutPause) _globalShortcutMap.pause = keyToAccelerator(s.shortcutPause);
+    const stopEl       = document.getElementById('set-shortcut-stop');
+    const pauseEl      = document.getElementById('set-shortcut-pause');
+    const recStopEl    = document.getElementById('set-shortcut-record-stop');
+    if (stopEl    && s.shortcutStop)       stopEl.value       = s.shortcutStop;
+    if (pauseEl   && s.shortcutPause)      pauseEl.value      = s.shortcutPause;
+    if (recStopEl && s.shortcutRecordStop) recStopEl.value    = s.shortcutRecordStop;
+    if (s.shortcutStop)       _globalShortcutMap.stop        = keyToAccelerator(s.shortcutStop);
+    if (s.shortcutPause)      _globalShortcutMap.pause       = keyToAccelerator(s.shortcutPause);
+    if (s.shortcutRecordStop) _globalShortcutMap.record_stop = keyToAccelerator(s.shortcutRecordStop);
+    else                      _globalShortcutMap.record_stop = 'F6';
     // Also load ACP hotkeys saved in localStorage
     try {
       const acp = JSON.parse(localStorage.getItem('acp_settings') || '{}');
@@ -539,18 +545,21 @@ async function testWebhook() {
 }
 
 async function saveShortcutSettings() {
-  const stopKey  = document.getElementById('set-shortcut-stop').value.trim();
-  const pauseKey = document.getElementById('set-shortcut-pause').value.trim();
-  const statusEl = document.getElementById('shortcut-status');
+  const stopKey       = document.getElementById('set-shortcut-stop').value.trim();
+  const pauseKey      = document.getElementById('set-shortcut-pause').value.trim();
+  const recStopKey    = document.getElementById('set-shortcut-record-stop').value.trim();
+  const statusEl      = document.getElementById('shortcut-status');
   try {
     const s = (await window.api.readSettings()) || {};
-    s.shortcutStop  = stopKey;
-    s.shortcutPause = pauseKey;
+    s.shortcutStop       = stopKey;
+    s.shortcutPause      = pauseKey;
+    s.shortcutRecordStop = recStopKey;
     await window.api.writeSettings(s);
-    if (stopKey)  _globalShortcutMap.stop  = keyToAccelerator(stopKey);
-    else          delete _globalShortcutMap.stop;
-    if (pauseKey) _globalShortcutMap.pause = keyToAccelerator(pauseKey);
-    else          delete _globalShortcutMap.pause;
+    if (stopKey)    _globalShortcutMap.stop        = keyToAccelerator(stopKey);
+    else            delete _globalShortcutMap.stop;
+    if (pauseKey)   _globalShortcutMap.pause       = keyToAccelerator(pauseKey);
+    else            delete _globalShortcutMap.pause;
+    _globalShortcutMap.record_stop = recStopKey ? keyToAccelerator(recStopKey) : 'F6';
     await _applyGlobalShortcuts();
     statusEl.textContent = '✅ Raccourcis activés';
     statusEl.style.color = 'var(--success)';

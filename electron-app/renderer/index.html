@@ -105,6 +105,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l7 7-4 1 2.5 5L9 17l-2.5-5L3 13z"/><circle cx="17" cy="6" r="2" fill="currentColor" stroke="none"/></svg>
         <span>Auto Clicker</span>
       </a>
+      <a class="nav-item" data-page="qte" title="Auto QTE Cheat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+        <span>Auto QTE</span>
+      </a>
       <a class="nav-item" data-page="settings" title="Paramètres">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Paramètres</span>
@@ -626,6 +630,271 @@
       </div>
     </section>
 
+    <!-- ═══════════════════ AUTO QTE ═════════════════════ -->
+    <section class="page" id="page-qte">
+      <div class="page-header">
+        <h1>Auto QTE
+          <span id="qte-status-badge" class="macro-status-badge" style="display:none;margin-left:8px;font-size:11px;vertical-align:middle">ACTIF</span>
+        </h1>
+        <div class="header-actions">
+          <span id="qte-status-text" style="font-size:13px;font-weight:600;color:var(--text-2)">Arrêté</span>
+          <button class="btn btn-success" id="qte-btn-start" onclick="startQte()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Démarrer
+          </button>
+          <button class="btn btn-danger" id="qte-btn-stop" onclick="stopQte()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            Arrêter
+          </button>
+        </div>
+      </div>
+
+      <!-- Mode tabs -->
+      <div class="tests-tab-bar" style="margin-bottom:16px">
+        <button class="tests-tab active" data-qte-mode="ocr" onclick="switchQteMode('ocr')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+          Instant + OCR
+        </button>
+        <button class="tests-tab" data-qte-mode="spam" onclick="switchQteMode('spam')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Spam
+        </button>
+        <button class="tests-tab" data-qte-mode="hold" onclick="switchQteMode('hold')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          Hold
+        </button>
+        <button class="tests-tab" data-qte-mode="arc" onclick="switchQteMode('arc')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="10"/><path d="M12 2 A10 10 0 0 1 22 12" stroke="gold" stroke-width="3"/></svg>
+          Arc
+        </button>
+      </div>
+
+      <div class="tester-layout">
+
+        <!-- ── LEFT: config ─────────────────────────────── -->
+        <div class="tester-panel">
+
+          <!-- Detection card -->
+          <div class="settings-card" style="margin-bottom:14px">
+            <div class="settings-card-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+              Détection — Centre du cercle QTE (lettre)
+            </div>
+            <div class="form-row" style="gap:6px">
+              <div class="form-group">
+                <label>X</label>
+                <input type="number" id="qte-det-x" value="880" min="0" oninput="_qteSaveConfig()">
+              </div>
+              <div class="form-group">
+                <label>Y</label>
+                <input type="number" id="qte-det-y" value="455" min="0" oninput="_qteSaveConfig()">
+              </div>
+              <div class="form-group">
+                <label>W</label>
+                <input type="number" id="qte-det-w" value="55" min="1" oninput="_qteSaveConfig()">
+              </div>
+              <div class="form-group">
+                <label>H</label>
+                <input type="number" id="qte-det-h" value="55" min="1" oninput="_qteSaveConfig()">
+              </div>
+            </div>
+            <div class="form-row" style="gap:8px;margin-top:10px">
+              <div class="form-group" style="flex:2">
+                <label>Touches autorisées <small style="color:var(--text-3)">(vide = toutes A-Z)</small></label>
+                <input type="text" id="qte-allowed-keys" value="ZQSD" maxlength="52"
+                       placeholder="ex: ZQSD"
+                       oninput="_qteSaveConfig()"
+                       style="font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase">
+              </div>
+              <div class="form-group" style="flex:1">
+                <label>Contraste min <small style="color:var(--text-3)">(anti-faux+)</small></label>
+                <input type="number" id="qte-min-contrast" value="22" min="0" max="80" oninput="_qteSaveConfig()">
+              </div>
+            </div>
+            <div class="tester-actions" style="margin-top:8px">
+              <button class="btn btn-secondary btn-sm" onclick="pickQteRegion()" title="Sélectionner la zone à l'écran">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
+                Zone
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="previewQteRegion()" title="Aperçu de la zone capturée">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                Aperçu
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="testQteDetection()" title="Tester l'OCR sur la zone">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                Tester OCR
+              </button>
+            </div>
+            <div id="qte-det-result" style="display:none;margin-top:8px;font-size:12px;padding:6px 10px;border-radius:4px;background:var(--bg)"></div>
+          </div>
+
+          <!-- Response card -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Réponse
+            </div>
+
+            <!-- Common params -->
+            <div class="form-row" style="gap:8px;margin-bottom:12px">
+              <div class="form-group" style="flex:1">
+                <label>Touche fallback <small style="color:var(--text-3)">(si OCR rate)</small></label>
+                <input type="text" id="qte-key" value="e" maxlength="10" oninput="_qteSaveConfig()">
+              </div>
+              <div class="form-group" style="flex:1">
+                <label>Réaction <small style="color:var(--text-3)">(ms, 0=instant)</small></label>
+                <input type="number" id="qte-reaction-ms" value="0" min="0" max="2000" oninput="_qteSaveConfig()">
+              </div>
+            </div>
+
+            <!-- Mode: OCR/Instant -->
+            <div id="qte-params-ocr">
+              <div style="font-size:12px;color:var(--text-3);padding:4px 0;line-height:1.5">
+                <b>Instant + OCR</b> — lit la lettre au centre du cercle par OCR, presse en 0 ms.<br>
+                Réaction surhumaine : impossible à reproduire manuellement.
+              </div>
+            </div>
+
+            <!-- Mode: Spam -->
+            <div id="qte-params-spam" style="display:none">
+              <div class="form-row" style="gap:8px">
+                <div class="form-group" style="flex:1">
+                  <label>Vitesse <small style="color:var(--text-3)">(Hz)</small></label>
+                  <input type="number" id="qte-rate-hz" value="30" min="1" max="100" oninput="_qteSaveConfig()">
+                </div>
+                <div class="form-group" style="flex:1">
+                  <label>Durée spam <small style="color:var(--text-3)">(s)</small></label>
+                  <input type="number" id="qte-duration" value="4.0" min="0.1" step="0.1" oninput="_qteSaveConfig()">
+                </div>
+              </div>
+              <div style="font-size:12px;color:var(--text-3);padding:4px 0">
+                <b>Spam</b> — presse la touche à X Hz pendant Y secondes (button mash).
+              </div>
+            </div>
+
+            <!-- Mode: Hold -->
+            <div id="qte-params-hold" style="display:none">
+              <div class="form-group">
+                <label>Durée maintien <small style="color:var(--text-3)">(s)</small></label>
+                <input type="number" id="qte-hold-duration" value="2.0" min="0.1" step="0.1" oninput="_qteSaveConfig()">
+              </div>
+              <div style="font-size:12px;color:var(--text-3);padding:4px 0">
+                <b>Hold</b> — maintient la touche enfoncée pendant X secondes.
+              </div>
+            </div>
+
+            <!-- Mode: Arc -->
+            <div id="qte-params-arc" style="display:none">
+              <div style="font-size:12px;color:var(--text-3);padding:4px 0 8px;line-height:1.5">
+                <b>Arc</b> — détecte quand l'arc jaune rejoint la cible rouge et appuie instantanément.<br>
+                Sélectionne le cercle QTE complet (pas juste la lettre centrale).
+              </div>
+              <div class="form-row" style="gap:6px;margin-bottom:8px">
+                <div class="form-group">
+                  <label>X cercle</label>
+                  <input type="number" id="qte-arc-x" value="820" min="0" oninput="_qteSaveConfig()">
+                </div>
+                <div class="form-group">
+                  <label>Y cercle</label>
+                  <input type="number" id="qte-arc-y" value="395" min="0" oninput="_qteSaveConfig()">
+                </div>
+                <div class="form-group">
+                  <label>W</label>
+                  <input type="number" id="qte-arc-w" value="175" min="10" oninput="_qteSaveConfig()">
+                </div>
+                <div class="form-group">
+                  <label>H</label>
+                  <input type="number" id="qte-arc-h" value="175" min="10" oninput="_qteSaveConfig()">
+                </div>
+              </div>
+              <div class="form-row" style="gap:8px;margin-bottom:6px">
+                <div class="form-group" style="flex:1">
+                  <label>Tolérance angle <small style="color:var(--text-3)">(°)</small></label>
+                  <input type="number" id="qte-arc-tol" value="20" min="1" max="90" oninput="_qteSaveConfig()">
+                </div>
+              </div>
+              <div class="tester-actions" style="margin-top:4px">
+                <button class="btn btn-secondary btn-sm" onclick="pickQteArcRegion()" title="Sélectionner le cercle QTE">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
+                  Zone cercle
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="previewQteArcRegion()" title="Aperçu du cercle">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  Aperçu cercle
+                </button>
+              </div>
+            </div>
+
+            <!-- Timing avancé -->
+            <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px">
+              <div class="form-row" style="gap:8px;margin-bottom:8px">
+                <div class="form-group" style="flex:1">
+                  <label>Durée appui <small style="color:var(--text-3)">(ms)</small></label>
+                  <input type="number" id="qte-press-dur" value="20" min="1" max="500" oninput="_qteSaveConfig()">
+                </div>
+                <div class="form-group" style="flex:1">
+                  <label>Aperçu live <small style="color:var(--text-3)">(ms)</small></label>
+                  <input type="number" id="qte-preview-delay" value="500" min="200" max="10000" step="100" oninput="_qteSaveConfig()">
+                </div>
+              </div>
+              <div class="form-row" style="gap:8px;align-items:center">
+                <div class="form-group" style="flex:1">
+                  <label>Délai boucle <small style="color:var(--text-3)">(s)</small></label>
+                  <input type="number" id="qte-loop-delay" value="0.05" min="0.01" step="0.01" oninput="_qteSaveConfig()">
+                </div>
+                <div class="form-group" style="flex:1;padding-top:20px">
+                  <label class="check-label">
+                    <input type="checkbox" id="qte-wait-fivem" checked onchange="_qteSaveConfig()">
+                    Guard: FiveM actif
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── RIGHT: preview + stats ───────────────────── -->
+        <div class="tester-preview-panel">
+
+          <!-- Zone preview -->
+          <div class="preview-label">Aperçu zone OCR</div>
+          <div id="qte-preview" class="preview-canvas">
+            <div class="preview-placeholder">Cliquez "Aperçu" pour capturer</div>
+          </div>
+
+          <!-- OCR letter display -->
+          <div style="margin-top:14px">
+            <div class="preview-label">Lettre détectée (OCR)</div>
+            <div id="qte-ocr-display"
+                 style="margin-top:6px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:40px;font-weight:700;text-align:center;color:var(--accent);min-height:72px;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">
+              —
+            </div>
+          </div>
+
+          <!-- Stats -->
+          <div style="margin-top:14px">
+            <div class="preview-label">Statistiques de session</div>
+            <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div style="padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-align:center">
+                <div id="qte-stat-detected" style="font-size:28px;font-weight:700;color:var(--cyan)">0</div>
+                <div style="font-size:11px;color:var(--text-3);margin-top:2px">Détectés</div>
+              </div>
+              <div style="padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-align:center">
+                <div id="qte-stat-pressed" style="font-size:28px;font-weight:700;color:var(--green)">0</div>
+                <div style="font-size:11px;color:var(--text-3);margin-top:2px">Répondus</div>
+              </div>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px" onclick="_qteResetStats()">
+              Remettre les stats à zéro
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
     <!-- ═══════════════════ SETTINGS ══════════════════════ -->
     <section class="page" id="page-settings">
       <div class="page-header">
@@ -730,6 +999,10 @@
         <div class="shortcut-row">
           <span>Pause / Reprendre</span>
           <input type="text" id="set-shortcut-pause" class="key-capture shortcut-input" placeholder="Cliquez puis appuyez" readonly onfocus="startKeyCapture(this)" data-field="shortcut-pause">
+        </div>
+        <div class="shortcut-row">
+          <span>Arrêter l'enregistrement</span>
+          <input type="text" id="set-shortcut-record-stop" class="key-capture shortcut-input" placeholder="Cliquez puis appuyez" readonly onfocus="startKeyCapture(this)" data-field="shortcut-record-stop">
         </div>
         <div class="form-row" style="margin-top:.5rem">
           <button class="btn btn-primary btn-sm" onclick="saveShortcutSettings()" title="Appliquer les raccourcis">
@@ -1095,6 +1368,7 @@
 <script defer src="js/page-actions.js"></script>
 <script defer src="js/page-windows.js"></script>
 <script defer src="js/page-autoclicker.js"></script>
+<script defer src="js/page-qte.js"></script>
 
 <!-- Patch : expose toutes les fonctions critiques sur window APRÈS chargement de tous les scripts -->
 <script>
