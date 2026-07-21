@@ -3,11 +3,6 @@ name: Test Build (PR)
 on:
   pull_request:
     branches: [ main ]
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - '*.md'
-      - 'CHANGELOG.md'
 
 jobs:
   test-build:
@@ -29,6 +24,22 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+
+      - name: 📦 Cache embedded Python + Tesseract
+        uses: actions/cache@v4
+        with:
+          path: |
+            electron-app/python-embed
+            tesseract
+          key: python-embed-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: 📦 Cache Electron + electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-builder-cache-${{ runner.os }}-${{ hashFiles('electron-app/package-lock.json') }}
 
       - name: 📥 Install Node dependencies
         working-directory: electron-app

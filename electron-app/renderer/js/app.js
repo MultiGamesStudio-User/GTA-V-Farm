@@ -304,9 +304,12 @@ async function init() {
 
   setSplashMsg('Chargement...');
 
-  /* License check + macros + settings en parallèle */
+  /* Licence vérifiée en fond (réseau, jusqu'à 5s) — ne bloque plus l'affichage.
+     Elle pose son propre overlay par-dessus l'UI si invalide/révoquée. */
+  checkLicense().catch(() => {});
+
+  /* Macros + settings : lecture locale, rapide, seule chose qui gate le splash */
   await Promise.all([
-    checkLicense(),
     loadMacros(),
     loadAppSettings(),
   ]);

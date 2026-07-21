@@ -83,7 +83,8 @@
       ]
     },
     "portable": {
-      "artifactName": "${productName}-Portable.exe"
+      "artifactName": "${productName}-Portable.exe",
+      "unpackDirName": "MacroEngine-Portable-Cache"
     },
     "nsis": {
       "oneClick": false,

@@ -134,33 +134,14 @@ async function main() {
     console.log('[prepare-python] pip installed.');
   }
 
-  // 5. Install requirements (use headless opencv for smaller size)
+  // 5. Install requirements (requirements.txt already pins opencv-python-headless)
   if (fs.existsSync(REQ_FILE)) {
     console.log('[prepare-python] Installing requirements…');
-    // First uninstall opencv-python in case it's already installed, and install headless variant
-    try {
-      execSync(
-        `"${pythonExe}" -m pip uninstall opencv-python -y --quiet`,
-        { cwd: EMBED_DIR, stdio: 'ignore', windowsHide: true }
-      );
-    } catch (_) {}
     execSync(
       `"${pythonExe}" -m pip install -r "${REQ_FILE}" --no-warn-script-location --disable-pip-version-check`,
       { cwd: EMBED_DIR, stdio: 'inherit', windowsHide: true }
     );
-    // Replace opencv-python with opencv-python-headless (saves ~40MB)
-    // --force-reinstall ensures the .pyd files are written even if dist-info lingers
-    try {
-      execSync(
-        `"${pythonExe}" -m pip uninstall opencv-python -y`,
-        { cwd: EMBED_DIR, stdio: 'inherit', windowsHide: true }
-      );
-    } catch (_) {}
-    execSync(
-      `"${pythonExe}" -m pip install opencv-python-headless --force-reinstall --no-cache-dir --no-warn-script-location --disable-pip-version-check`,
-      { cwd: EMBED_DIR, stdio: 'inherit', windowsHide: true }
-    );
-    console.log('[prepare-python] Requirements installed (headless opencv).');
+    console.log('[prepare-python] Requirements installed.');
   } else {
     console.log('[prepare-python] No requirements.txt found — skipping pip install.');
   }
@@ -174,9 +155,23 @@ async function main() {
       });
     } catch (_) {}
   }
-  // Remove __pycache__ dirs to save space
+
+  // 7. Strip pywin32 submodules the bot never imports (only win32gui/win32con/
+  // win32process are used — see modules/engine/window_manager.py) and anything
+  // pip left behind on Windows file locks (uninstall renames to ~name and gives
+  // up if it can't delete). Portable startup re-extracts this whole folder, so
+  // every unused MB here is pure launch-time cost.
   const spDir = path.join(EMBED_DIR, 'Lib', 'site-packages');
   if (fs.existsSync(spDir)) {
+    const UNUSED_PREFIXES = ['win32com', 'win32comext', 'pythonwin', 'adodbapi', 'isapi', 'pip', 'setuptools', 'wheel'];
+    for (const entry of fs.readdirSync(spDir)) {
+      const isOrphan = entry.startsWith('~');
+      const isUnused = UNUSED_PREFIXES.some(p => entry === p || entry.startsWith(p + '-') || entry.startsWith(p + '.'));
+      if (isOrphan || isUnused) {
+        fs.rmSync(path.join(spDir, entry), { recursive: true, force: true });
+      }
+    }
+    // Remove __pycache__ dirs to save space
     removePycache(spDir);
   }
 
