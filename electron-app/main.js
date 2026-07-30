@@ -398,6 +398,50 @@ function _aiDepsAlreadyImportable() {
 // line to come back as if it were a model answer).
 let _aiDepsInstalling = false;
 
+// One full attempt: GPU detect, torch (+ CPU fallback), transformers/einops,
+// model download, marker write. Pip re-running an already-satisfied package
+// is fast, so simply redoing every step on retry (rather than trying to
+// resume from whichever one failed) is simplest and safe.
+async function _installAiDepsOnce(send) {
+  send('IA locale Auto Bouffe : vérification GPU…');
+  const hasGpu = _hasNvidiaGpu();
+
+  send(hasGpu ? 'GPU NVIDIA détecté — installation de torch (GPU)…'
+              : 'Pas de GPU NVIDIA détecté — installation de torch (CPU)…');
+  const gpuArgs = ['-m', 'pip', 'install', 'torch', 'torchvision',
+                   '--index-url', 'https://download.pytorch.org/whl/cu126'];
+  const cpuArgs = ['-m', 'pip', 'install', 'torch', 'torchvision'];
+  try {
+    await _runChildStreaming(PYTHON_EXE, hasGpu ? gpuArgs : cpuArgs, send, { cwd: path.dirname(PYTHON_EXE) });
+  } catch (e) {
+    if (!hasGpu) throw e;
+    send('Échec installation GPU — bascule en CPU…');
+    await _runChildStreaming(PYTHON_EXE, cpuArgs, send, { cwd: path.dirname(PYTHON_EXE) });
+  }
+
+  send('Installation de transformers/einops…');
+  await _runChildStreaming(
+    PYTHON_EXE,
+    ['-m', 'pip', 'install', 'transformers>=4.46.0,<4.50.0', 'einops', 'safetensors'],
+    send, { cwd: path.dirname(PYTHON_EXE) }
+  );
+
+  send('Téléchargement du modèle IA (moondream2, ~2 Go) — peut prendre plusieurs minutes…');
+  // -c mode doesn't add the cwd to sys.path on this embeddable Python (its
+  // ._pth file overrides the default search path), so the `modules`
+  // package needs an explicit insert here — same reason main.py does it.
+  const loadModelCode =
+    "import sys; sys.stdout.reconfigure(encoding='utf-8'); " +
+    `sys.path.insert(0, r'${BOT_DIR}'); ` +
+    'from modules.engine.vlm_engine import _load; _load(lambda m,l: print(m, flush=True))';
+  await _runChildStreaming(PYTHON_EXE, ['-c', loadModelCode], send, { cwd: BOT_DIR });
+
+  fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8');
+}
+
+const _AI_DEPS_MAX_ATTEMPTS = 3;
+const _AI_DEPS_RETRY_DELAY_MS = 5000;
+
 async function ensureAiDeps() {
   // Only ever touch the app's own bundled python-embed — never an arbitrary
   // system Python a developer or advanced user might have configured.
@@ -423,44 +467,24 @@ async function ensureAiDeps() {
       writeLog('INFO', 'IA locale Auto Bouffe: dépendances déjà présentes, rien à installer.');
       return;
     }
-    send('IA locale Auto Bouffe : vérification GPU…');
-    const hasGpu = _hasNvidiaGpu();
 
-    send(hasGpu ? 'GPU NVIDIA détecté — installation de torch (GPU)…'
-                : 'Pas de GPU NVIDIA détecté — installation de torch (CPU)…');
-    const gpuArgs = ['-m', 'pip', 'install', 'torch', 'torchvision',
-                     '--index-url', 'https://download.pytorch.org/whl/cu126'];
-    const cpuArgs = ['-m', 'pip', 'install', 'torch', 'torchvision'];
-    try {
-      await _runChildStreaming(PYTHON_EXE, hasGpu ? gpuArgs : cpuArgs, send, { cwd: path.dirname(PYTHON_EXE) });
-    } catch (e) {
-      if (!hasGpu) throw e;
-      send('Échec installation GPU — bascule en CPU…');
-      await _runChildStreaming(PYTHON_EXE, cpuArgs, send, { cwd: path.dirname(PYTHON_EXE) });
+    // Self-heal transient failures (network blip, HF rate-limit, etc.)
+    // within this same launch instead of making the user restart the app.
+    for (let attempt = 1; attempt <= _AI_DEPS_MAX_ATTEMPTS; attempt++) {
+      try {
+        await _installAiDepsOnce(send);
+        writeLog('INFO', 'IA locale Auto Bouffe: dépendances installées.');
+        mainWindow?.webContents.send('setup:done');
+        return;
+      } catch (e) {
+        writeLog('WARNING', `IA locale Auto Bouffe: tentative ${attempt}/${_AI_DEPS_MAX_ATTEMPTS} échouée —`, e.message);
+        if (attempt === _AI_DEPS_MAX_ATTEMPTS) throw e;
+        send(`Échec (${e.message}) — nouvel essai dans ${_AI_DEPS_RETRY_DELAY_MS / 1000}s…`);
+        await new Promise(r => setTimeout(r, _AI_DEPS_RETRY_DELAY_MS));
+      }
     }
-
-    send('Installation de transformers/einops…');
-    await _runChildStreaming(
-      PYTHON_EXE,
-      ['-m', 'pip', 'install', 'transformers>=4.46.0,<4.50.0', 'einops', 'safetensors'],
-      send, { cwd: path.dirname(PYTHON_EXE) }
-    );
-
-    send('Téléchargement du modèle IA (moondream2, ~2 Go) — peut prendre plusieurs minutes…');
-    // -c mode doesn't add the cwd to sys.path on this embeddable Python (its
-    // ._pth file overrides the default search path), so the `modules`
-    // package needs an explicit insert here — same reason main.py does it.
-    const loadModelCode =
-      "import sys; sys.stdout.reconfigure(encoding='utf-8'); " +
-      `sys.path.insert(0, r'${BOT_DIR}'); ` +
-      'from modules.engine.vlm_engine import _load; _load(lambda m,l: print(m, flush=True))';
-    await _runChildStreaming(PYTHON_EXE, ['-c', loadModelCode], send, { cwd: BOT_DIR });
-
-    fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8');
-    writeLog('INFO', 'IA locale Auto Bouffe: dépendances installées.');
-    mainWindow?.webContents.send('setup:done');
   } catch (e) {
-    writeLog('ERROR', 'IA locale Auto Bouffe: installation échouée —', e.message);
+    writeLog('ERROR', 'IA locale Auto Bouffe: installation échouée après plusieurs tentatives —', e.message);
     mainWindow?.webContents.send('setup:error', {
       msg: 'Installation IA (Auto Bouffe) échouée: ' + e.message + ' — réessai au prochain lancement.',
     });
