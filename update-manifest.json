@@ -14,7 +14,7 @@
     "modules/engine/recorder.py": "ed64507d3701c306026b1d7f22df22c1edd328ad14f71ae5fca163432022932f",
     "modules/engine/screen_reader.py": "2dcbc7d9a5e0abb0c04b7fb87abf3a1f4c6e15d10d8b14286a527a78f9035c15",
     "modules/engine/state.py": "b337150b545cb3975a75c4561c3ce55e98802b84ae4ad4fe639e2b7609f79987",
-    "modules/engine/vlm_engine.py": "3606fe6d5e004bbec193ac7dce8a76902c95cc5e1d18703dc5e5fa1fa6fc750d",
+    "modules/engine/vlm_engine.py": "c62d16916c4696757f6a24b86ddab0dc1e233c76432f7053108ec2b029597d55",
     "modules/engine/window_manager.py": "3446d5443b790f861a31003e09788fc210106309f93026cbed415756b4967174",
     "modules/engine/__init__.py": "7c4621ac5cf352d2e76cc8b82fa45f7925dc610d4a7873763ab007324e321962",
     "modules/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
