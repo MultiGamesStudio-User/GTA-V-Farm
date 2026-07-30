@@ -143,16 +143,31 @@ async function _abfAskTitle(zone, debug, label) {
 /* Re-find the game window by title/exe (not a stored hwnd, which goes stale
    if the window closes/reopens) — shared by rect resolution (for the %-based
    detection zone) and focus (so key/mouse actions reliably reach the game
-   instead of whatever window currently has OS focus, e.g. this app). */
+   instead of whatever window currently has OS focus, e.g. this app).
+   Short-cached: a full cycle calls this before every key/click (open,
+   close/reopen retries, eat, drink, close, trunk reopen — up to ~8-10 times),
+   each otherwise round-tripping to Python to re-enumerate every window and
+   process on the system. The window's hwnd doesn't change within a couple
+   seconds in practice, and a stale hit just fails the same way a miss
+   already does (focus/rect calls on a dead hwnd are handled gracefully). */
+let _abfWindowCache = null; // { match, ts }
+const _ABF_WINDOW_CACHE_MS = 2000;
+
 async function _abfFindGameWindow() {
   if (!_abfWindowTitle) return null;
+  const now = Date.now();
+  if (_abfWindowCache && (now - _abfWindowCache.ts) < _ABF_WINDOW_CACHE_MS) {
+    return _abfWindowCache.match;
+  }
   try {
     const res = await window.api.listWindows();
     const wins = res?.windows || [];
-    return wins.find(w => w.title === _abfWindowTitle)
+    const match = wins.find(w => w.title === _abfWindowTitle)
         || (_abfWindowExe && wins.find(w => w.exe && w.exe.toLowerCase() === _abfWindowExe.toLowerCase()))
         || wins.find(w => w.title && w.title.toLowerCase().includes('fivem'))
         || null;
+    _abfWindowCache = { match, ts: now };
+    return match;
   } catch (_) {
     return null;
   }
@@ -219,6 +234,7 @@ function _abfSelectWindow(selectEl) {
   if (!w) return;
   _abfWindowTitle = w.title;
   _abfWindowExe = w.exe || null;
+  _abfWindowCache = null; // invalidate — was keyed to whatever was picked before
   _abfUpdateWindowLabel();
   _abfSave();
   appendLog('INFO', `Auto Bouffe: fenêtre choisie "${w.title}"`);
