@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.5.2] – 2026-07-30
+
+### Added
+- Installation des dépendances IA Auto Bouffe : retry automatique (3 tentatives) sur échec transitoire (réseau, rate-limit), sans avoir à relancer l'app
+
+### Fixed
+- Fenêtre de course au tout premier lancement : Auto Bouffe pouvait appeler l'IA avant que le blocage d'installation ne soit posé
+- Message d'erreur d'installation IA générique ("exit 1") remplacé par la vraie raison de l'échec
+
+---
+
+
+
 ## [2.5.1] – 2026-07-30
 
 ### Fixed
