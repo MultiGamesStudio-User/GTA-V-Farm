@@ -338,6 +338,95 @@ function ensureUserFiles() {
   }
 }
 
+// ── Auto Bouffe IA — first-launch dependency install ──────────────────────────
+// torch/transformers (+ the moondream2 model weights) are never bundled in the
+// installer/portable build (multi-GB, and most users never touch this
+// feature) — instead they're fetched once, here, on the first real launch,
+// with progress surfaced through the existing "deps-banner" setup UI so the
+// user isn't left staring at a frozen app. Runs in the background alongside
+// normal startup (engine + macros already work while this downloads).
+function _aiDepsMarkerPath() {
+  return path.join(path.dirname(PYTHON_EXE), '.ai_deps_installed');
+}
+
+function _aiDepsInstalled() {
+  try { return fs.existsSync(_aiDepsMarkerPath()); } catch (_) { return false; }
+}
+
+function _hasNvidiaGpu() {
+  try {
+    execSync('nvidia-smi', { stdio: 'ignore', windowsHide: true, timeout: 5000 });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function _runChildStreaming(exe, args, onLine, opts) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(exe, args, { windowsHide: true, ...opts });
+    const relay = d => {
+      const text = d.toString().trim();
+      if (text) onLine(text.slice(-200)); // last line usually carries the useful bit (e.g. pip's progress %)
+    };
+    proc.stdout.on('data', relay);
+    proc.stderr.on('data', relay);
+    proc.on('error', reject);
+    proc.on('close', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
+  });
+}
+
+async function ensureAiDeps() {
+  // Only ever touch the app's own bundled python-embed — never an arbitrary
+  // system Python a developer or advanced user might have configured.
+  if (!PYTHON_EXE || !PYTHON_EXE.toLowerCase().includes('python-embed')) return;
+  if (_aiDepsInstalled()) return;
+  const send = (message) => mainWindow?.webContents.send('setup:progress', { message });
+  try {
+    send('IA locale Auto Bouffe : vérification GPU…');
+    const hasGpu = _hasNvidiaGpu();
+
+    send(hasGpu ? 'GPU NVIDIA détecté — installation de torch (GPU)…'
+                : 'Pas de GPU NVIDIA détecté — installation de torch (CPU)…');
+    const gpuArgs = ['-m', 'pip', 'install', 'torch', 'torchvision',
+                     '--index-url', 'https://download.pytorch.org/whl/cu126'];
+    const cpuArgs = ['-m', 'pip', 'install', 'torch', 'torchvision'];
+    try {
+      await _runChildStreaming(PYTHON_EXE, hasGpu ? gpuArgs : cpuArgs, send, { cwd: path.dirname(PYTHON_EXE) });
+    } catch (e) {
+      if (!hasGpu) throw e;
+      send('Échec installation GPU — bascule en CPU…');
+      await _runChildStreaming(PYTHON_EXE, cpuArgs, send, { cwd: path.dirname(PYTHON_EXE) });
+    }
+
+    send('Installation de transformers/einops…');
+    await _runChildStreaming(
+      PYTHON_EXE,
+      ['-m', 'pip', 'install', 'transformers>=4.46.0,<4.50.0', 'einops', 'safetensors'],
+      send, { cwd: path.dirname(PYTHON_EXE) }
+    );
+
+    send('Téléchargement du modèle IA (moondream2, ~2 Go) — peut prendre plusieurs minutes…');
+    // -c mode doesn't add the cwd to sys.path on this embeddable Python (its
+    // ._pth file overrides the default search path), so the `modules`
+    // package needs an explicit insert here — same reason main.py does it.
+    const loadModelCode =
+      "import sys; sys.stdout.reconfigure(encoding='utf-8'); " +
+      `sys.path.insert(0, r'${BOT_DIR}'); ` +
+      'from modules.engine.vlm_engine import _load; _load(lambda m,l: print(m, flush=True))';
+    await _runChildStreaming(PYTHON_EXE, ['-c', loadModelCode], send, { cwd: BOT_DIR });
+
+    fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8');
+    writeLog('INFO', 'IA locale Auto Bouffe: dépendances installées.');
+    mainWindow?.webContents.send('setup:done');
+  } catch (e) {
+    writeLog('ERROR', 'IA locale Auto Bouffe: installation échouée —', e.message);
+    mainWindow?.webContents.send('setup:error', {
+      msg: 'Installation IA (Auto Bouffe) échouée: ' + e.message + ' — réessai au prochain lancement.',
+    });
+  }
+}
+
 app.whenReady().then(() => {
   writeLog('INFO', 'app ready');
   ensureUserFiles();
@@ -356,6 +445,7 @@ app.whenReady().then(() => {
     mainWindow?.webContents.send('setup:done');
     startEngine(); // pré-démarre Python dès que l'UI est prête
     _pushLicenseKeyToEngine();
+    ensureAiDeps(); // en arrière-plan — n'attend pas, l'app est utilisable pendant ce temps
 
     // ── Vérification automatique des mises à jour ──────────────
     // IS_PACKED only: en dev, RENDERER_DIR pointe sur le dossier source réel —

@@ -10,16 +10,10 @@ pytesseract>=0.3.10
 keyboard>=0.13.5
 pynput>=1.7.6
 
-# Auto Bouffe IA locale (vision-language) — lourd (~2 Go modèle inclus
-# téléchargement HuggingFace au premier lancement), installer seulement si
-# cette fonctionnalité est utilisée. Tourne sur CPU par défaut ; utilise le
-# GPU (CUDA) automatiquement si présent — installer torch avec le bon index
-# --index-url https://download.pytorch.org/whl/cuXXX (voir pytorch.org) pour
-# profiter du GPU, sinon le wheel par défaut/CPU convient aussi.
-torch>=2.2.0
-torchvision>=0.17.0
-# moondream2's custom modeling code (trust_remote_code) predates transformers'
-# v4.50 GenerationMixin/PreTrainedModel split and v5's config internals rewrite
-# — pin below both or model loading raises AttributeError on PhiConfig.
-transformers>=4.46.0,<4.50.0
-einops>=0.7.0
+# Auto Bouffe IA locale (torch/transformers/einops, ~2-4 Go avec le modèle) —
+# volontairement PAS dans ce fichier : prepare-python.js l'utilise pour
+# préparer python-embed/ au moment du build, et ces paquets bundlés dans
+# chaque installeur/portable alourdiraient le téléchargement pour tout le
+# monde, même ceux qui n'utilisent jamais cette fonctionnalité. Ils sont
+# installés automatiquement à la place, au premier lancement réel de l'app
+# (voir electron-app/main.js → ensureAiDeps(), et requirements-ai.txt).

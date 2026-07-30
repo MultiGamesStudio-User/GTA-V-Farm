@@ -1,0 +1,17 @@
+# Auto Bouffe IA locale (vision-language, moondream2). Pas installé au build
+# (voir requirements.txt) — installé automatiquement au premier lancement
+# réel de l'app par electron-app/main.js → ensureAiDeps(), qui reproduit
+# exactement ces commandes contre python-embed/python.exe :
+#
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126   (si GPU NVIDIA détecté)
+#   pip install torch torchvision                                                       (sinon, CPU)
+#   pip install "transformers>=4.46.0,<4.50.0" einops safetensors
+#
+# moondream2's custom modeling code (trust_remote_code) predates transformers'
+# v4.50 GenerationMixin/PreTrainedModel split and v5's config internals rewrite
+# — pin below both or model loading raises AttributeError on PhiConfig.
+torch>=2.2.0
+torchvision>=0.17.0
+transformers>=4.46.0,<4.50.0
+einops>=0.7.0
+safetensors

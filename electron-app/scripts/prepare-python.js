@@ -146,9 +146,14 @@ async function main() {
     console.log('[prepare-python] No requirements.txt found — skipping pip install.');
   }
 
-  // 6. Remove pip/setuptools/wheel from the bundle (not needed at runtime)
+  // 6. Remove setuptools/wheel from the bundle (not needed at runtime) — but
+  // KEEP pip: Auto Bouffe's local-AI dependencies (torch/transformers, ~2-4 Go)
+  // are deliberately not bundled here (see requirements-ai.txt) and instead
+  // get pip-installed on the client's own machine at first launch
+  // (electron-app/main.js → ensureAiDeps()), which needs pip to still work
+  // in the shipped python-embed.
   console.log('[prepare-python] Cleaning up build-only packages…');
-  for (const pkg of ['pip', 'setuptools', 'wheel']) {
+  for (const pkg of ['setuptools', 'wheel']) {
     try {
       execSync(`"${pythonExe}" -m pip uninstall ${pkg} -y --quiet`, {
         cwd: EMBED_DIR, stdio: 'ignore', windowsHide: true
@@ -163,7 +168,9 @@ async function main() {
   // every unused MB here is pure launch-time cost.
   const spDir = path.join(EMBED_DIR, 'Lib', 'site-packages');
   if (fs.existsSync(spDir)) {
-    const UNUSED_PREFIXES = ['win32com', 'win32comext', 'pythonwin', 'adodbapi', 'isapi', 'pip', 'setuptools', 'wheel'];
+    // 'pip' itself is intentionally NOT stripped here — see the note on the
+    // uninstall loop above, ensureAiDeps() needs it at runtime.
+    const UNUSED_PREFIXES = ['win32com', 'win32comext', 'pythonwin', 'adodbapi', 'isapi', 'setuptools', 'wheel'];
     const UNUSED_FILES = ['PyWin32.chm'];
     for (const entry of fs.readdirSync(spDir)) {
       const isOrphan = entry.startsWith('~');
