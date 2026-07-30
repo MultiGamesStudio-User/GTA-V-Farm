@@ -35,6 +35,6 @@
     "electron-app/renderer/overlay.html": "f74be1051d2d85758c0ab6eab1fff75ac85ad180e0099b467d73ca8429264c28",
     "electron-app/renderer/picker.html": "69564167c04a19670b19276fe0528bd9a4febbcdc8143aa0f7046a1112192466",
     "electron-app/renderer/styles.css": "45ddbd7b9d9d175bbfec6a4fd8f7fdb75f0918e1cfee9701ca913940a03ee809",
-    "electron-app/package.json": "da7bbd2ef0ab7cd7817be49020695ebf6d45b735272d0fcb4cc3fd36557783a7"
+    "electron-app/package.json": "333b97f2125b6a5f11d425fdae73e971fc3a044453b4ccc624a65731987bf511"
   }
 }
