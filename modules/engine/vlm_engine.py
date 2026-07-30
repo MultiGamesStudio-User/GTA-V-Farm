@@ -72,7 +72,7 @@ def warmup(on_log=None) -> None:
 
 def unload(on_log=None) -> None:
     """Free the model and its VRAM. Auto Bouffe's interval is typically
-    hours — there's no reason to hold ~2-3 Go of VRAM reserved the whole
+    hours — there's no reason to hold ~4 Go of VRAM reserved the whole
     time between scans, so the caller unloads right after each cycle and
     calls warmup() again shortly before the next one."""
     global _model, _tokenizer
@@ -92,8 +92,16 @@ def unload(on_log=None) -> None:
 def ask_image(pil_image, question: str, on_log=None) -> str:
     """Ask a natural-language question about a PIL image, return the answer text."""
     _load(on_log)
-    encoded = _model.encode_image(pil_image)
-    return _model.answer_question(encoded, question, _tokenizer)
+    # Capture local references under the lock instead of using the globals
+    # directly below: a concurrent unload() (e.g. the interval loop freeing
+    # VRAM right as a manual "Tester" click is mid-request) could otherwise
+    # null out _model/_tokenizer between this call and encode_image().
+    with _lock:
+        model, tokenizer = _model, _tokenizer
+    if model is None:
+        raise RuntimeError('vision model was unloaded before inference could run')
+    encoded = model.encode_image(pil_image)
+    return model.answer_question(encoded, question, tokenizer)
 
 
 def ask_region(x: int, y: int, w: int, h: int, question: str, on_log=None) -> str:

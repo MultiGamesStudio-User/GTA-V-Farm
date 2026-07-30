@@ -127,9 +127,9 @@ async function _abfClick(x, y, button) {
 
 /* ── IA-based detection (single calibration zone, no reference image) ─────
    Pixel-color/OCR/template-matching all proved too brittle for this — a
-   local vision-language model (moondream2, CPU) instead just answers a
-   plain-text question about the calibrated zone: closed / own inventory /
-   own + a 3rd-party panel (vehicle/crate/box). ── */
+   local vision-language model (moondream2, GPU when available else CPU)
+   instead just answers a plain-text question about the calibrated zone:
+   closed / own inventory / own + a 3rd-party panel (vehicle/crate/box). ── */
 function _abfNoTitleDetected(raw) {
   const norm = raw.trim().toLowerCase();
   return !norm || /\bnone\b/.test(norm) || norm.includes('no discernible') || norm.includes('no text');
@@ -420,7 +420,7 @@ async function _abfIntervalLoop() {
     }
 
     // 5. Free the model's VRAM until shortly before the next scan — Auto
-    //    Bouffe's interval is typically hours, no reason to hold ~2-3 Go of
+    //    Bouffe's interval is typically hours, no reason to hold ~4 Go of
     //    VRAM reserved (and briefly competing with the game's own GPU use)
     //    the whole time between scans.
     await _abfVlmUnload();
