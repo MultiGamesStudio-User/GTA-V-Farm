@@ -376,12 +376,44 @@ function _runChildStreaming(exe, args, onLine, opts) {
   });
 }
 
+function _aiDepsAlreadyImportable() {
+  try {
+    execSync(`"${PYTHON_EXE}" -c "import torch, torchvision, transformers, einops"`,
+      { stdio: 'ignore', windowsHide: true, timeout: 30000 });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// True while pip is actively installing/upgrading torch/transformers into
+// python-embed — vlm_ask/vlm_warmup/vlm_unload refuse to run meanwhile
+// instead of racing main.py's own `import torch` against pip rewriting the
+// exact same files (this is what caused a stray pip/huggingface_hub console
+// line to come back as if it were a model answer).
+let _aiDepsInstalling = false;
+
 async function ensureAiDeps() {
   // Only ever touch the app's own bundled python-embed — never an arbitrary
   // system Python a developer or advanced user might have configured.
   if (!PYTHON_EXE || !PYTHON_EXE.toLowerCase().includes('python-embed')) return;
   if (_aiDepsInstalled()) return;
   const send = (message) => mainWindow?.webContents.send('setup:progress', { message });
+
+  // Cheap import check first: the marker file is only missing the very
+  // first time this ran, but a dev machine (or a rebuilt python-embed that
+  // already had these packages some other way) can already have everything
+  // — running pip again anyway would race actual Auto Bouffe usage against
+  // a concurrent reinstall of the exact modules it just imported, which can
+  // corrupt in-flight inference (observed: a stray pip/huggingface_hub
+  // console line ending up as a "model answer").
+  if (_aiDepsAlreadyImportable()) {
+    try { fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8'); } catch (_) {}
+    writeLog('INFO', 'IA locale Auto Bouffe: dépendances déjà présentes, rien à installer.');
+    return;
+  }
+
+  _aiDepsInstalling = true;
   try {
     send('IA locale Auto Bouffe : vérification GPU…');
     const hasGpu = _hasNvidiaGpu();
@@ -424,6 +456,8 @@ async function ensureAiDeps() {
     mainWindow?.webContents.send('setup:error', {
       msg: 'Installation IA (Auto Bouffe) échouée: ' + e.message + ' — réessai au prochain lancement.',
     });
+  } finally {
+    _aiDepsInstalling = false;
   }
 }
 
@@ -671,6 +705,9 @@ async function _ensureEngineStarted() {
 // usual 15s ceiling. vlm_unload is fast but shares the handler for symmetry.
 for (const cmd of ['vlm_ask', 'vlm_warmup', 'vlm_unload']) {
   ipcMain.handle(`engine:${cmd}`, async (_evt, params) => {
+    if (_aiDepsInstalling) {
+      return { ok: false, error: 'Installation des dépendances IA en cours — réessaie dans un instant.' };
+    }
     await _ensureEngineStarted();
     try {
       return await engineCmd({ cmd, ...params }, 300000);
