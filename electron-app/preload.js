@@ -3,6 +3,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  userDataPath: ()       => ipcRenderer.invoke('app:userDataPath'),
+
   // ── Engine lifecycle ──────────────────────────────────────
   startEngine:  ()       => ipcRenderer.invoke('engine:start'),
   stopEngine:   ()       => ipcRenderer.invoke('engine:stop'),
@@ -25,9 +27,12 @@ contextBridge.exposeInMainWorld('api', {
   // ── Vision & OCR ─────────────────────────────────────────
   previewRegion:     (p) => ipcRenderer.invoke('engine:preview_region', p),
   pickColor:         (p) => ipcRenderer.invoke('engine:pick_color', p),
+  regionAvgColor:    (p) => ipcRenderer.invoke('engine:region_avg_color', p),
+  saveTemplate:      (p) => ipcRenderer.invoke('engine:save_template', p),
   checkOcr:          ()  => ipcRenderer.invoke('engine:check_ocr'),
   ocrText:           (p) => ipcRenderer.invoke('engine:ocr_text', p),
   testTemplateScore: (p) => ipcRenderer.invoke('engine:test_template_score', p),
+  vlmAsk:            (p) => ipcRenderer.invoke('engine:vlm_ask', p),
 
   // ── Conditions / Actions testing ─────────────────────────
   testCondition:  (p) => ipcRenderer.invoke('engine:test_condition', p),
@@ -80,7 +85,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Global shortcuts ──────────────────────────────────────
   registerShortcuts: (s) => ipcRenderer.invoke('shortcuts:register', s),
-  onShortcutTriggered: (cb) => ipcRenderer.on('shortcut:triggered', (_, d) => cb(d)),
+  onShortcutTriggered: (cb) => ipcRenderer.on('shortcut:triggered', (_, d) => cb(d.action)),
 
   // ── Multi-monitor ─────────────────────────────────────────
   listMonitors: ()       => ipcRenderer.invoke('monitors:list'),

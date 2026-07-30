@@ -1,0 +1,8 @@
+{
+  "name": "gta-v-farm",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix electron-app run dev",
+    "start": "npm --prefix electron-app run start"
+  }
+}

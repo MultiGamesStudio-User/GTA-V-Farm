@@ -45,6 +45,14 @@ def capture_region_pil(x: int, y: int, w: int, h: int) -> Image.Image:
     return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
 
+def save_region_template(x: int, y: int, w: int, h: int, path: str) -> None:
+    """Capture a region and save it to disk — reference image for template_match."""
+    import os
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    img = capture_region(x, y, w, h)
+    cv2.imwrite(path, img)
+
+
 def get_pixel_color(x: int, y: int) -> tuple[int, int, int]:
     """Get BGR color of a single pixel."""
     img = capture_region(x, y, 1, 1)
@@ -52,11 +60,27 @@ def get_pixel_color(x: int, y: int) -> tuple[int, int, int]:
     return (int(r), int(g), int(b))   # returns RGB tuple
 
 
+def get_region_avg_color(x: int, y: int, w: int, h: int) -> tuple[int, int, int]:
+    """Average RGB color over a region — same reference value region_color_avg compares against."""
+    img = capture_region(x, y, w, h)
+    mean = img.mean(axis=(0, 1))
+    return (int(mean[2]), int(mean[1]), int(mean[0]))  # BGR → RGB
+
+
 def capture_full_window(left: int, top: int, right: int, bottom: int) -> np.ndarray:
     """Capture an entire window given its rect."""
     w = right - left
     h = bottom - top
     return capture_region(left, top, w, h)
+
+
+def capture_all_screens() -> np.ndarray:
+    """Capture the full virtual desktop (all monitors combined)."""
+    sct = _get_sct()
+    mon = sct.monitors[0]   # mss index 0 = bounding box of every monitor
+    raw = sct.grab(mon)
+    img = np.frombuffer(raw.rgb, dtype=np.uint8).reshape(raw.height, raw.width, 3)
+    return cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
 
 def region_to_b64(x: int, y: int, w: int, h: int) -> str:

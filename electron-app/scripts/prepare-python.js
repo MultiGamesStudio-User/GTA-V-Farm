@@ -164,10 +164,12 @@ async function main() {
   const spDir = path.join(EMBED_DIR, 'Lib', 'site-packages');
   if (fs.existsSync(spDir)) {
     const UNUSED_PREFIXES = ['win32com', 'win32comext', 'pythonwin', 'adodbapi', 'isapi', 'pip', 'setuptools', 'wheel'];
+    const UNUSED_FILES = ['PyWin32.chm'];
     for (const entry of fs.readdirSync(spDir)) {
       const isOrphan = entry.startsWith('~');
       const isUnused = UNUSED_PREFIXES.some(p => entry === p || entry.startsWith(p + '-') || entry.startsWith(p + '.'));
-      if (isOrphan || isUnused) {
+      const isUnusedFile = UNUSED_FILES.includes(entry);
+      if (isOrphan || isUnused || isUnusedFile) {
         fs.rmSync(path.join(spDir, entry), { recursive: true, force: true });
       }
     }
@@ -202,9 +204,17 @@ async function main() {
     for (const f of fs.readdirSync(tmpDir).filter(n => n.endsWith('.dll'))) {
       fs.copyFileSync(path.join(tmpDir, f), path.join(TESS_DIR, f));
     }
+    // osd.traineddata (orientation/script detection) and the ScrollView Java
+    // debug viewer jars ship with the installer but the bot never uses OSD
+    // (--psm 0) or the debug viewer — pure launch-time weight on portable.
+    const TESSDATA_SKIP = new Set([
+      'osd.traineddata', 'ScrollView.jar', 'piccolo2d-core-3.0.1.jar',
+      'piccolo2d-extras-3.0.1.jar', 'jaxb-api-2.3.1.jar',
+    ]);
     const srcTessdata = path.join(tmpDir, 'tessdata');
     if (fs.existsSync(srcTessdata)) {
       for (const f of fs.readdirSync(srcTessdata)) {
+        if (TESSDATA_SKIP.has(f)) continue;
         const src = path.join(srcTessdata, f);
         if (fs.statSync(src).isFile()) {
           fs.copyFileSync(src, path.join(TESS_DIR, 'tessdata', f));

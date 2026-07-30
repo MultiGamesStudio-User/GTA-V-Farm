@@ -277,6 +277,7 @@ function _acpCaptureHandler(e) {
   _acpHotkeys[_acpCapturing.fieldId] = key;
   _acpCapturing = null;
   _acpSave();
+  _acpRegisterHotkeys();
 }
 
 /* ── Licence settings helpers ────────────────────────────── */

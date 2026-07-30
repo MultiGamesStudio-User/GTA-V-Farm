@@ -97,17 +97,13 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
         <span>Macros</span>
       </a>
-      <a class="nav-item" data-page="tests" title="Tests">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
-        <span>Tests</span>
-      </a>
       <a class="nav-item" data-page="autoclicker" title="Auto Clicker">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l7 7-4 1 2.5 5L9 17l-2.5-5L3 13z"/><circle cx="17" cy="6" r="2" fill="currentColor" stroke="none"/></svg>
         <span>Auto Clicker</span>
       </a>
-      <a class="nav-item" data-page="qte" title="Auto QTE Cheat">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
-        <span>Auto QTE</span>
+      <a class="nav-item" data-page="autobouffe" title="Auto Bouffe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4Z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        <span>Auto Bouffe</span>
       </a>
       <a class="nav-item" data-page="settings" title="Paramètres">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -245,653 +241,286 @@
       </div>
     </section>
 
-    <!-- ═══════════════════ TESTS (Conditions + Actions + Fenêtres) ══════════════ -->
-    <section class="page" id="page-tests">
-      <div class="page-header">
-        <h1>Tests</h1>
-        <div class="header-actions" id="tests-header-actions-windows" style="display:none">
-          <button class="btn btn-secondary" onclick="refreshWindows()" title="Rafraîchir fenêtres">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- ── Tab bar ── -->
-      <div class="tests-tab-bar">
-        <button class="tests-tab active" data-tab="conditions" onclick="switchTestTab('conditions')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          Conditions
-        </button>
-        <button class="tests-tab" data-tab="actions" onclick="switchTestTab('actions')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Actions
-        </button>
-        <button class="tests-tab" data-tab="windows" onclick="switchTestTab('windows')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          Fenêtres
-        </button>
-      </div>
-
-      <!-- ── Panneau Conditions ── -->
-      <div class="test-panel active" id="test-panel-conditions">
-        <div class="tester-layout">
-          <div class="tester-panel">
-            <div class="form-group">
-              <label>Type de condition</label>
-              <select id="cond-type" onchange="renderConditionFields()">
-                <optgroup label="─── Vision">
-                  <option value="pixel_color">Couleur d'un pixel</option>
-                  <option value="pixel_color_not">Couleur d'un pixel ≠</option>
-                  <option value="pixel_changed">Pixel a changé (snapshot)</option>
-                  <option value="pixel_not_changed">Pixel n'a pas changé</option>
-                  <option value="region_color_avg">Couleur moyenne d'une zone</option>
-                  <option value="text_contains">Texte contient (OCR)</option>
-                  <option value="text_not_contains">Texte ne contient pas (OCR)</option>
-                  <option value="text_regex">Texte regex (OCR)</option>
-                  <option value="template_match">Image template présente</option>
-                  <option value="template_not_found">Image template absente</option>
-                </optgroup>
-                <optgroup label="─── Fenêtres &amp; Processus">
-                  <option value="window_focused">Fenêtre active (titre)</option>
-                  <option value="window_not_focused">Fenêtre non active</option>
-                  <option value="window_exists">Fenêtre existe</option>
-                  <option value="window_not_exists">Fenêtre absente</option>
-                  <option value="process_running">Processus actif (exe)</option>
-                  <option value="process_not_running">Processus inactif</option>
-                </optgroup>
-                <optgroup label="─── Macros">
-                  <option value="macro_is_running">Macro en cours</option>
-                  <option value="macro_not_running">Macro arrêtée</option>
-                </optgroup>
-                <optgroup label="─── Compteurs">
-                  <option value="counter_eq">Compteur =</option>
-                  <option value="counter_not_eq">Compteur ≠</option>
-                  <option value="counter_gte">Compteur ≥</option>
-                  <option value="counter_lte">Compteur ≤</option>
-                  <option value="counter_gt">Compteur &gt;</option>
-                  <option value="counter_lt">Compteur &lt;</option>
-                  <option value="counter_between">Compteur entre</option>
-                </optgroup>
-                <optgroup label="─── Variables">
-                  <option value="variable_equals">Variable =</option>
-                  <option value="variable_contains">Variable contient</option>
-                </optgroup>
-                <optgroup label="─── Heure &amp; Aléatoire">
-                  <option value="time_between">Heure entre</option>
-                  <option value="random_chance">Chance aléatoire</option>
-                </optgroup>
-                <optgroup label="─── Entrées">
-                  <option value="key_is_held">Touche enfoncée</option>
-                  <option value="key_not_held">Touche relâchée</option>
-                  <option value="clipboard_contains">Presse-papier contient</option>
-                </optgroup>
-                <optgroup label="─── Constantes">
-                  <option value="always">Toujours vrai</option>
-                  <option value="never">Toujours faux</option>
-                </optgroup>
-              </select>
-            </div>
-            <div id="cond-fields" class="cond-fields"></div>
-            <div class="tester-actions">
-              <button class="btn btn-secondary" onclick="previewConditionRegion()" title="Aperçu zone">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              </button>
-              <button id="btn-ocr-read" class="btn btn-secondary" onclick="readOcrText()" title="Lire texte OCR" style="display:none">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-              </button>
-              <button class="btn btn-primary" onclick="testCondition()" title="Tester condition">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-              </button>
-            </div>
-            <div id="cond-result" class="test-result" style="display:none"></div>
-            <div id="cond-ocr-result" style="display:none;margin-top:10px">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);margin-bottom:6px">Texte OCR détecté</div>
-              <pre id="cond-ocr-text" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-family:var(--mono);font-size:12px;color:var(--cyan);white-space:pre-wrap;word-break:break-all;max-height:120px;overflow-y:auto"></pre>
-            </div>
-          </div>
-          <div class="tester-preview-panel" id="cond-preview-wrap">
-            <div class="preview-label">Aperçu de la zone</div>
-            <div id="cond-preview" class="preview-canvas">
-              <div class="preview-placeholder">Cliquez "Aperçu zone" pour voir la capture</div>
-            </div>
-            <div class="picker-helper">
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label>Picker: X</label>
-                  <input type="number" id="picker-x" value="0" min="0">
-                </div>
-                <div class="form-group flex-1">
-                  <label>Picker: Y</label>
-                  <input type="number" id="picker-y" value="0" min="0">
-                </div>
-                <div class="form-group flex-1" style="justify-content:flex-end">
-                  <button class="btn btn-secondary" style="margin-top:auto" onclick="pickColor()">Lire couleur</button>
-                </div>
-              </div>
-              <div id="color-result" class="color-result" style="display:none">
-                <span class="color-swatch" id="color-swatch"></span>
-                <span id="color-value"></span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Panneau Actions ── -->
-      <div class="test-panel" id="test-panel-actions">
-        <div class="tester-layout">
-          <div class="tester-panel">
-            <div class="form-group">
-              <label>Type d'action</label>
-              <select id="act-type" onchange="renderActionFields()">
-                <optgroup label="─── Clavier">
-                  <option value="key_tap">Appui touche (tap)</option>
-                  <option value="key_hold">Maintien touche (hold)</option>
-                  <option value="key_release">Relâcher touche</option>
-                  <option value="key_combo">Combinaison de touches</option>
-                  <option value="type_text">Taper du texte</option>
-                </optgroup>
-                <optgroup label="─── Souris">
-                  <option value="mouse_move">Déplacer souris</option>
-                  <option value="mouse_click">Clic souris</option>
-                  <option value="mouse_double_click">Double-clic souris</option>
-                  <option value="mouse_drag">Drag souris</option>
-                  <option value="scroll">Scroll</option>
-                </optgroup>
-                <optgroup label="─── Temporisation">
-                  <option value="wait">Attendre (fixe)</option>
-                  <option value="random_wait">Attendre (aléatoire)</option>
-                </optgroup>
-                <optgroup label="─── Contrôle macro">
-                  <option value="macro_start">Lancer une macro</option>
-                  <option value="macro_stop">Arrêter une macro</option>
-                  <option value="stop_self">Arrêter cette macro</option>
-                  <option value="repeat">Répéter un bloc d'actions</option>
-                </optgroup>
-                <optgroup label="─── Variables &amp; Compteurs">
-                  <option value="set_variable">Définir variable</option>
-                  <option value="counter_set">Définir compteur</option>
-                  <option value="counter_inc">Incrémenter compteur</option>
-                  <option value="counter_dec">Décrémenter compteur</option>
-                  <option value="counter_reset">Remettre compteur à zéro</option>
-                </optgroup>
-                <optgroup label="─── Notifications">
-                  <option value="send_webhook">Envoyer webhook Discord</option>
-                  <option value="log_message">Message dans les logs</option>
-                  <option value="notify_toast">Notification Windows</option>
-                  <option value="play_sound">Jouer un son</option>
-                </optgroup>
-                <optgroup label="─── Système">
-                  <option value="focus_window">Mettre fenêtre au 1er plan</option>
-                  <option value="screenshot_save">Sauvegarder screenshot</option>
-                  <option value="clipboard_set">Copier dans presse-papier</option>
-                </optgroup>
-              </select>
-            </div>
-            <div id="act-fields" class="cond-fields"></div>
-            <div class="tester-actions">
-              <button class="btn btn-primary" onclick="testAction()" title="Exécuter action">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              </button>
-            </div>
-            <div id="act-result" class="test-result" style="display:none"></div>
-          </div>
-          <div class="tester-preview-panel">
-            <div class="preview-label">Aide des touches</div>
-            <div class="keys-help">
-              <div class="keys-grid">
-                <span>Lettres: a–z</span><span>Chiffres: 0–9</span>
-                <span>f1–f12</span><span>space, enter</span>
-                <span>tab, escape</span><span>backspace</span>
-                <span>ctrl, alt, shift</span><span>up, down, left, right</span>
-                <span>home, end</span><span>pageup, pagedown</span>
-                <span>insert, delete</span><span>numpad0–numpad9</span>
-              </div>
-              <div class="preview-label" style="margin-top:1rem">Boutons souris</div>
-              <div class="keys-grid">
-                <span>left</span><span>right</span><span>middle</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Panneau Fenêtres ── -->
-      <div class="test-panel" id="test-panel-windows">
-        <div class="dash-section" style="margin-bottom:1rem">
-          <div class="dash-section-title">Fenêtre cible</div>
-          <div id="target-window-info" class="target-info" style="display:none"></div>
-          <div id="window-rect-info" class="rect-info" style="display:none"></div>
-        </div>
-        <div class="dash-section" style="margin-bottom:1rem">
-          <div class="dash-section-title">Statut OCR (détection de texte)</div>
-          <div id="ocr-status" class="ocr-status">
-            <button class="btn btn-xs btn-secondary" onclick="checkOcrStatus()">Vérifier OCR</button>
-            <span id="ocr-status-text" style="margin-left:8px"></span>
-          </div>
-        </div>
-        <div id="windows-list" class="windows-list">
-          <div class="empty-state">Cliquez Rafraîchir pour lister les fenêtres</div>
-        </div>
-      </div>
-
-    </section>
+      <!-- ── Panel: Tests (Conditions + Actions + Fenêtres) ── -->
 
     <!-- ═══════════════════ CONSOLE ═══════════════════════ -->
     <!-- ═══════════════════ AUTO CLICKER ═════════════════ -->
     <section class="page" id="page-autoclicker">
       <div class="page-header">
         <h1>Auto Clicker</h1>
+        <div class="header-actions">
+          <span id="acp-status" style="font-size:13px;font-weight:600;color:var(--text-2)">Arrêté</span>
+          <button class="btn btn-success" id="acp-btn-start" onclick="startAutoClicker()" title="Démarrer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+          <button class="btn btn-danger"  id="acp-btn-stop"  onclick="stopAutoClicker()" disabled title="Arrêter">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </button>
+        </div>
       </div>
 
-      <div class="settings-card" style="max-width:720px">
+      <div class="settings-card" style="max-width:820px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px 32px">
 
-        <!-- ── Statut + contrôles ── -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-          <span id="acp-status" style="font-size:13px;font-weight:600;color:var(--text-2)">Arrêté</span>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-success" id="acp-btn-start" onclick="startAutoClicker()" title="Démarrer">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </button>
-            <button class="btn btn-danger"  id="acp-btn-stop"  onclick="stopAutoClicker()" disabled title="Arrêter">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-            </button>
+          <!-- ── Démarrage ── -->
+          <div>
+            <div class="ac-section-lbl" style="margin-bottom:10px">Délai avant démarrage</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <input type="number" id="acp-start-delay" class="ac-narrow" value="3" min="0" max="60" placeholder="0">
+              <span class="ac-unit">s</span>
+              <span style="font-size:11px;color:var(--text-3)">Avant le 1er clic (0 = immédiat)</span>
+            </div>
           </div>
-        </div>
 
-        <!-- ── Séparateur ── -->
-        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
-
-        <!-- ── Délai de démarrage ── -->
-        <div style="margin-bottom:16px">
-          <div class="ac-section-lbl" style="margin-bottom:10px">Délai avant démarrage</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="number" id="acp-start-delay" class="ac-narrow" value="3" min="0" max="60" placeholder="0">
-            <span class="ac-unit">s</span>
-            <span style="font-size:11px;color:var(--text-3)">Temps pour positionner la souris avant le 1er clic (0 = immédiat)</span>
-          </div>
-        </div>
-
-        <!-- ── Séparateur ── -->
-        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
-
-        <!-- ── Intervalle ── -->
-        <div style="margin-bottom:16px">
-          <div class="ac-section-lbl" style="margin-bottom:10px">Intervalle de clic</div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap">
-            <input type="number" id="acp-h"  class="ac-narrow" value="0" min="0" placeholder="0">
-            <span class="ac-unit">h</span>
-            <input type="number" id="acp-m"  class="ac-narrow" value="0" min="0" max="59" placeholder="0">
-            <span class="ac-unit">m</span>
-            <input type="number" id="acp-s"  class="ac-narrow" value="0" min="0" max="59" placeholder="0">
-            <span class="ac-unit">s</span>
-            <input type="number" id="acp-ms" class="ac-mid"    value="100" min="1" max="999" placeholder="100">
-            <span class="ac-unit">ms</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);white-space:nowrap;cursor:pointer">
-              <input type="checkbox" id="acp-rand-offset" onchange="_acpToggleOffset(this)" style="margin:0">
-              Offset aléatoire ±
-            </label>
-            <input type="number" id="acp-rand-ms" class="ac-mid" value="40" min="0" disabled>
-            <span class="ac-unit">ms</span>
-          </div>
-        </div>
-
-        <!-- ── Séparateur ── -->
-        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
-
-        <!-- ── Options de clic ── -->
-        <div style="margin-bottom:16px">
-          <div class="ac-section-lbl" style="margin-bottom:10px">Options de clic</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div>
-              <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Bouton souris</label>
-              <select id="acp-button" style="width:100%">
-                <option value="left">Gauche</option>
-                <option value="right">Droit</option>
-                <option value="middle">Milieu</option>
+          <!-- ── Répétition ── -->
+          <div>
+            <div class="ac-section-lbl" style="margin-bottom:10px">Répétition</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <select id="acp-repeat-mode" onchange="_acpToggleRepeat()" style="flex:1;max-width:200px">
+                <option value="until_stopped">Jusqu&rsquo;à arrêt</option>
+                <option value="count">Nombre de fois</option>
               </select>
+              <input type="number" id="acp-repeat-count" class="ac-mid" value="1" min="1" disabled>
+              <span class="ac-unit">fois</span>
             </div>
-            <div>
-              <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Type de clic</label>
-              <select id="acp-click-type" style="width:100%">
-                <option value="single">Simple</option>
-                <option value="double">Double</option>
-                <option value="triple">Triple</option>
+          </div>
+
+          <!-- ── Intervalle ── -->
+          <div style="grid-column:1 / -1">
+            <div class="ac-section-lbl" style="margin-bottom:10px">Intervalle de clic</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <input type="number" id="acp-h"  class="ac-narrow" value="0" min="0" placeholder="0">
+              <span class="ac-unit">h</span>
+              <input type="number" id="acp-m"  class="ac-narrow" value="0" min="0" max="59" placeholder="0">
+              <span class="ac-unit">m</span>
+              <input type="number" id="acp-s"  class="ac-narrow" value="0" min="0" max="59" placeholder="0">
+              <span class="ac-unit">s</span>
+              <input type="number" id="acp-ms" class="ac-mid"    value="100" min="1" max="999" placeholder="100">
+              <span class="ac-unit">ms</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);white-space:nowrap;cursor:pointer">
+                <input type="checkbox" id="acp-rand-offset" onchange="_acpToggleOffset(this)" style="margin:0">
+                Offset aléatoire ±
+              </label>
+              <input type="number" id="acp-rand-ms" class="ac-mid" value="40" min="0" disabled>
+              <span class="ac-unit">ms</span>
+            </div>
+          </div>
+
+          <!-- ── Options de clic ── -->
+          <div>
+            <div class="ac-section-lbl" style="margin-bottom:10px">Options de clic</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div>
+                <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Bouton souris</label>
+                <select id="acp-button" style="width:100%">
+                  <option value="left">Gauche</option>
+                  <option value="right">Droit</option>
+                  <option value="middle">Milieu</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Type de clic</label>
+                <select id="acp-click-type" style="width:100%">
+                  <option value="single">Simple</option>
+                  <option value="double">Double</option>
+                  <option value="triple">Triple</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Raccourcis clavier ── -->
+          <div>
+            <div class="ac-section-lbl" style="margin-bottom:10px">Raccourcis clavier</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div>
+                <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Touche Démarrer</label>
+                <input type="text" id="acp-key-start" readonly placeholder="F6"
+                  style="width:100%;cursor:pointer;text-align:center"
+                  onfocus="_acpCapKey(this,'acp-key-start')" value="F6">
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Touche Arrêter</label>
+                <input type="text" id="acp-key-stop" readonly placeholder="F7"
+                  style="width:100%;cursor:pointer;text-align:center"
+                  onfocus="_acpCapKey(this,'acp-key-stop')" value="F7">
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Position ── -->
+          <div style="grid-column:1 / -1">
+            <div class="ac-section-lbl" style="margin-bottom:10px">Position du curseur</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <select id="acp-pos-mode" onchange="_acpTogglePosition()" style="max-width:220px">
+                <option value="current">Position actuelle</option>
+                <option value="pick">Point fixe</option>
+                <option value="pick_app">Point fixe + app</option>
               </select>
+              <div id="acp-pos-fields" style="display:none;align-items:center;gap:8px">
+                <span style="font-size:11px;color:var(--text-3)">X</span>
+                <input type="number" id="acp-x" value="0" style="width:68px">
+                <span style="font-size:11px;color:var(--text-3)">Y</span>
+                <input type="number" id="acp-y" value="0" style="width:68px">
+                <button class="btn btn-secondary btn-sm" onclick="_acpPickPoint()" title="Choisir un point à l'écran">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
+                </button>
+              </div>
             </div>
           </div>
+
         </div>
-
-        <!-- ── Séparateur ── -->
-        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
-
-        <!-- ── Répétition ── -->
-        <div style="margin-bottom:16px">
-          <div class="ac-section-lbl" style="margin-bottom:10px">Répétition</div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <select id="acp-repeat-mode" onchange="_acpToggleRepeat()" style="flex:1;max-width:200px">
-              <option value="until_stopped">Jusqu&rsquo;à arrêt</option>
-              <option value="count">Nombre de fois</option>
-            </select>
-            <input type="number" id="acp-repeat-count" class="ac-mid" value="1" min="1" disabled>
-            <span class="ac-unit">fois</span>
-          </div>
-        </div>
-
-        <!-- ── Séparateur ── -->
-        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
-
-        <!-- ── Position ── -->
-        <div>
-          <div class="ac-section-lbl" style="margin-bottom:10px">Position du curseur</div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <select id="acp-pos-mode" onchange="_acpTogglePosition()" style="max-width:220px">
-              <option value="current">Position actuelle</option>
-              <option value="pick">Point fixe</option>
-              <option value="pick_app">Point fixe + app</option>
-            </select>
-            <div id="acp-pos-fields" style="display:none;align-items:center;gap:8px">
-              <span style="font-size:11px;color:var(--text-3)">X</span>
-              <input type="number" id="acp-x" value="0" style="width:68px">
-              <span style="font-size:11px;color:var(--text-3)">Y</span>
-              <input type="number" id="acp-y" value="0" style="width:68px">
-              <button class="btn btn-secondary btn-sm" onclick="_acpPickPoint()" title="Choisir un point à l'écran">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Séparateur ── -->
-        <!-- ── Séparateur ── -->
-        <div style="border-top:1px solid var(--border);margin-bottom:18px"></div>
-
-        <!-- ── Raccourcis clavier ── -->
-        <div>
-          <div class="ac-section-lbl" style="margin-bottom:10px">Raccourcis clavier</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div>
-              <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Touche Démarrer</label>
-              <input type="text" id="acp-key-start" readonly placeholder="F6"
-                style="width:100%;cursor:pointer;text-align:center"
-                onfocus="_acpCapKey(this,'acp-key-start')" value="F6">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Touche Arrêter</label>
-              <input type="text" id="acp-key-stop" readonly placeholder="F7"
-                style="width:100%;cursor:pointer;text-align:center"
-                onfocus="_acpCapKey(this,'acp-key-stop')" value="F7">
-            </div>
-          </div>
-        </div>
-
       </div>
     </section>
 
-    <!-- ═══════════════════ AUTO QTE ═════════════════════ -->
-    <section class="page" id="page-qte">
+    <!-- ═══════════════════ AUTO BOUFFE ═════════════════ -->
+    <section class="page" id="page-autobouffe">
       <div class="page-header">
-        <h1>Auto QTE
-          <span id="qte-status-badge" class="macro-status-badge" style="display:none;margin-left:8px;font-size:11px;vertical-align:middle">ACTIF</span>
-        </h1>
+        <h1>Auto Bouffe</h1>
         <div class="header-actions">
-          <span id="qte-status-text" style="font-size:13px;font-weight:600;color:var(--text-2)">Arrêté</span>
-          <button class="btn btn-success" id="qte-btn-start" onclick="startQte()">
+          <span id="abf-status" style="font-size:13px;font-weight:600;color:var(--text-2)">Arrêté</span>
+          <button class="btn btn-success" id="abf-btn-start" onclick="startAutoBouffe()" title="Démarrer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Démarrer
           </button>
-          <button class="btn btn-danger" id="qte-btn-stop" onclick="stopQte()" disabled>
+          <button class="btn btn-danger" id="abf-btn-stop" onclick="stopAutoBouffe()" disabled title="Arrêter">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-            Arrêter
           </button>
         </div>
       </div>
 
-      <!-- Mode tabs -->
-      <div class="tests-tab-bar" style="margin-bottom:16px">
-        <button class="tests-tab active" data-qte-mode="ocr" onclick="switchQteMode('ocr')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
-          Instant + OCR
+      <!-- ── Sous-onglets mode ── -->
+      <div class="tests-tab-bar" id="abf-mode-tab-bar">
+        <button class="tests-tab active" data-abf-mode="interval" onclick="switchAbfMode('interval')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Intervalle
         </button>
-        <button class="tests-tab" data-qte-mode="spam" onclick="switchQteMode('spam')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Spam
-        </button>
-        <button class="tests-tab" data-qte-mode="hold" onclick="switchQteMode('hold')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-          Hold
-        </button>
-        <button class="tests-tab" data-qte-mode="arc" onclick="switchQteMode('arc')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="10"/><path d="M12 2 A10 10 0 0 1 22 12" stroke="gold" stroke-width="3"/></svg>
-          Arc
+        <button class="tests-tab" data-abf-mode="auto" onclick="switchAbfMode('auto')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Auto (détection)
         </button>
       </div>
 
-      <div class="tester-layout">
+      <!-- ── Panneau Intervalle ── -->
+      <div class="settings-card abf-mode-panel active" id="abf-panel-interval">
+        <div class="settings-card-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4z"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9" y1="14.5" x2="15" y2="14.5"/></svg>
+          Touche & points
+        </div>
+        <div class="form-row" style="gap:16px">
+          <div class="form-group flex-1">
+            <label>Touche inventaire</label>
+            <input type="text" id="abf-key-inventory" readonly placeholder="Cliquez puis appuyez"
+              style="width:100%;cursor:pointer;text-align:center"
+              onfocus="_abfCapKey(this,'abf-key-inventory')">
+          </div>
+          <div class="form-group flex-1">
+            <label>Touche coffre/véhicule</label>
+            <input type="text" id="abf-key-trunk" readonly placeholder="Cliquez puis appuyez"
+              style="width:100%;cursor:pointer;text-align:center"
+              onfocus="_abfCapKey(this,'abf-key-trunk')">
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5">
+          Si un coffre/véhicule était ouvert avant de manger, l'inventaire ferme tout le temps de manger/boire puis rouvre le coffre avec cette touche (séparée de la touche inventaire).
+        </div>
 
-        <!-- ── LEFT: config ─────────────────────────────── -->
-        <div class="tester-panel">
+        <!-- ── Séparateur ── -->
+        <div style="border-top:1px solid var(--border);margin:16px 0"></div>
 
-          <!-- Detection card -->
-          <div class="settings-card" style="margin-bottom:14px">
-            <div class="settings-card-header">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
-              Détection — Centre du cercle QTE (lettre)
-            </div>
-            <div class="form-row" style="gap:6px">
-              <div class="form-group">
-                <label>X</label>
-                <input type="number" id="qte-det-x" value="880" min="0" oninput="_qteSaveConfig()">
-              </div>
-              <div class="form-group">
-                <label>Y</label>
-                <input type="number" id="qte-det-y" value="455" min="0" oninput="_qteSaveConfig()">
-              </div>
-              <div class="form-group">
-                <label>W</label>
-                <input type="number" id="qte-det-w" value="55" min="1" oninput="_qteSaveConfig()">
-              </div>
-              <div class="form-group">
-                <label>H</label>
-                <input type="number" id="qte-det-h" value="55" min="1" oninput="_qteSaveConfig()">
-              </div>
-            </div>
-            <div class="form-row" style="gap:8px;margin-top:10px">
-              <div class="form-group" style="flex:2">
-                <label>Touches autorisées <small style="color:var(--text-3)">(vide = toutes A-Z)</small></label>
-                <input type="text" id="qte-allowed-keys" value="ZQSD" maxlength="52"
-                       placeholder="ex: ZQSD"
-                       oninput="_qteSaveConfig()"
-                       style="font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase">
-              </div>
-              <div class="form-group" style="flex:1">
-                <label>Contraste min <small style="color:var(--text-3)">(anti-faux+)</small></label>
-                <input type="number" id="qte-min-contrast" value="22" min="0" max="80" oninput="_qteSaveConfig()">
-              </div>
-            </div>
-            <div class="tester-actions" style="margin-top:8px">
-              <button class="btn btn-secondary btn-sm" onclick="pickQteRegion()" title="Sélectionner la zone à l'écran">
+        <div class="ac-section-lbl" style="margin-bottom:10px">Détection IA (état inventaire)</div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;line-height:1.5">
+          1) Détecte la fenêtre du jeu (FiveM doit être ouvert). 2) Dessine UNE petite bande serrée sur les titres de panneau (TON inventaire à gauche, l'endroit où un panneau tiers véhicule/coffre/carton apparaît à droite) — reste précis, une bande trop large fait lire n'importe quel texte (FPS, watermark) au lieu du titre. La bande est mémorisée en % de la fenêtre : si elle bouge ou change de taille, la détection suit automatiquement. Une IA locale (moondream2, GPU si dispo sinon CPU) lit le titre à chaque cycle — pas de référence à capturer. Premier lancement : téléchargement du modèle (~2 Go), peut prendre plusieurs minutes.
+        </div>
+        <div class="tester-actions" style="flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="_abfListWindowsForPicker()" title="Lister les fenêtres ouvertes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+            Choisir fenêtre
+          </button>
+          <select id="abf-window-select" onchange="_abfSelectWindow(this)" style="display:none;max-width:260px"></select>
+          <button class="btn btn-secondary btn-sm" onclick="_abfPickStateZone()" title="Dessiner la bande titre à l'écran">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
+            Bande titre
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="_abfTestStateZone()" title="Tester la détection maintenant">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Tester
+          </button>
+          <span id="abf-window-lbl" style="font-size:11px;color:var(--text-3);font-family:var(--mono)"></span>
+          <span id="abf-state-zone-lbl" style="font-size:11px;color:var(--text-3);font-family:var(--mono)"></span>
+          <span id="abf-state-test-result" style="font-size:11px;font-weight:600"></span>
+        </div>
+
+        <!-- ── Séparateur ── -->
+        <div style="border-top:1px solid var(--border);margin:16px 0"></div>
+
+        <div class="ac-section-lbl" style="margin-bottom:10px">Intervalle entre les repas (min. 30s)</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input type="number" id="abf-h" class="ac-narrow" value="0" min="0" placeholder="0">
+          <span class="ac-unit">h</span>
+          <input type="number" id="abf-m" class="ac-narrow" value="1" min="0" max="59" placeholder="0">
+          <span class="ac-unit">m</span>
+          <input type="number" id="abf-s" class="ac-narrow" value="0" min="0" max="59" placeholder="0">
+          <span class="ac-unit">s</span>
+        </div>
+        <div id="abf-interval-warning" style="font-size:11px;color:var(--accent);margin-top:6px;display:none">Minimum 30 secondes — ajusté automatiquement.</div>
+
+        <!-- ── Séparateur ── -->
+        <div style="border-top:1px solid var(--border);margin:16px 0"></div>
+
+        <div class="form-row" style="gap:24px">
+          <div class="form-group flex-1">
+            <label>Point Manger</label>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <input type="number" id="abf-eat-x" value="0" style="width:72px">
+              <input type="number" id="abf-eat-y" value="0" style="width:72px">
+              <button class="btn btn-secondary btn-sm" onclick="_abfPickPoint('eat')" title="Choisir un point à l'écran">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
-                Zone
               </button>
-              <button class="btn btn-secondary btn-sm" onclick="previewQteRegion()" title="Aperçu de la zone capturée">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                Aperçu
-              </button>
-              <button class="btn btn-primary btn-sm" onclick="testQteDetection()" title="Tester l'OCR sur la zone">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                Tester OCR
-              </button>
-            </div>
-            <div id="qte-det-result" style="display:none;margin-top:8px;font-size:12px;padding:6px 10px;border-radius:4px;background:var(--bg)"></div>
-          </div>
-
-          <!-- Response card -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              Réponse
-            </div>
-
-            <!-- Common params -->
-            <div class="form-row" style="gap:8px;margin-bottom:12px">
-              <div class="form-group" style="flex:1">
-                <label>Touche fallback <small style="color:var(--text-3)">(si OCR rate)</small></label>
-                <input type="text" id="qte-key" value="e" maxlength="10" oninput="_qteSaveConfig()">
-              </div>
-              <div class="form-group" style="flex:1">
-                <label>Réaction <small style="color:var(--text-3)">(ms, 0=instant)</small></label>
-                <input type="number" id="qte-reaction-ms" value="0" min="0" max="2000" oninput="_qteSaveConfig()">
-              </div>
-            </div>
-
-            <!-- Mode: OCR/Instant -->
-            <div id="qte-params-ocr">
-              <div style="font-size:12px;color:var(--text-3);padding:4px 0;line-height:1.5">
-                <b>Instant + OCR</b> — lit la lettre au centre du cercle par OCR, presse en 0 ms.<br>
-                Réaction surhumaine : impossible à reproduire manuellement.
-              </div>
-            </div>
-
-            <!-- Mode: Spam -->
-            <div id="qte-params-spam" style="display:none">
-              <div class="form-row" style="gap:8px">
-                <div class="form-group" style="flex:1">
-                  <label>Vitesse <small style="color:var(--text-3)">(Hz)</small></label>
-                  <input type="number" id="qte-rate-hz" value="30" min="1" max="100" oninput="_qteSaveConfig()">
-                </div>
-                <div class="form-group" style="flex:1">
-                  <label>Durée spam <small style="color:var(--text-3)">(s)</small></label>
-                  <input type="number" id="qte-duration" value="4.0" min="0.1" step="0.1" oninput="_qteSaveConfig()">
-                </div>
-              </div>
-              <div style="font-size:12px;color:var(--text-3);padding:4px 0">
-                <b>Spam</b> — presse la touche à X Hz pendant Y secondes (button mash).
-              </div>
-            </div>
-
-            <!-- Mode: Hold -->
-            <div id="qte-params-hold" style="display:none">
-              <div class="form-group">
-                <label>Durée maintien <small style="color:var(--text-3)">(s)</small></label>
-                <input type="number" id="qte-hold-duration" value="2.0" min="0.1" step="0.1" oninput="_qteSaveConfig()">
-              </div>
-              <div style="font-size:12px;color:var(--text-3);padding:4px 0">
-                <b>Hold</b> — maintient la touche enfoncée pendant X secondes.
-              </div>
-            </div>
-
-            <!-- Mode: Arc -->
-            <div id="qte-params-arc" style="display:none">
-              <div style="font-size:12px;color:var(--text-3);padding:4px 0 8px;line-height:1.5">
-                <b>Arc</b> — détecte quand l'arc jaune rejoint la cible rouge et appuie instantanément.<br>
-                Sélectionne le cercle QTE complet (pas juste la lettre centrale).
-              </div>
-              <div class="form-row" style="gap:6px;margin-bottom:8px">
-                <div class="form-group">
-                  <label>X cercle</label>
-                  <input type="number" id="qte-arc-x" value="820" min="0" oninput="_qteSaveConfig()">
-                </div>
-                <div class="form-group">
-                  <label>Y cercle</label>
-                  <input type="number" id="qte-arc-y" value="395" min="0" oninput="_qteSaveConfig()">
-                </div>
-                <div class="form-group">
-                  <label>W</label>
-                  <input type="number" id="qte-arc-w" value="175" min="10" oninput="_qteSaveConfig()">
-                </div>
-                <div class="form-group">
-                  <label>H</label>
-                  <input type="number" id="qte-arc-h" value="175" min="10" oninput="_qteSaveConfig()">
-                </div>
-              </div>
-              <div class="form-row" style="gap:8px;margin-bottom:6px">
-                <div class="form-group" style="flex:1">
-                  <label>Tolérance angle <small style="color:var(--text-3)">(°)</small></label>
-                  <input type="number" id="qte-arc-tol" value="20" min="1" max="90" oninput="_qteSaveConfig()">
-                </div>
-              </div>
-              <div class="tester-actions" style="margin-top:4px">
-                <button class="btn btn-secondary btn-sm" onclick="pickQteArcRegion()" title="Sélectionner le cercle QTE">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
-                  Zone cercle
-                </button>
-                <button class="btn btn-secondary btn-sm" onclick="previewQteArcRegion()" title="Aperçu du cercle">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  Aperçu cercle
-                </button>
-              </div>
-            </div>
-
-            <!-- Timing avancé -->
-            <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px">
-              <div class="form-row" style="gap:8px;margin-bottom:8px">
-                <div class="form-group" style="flex:1">
-                  <label>Durée appui <small style="color:var(--text-3)">(ms)</small></label>
-                  <input type="number" id="qte-press-dur" value="20" min="1" max="500" oninput="_qteSaveConfig()">
-                </div>
-                <div class="form-group" style="flex:1">
-                  <label>Aperçu live <small style="color:var(--text-3)">(ms)</small></label>
-                  <input type="number" id="qte-preview-delay" value="500" min="200" max="10000" step="100" oninput="_qteSaveConfig()">
-                </div>
-              </div>
-              <div class="form-row" style="gap:8px;align-items:center">
-                <div class="form-group" style="flex:1">
-                  <label>Délai boucle <small style="color:var(--text-3)">(s)</small></label>
-                  <input type="number" id="qte-loop-delay" value="0.05" min="0.01" step="0.01" oninput="_qteSaveConfig()">
-                </div>
-                <div class="form-group" style="flex:1;padding-top:20px">
-                  <label class="check-label">
-                    <input type="checkbox" id="qte-wait-fivem" checked onchange="_qteSaveConfig()">
-                    Guard: FiveM actif
-                  </label>
-                </div>
-              </div>
+              <select id="abf-eat-button" style="width:90px">
+                <option value="right" selected>Droit</option>
+                <option value="left">Gauche</option>
+              </select>
             </div>
           </div>
-
+          <div class="form-group flex-1">
+            <label>Point Boire</label>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <input type="number" id="abf-drink-x" value="0" style="width:72px">
+              <input type="number" id="abf-drink-y" value="0" style="width:72px">
+              <button class="btn btn-secondary btn-sm" onclick="_abfPickPoint('drink')" title="Choisir un point à l'écran">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
+              </button>
+              <select id="abf-drink-button" style="width:90px">
+                <option value="right" selected>Droit</option>
+                <option value="left">Gauche</option>
+              </select>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <!-- ── RIGHT: preview + stats ───────────────────── -->
-        <div class="tester-preview-panel">
-
-          <!-- Zone preview -->
-          <div class="preview-label">Aperçu zone OCR</div>
-          <div id="qte-preview" class="preview-canvas">
-            <div class="preview-placeholder">Cliquez "Aperçu" pour capturer</div>
-          </div>
-
-          <!-- OCR letter display -->
-          <div style="margin-top:14px">
-            <div class="preview-label">Lettre détectée (OCR)</div>
-            <div id="qte-ocr-display"
-                 style="margin-top:6px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:40px;font-weight:700;text-align:center;color:var(--accent);min-height:72px;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">
-              —
-            </div>
-          </div>
-
-          <!-- Stats -->
-          <div style="margin-top:14px">
-            <div class="preview-label">Statistiques de session</div>
-            <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div style="padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-align:center">
-                <div id="qte-stat-detected" style="font-size:28px;font-weight:700;color:var(--cyan)">0</div>
-                <div style="font-size:11px;color:var(--text-3);margin-top:2px">Détectés</div>
-              </div>
-              <div style="padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-align:center">
-                <div id="qte-stat-pressed" style="font-size:28px;font-weight:700;color:var(--green)">0</div>
-                <div style="font-size:11px;color:var(--text-3);margin-top:2px">Répondus</div>
-              </div>
-            </div>
-            <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px" onclick="_qteResetStats()">
-              Remettre les stats à zéro
-            </button>
-          </div>
-
+      <!-- ── Panneau Auto ── -->
+      <div class="settings-card abf-mode-panel" id="abf-panel-auto">
+        <div class="settings-card-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+          Zone de capture (détection faim/soif)
         </div>
-
+        <div class="tester-actions">
+          <button class="btn btn-secondary btn-sm" onclick="_abfPickZone()" title="Sélectionner la zone à l'écran">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
+            Zone
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="_abfPreviewZone()" title="Aperçu de la zone capturée">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Aperçu
+          </button>
+          <span id="abf-zone-lbl" style="font-size:11px;color:var(--text-3);font-family:var(--mono)"></span>
+        </div>
+        <div id="abf-zone-preview" class="cond-preview" style="margin-top:10px">
+          <div class="preview-placeholder">Cliquez "Zone" pour sélectionner</div>
+        </div>
       </div>
     </section>
 
@@ -902,10 +531,14 @@
       </div>
 
       <!-- ── Tab bar ── -->
-      <div class="tests-tab-bar">
+      <div class="tests-tab-bar" id="settings-tab-bar">
         <button class="tests-tab active" data-tab="general" onclick="switchSettingsTab('general')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
           Général
+        </button>
+        <button class="tests-tab" data-tab="discord" onclick="switchSettingsTab('discord')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          Discord
         </button>
         <button class="tests-tab" data-tab="shortcuts" onclick="switchSettingsTab('shortcuts')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4z"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9" y1="14.5" x2="15" y2="14.5"/></svg>
@@ -922,6 +555,10 @@
         <button class="tests-tab" data-tab="logs" onclick="switchSettingsTab('logs')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Logs
+        </button>
+        <button class="tests-tab" data-tab="tests" onclick="switchSettingsTab('tests')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
+          Tests
         </button>
       </div>
 
@@ -950,6 +587,11 @@
           <span id="licence-status" style="font-size:12px;margin-left:8px"></span>
         </div>
       </div>
+
+      </div><!-- /settings-panel-general -->
+
+      <!-- ── Panel: Discord ── -->
+      <div class="settings-panel" id="settings-panel-discord">
 
       <!-- Webhook Discord -->
       <div class="settings-card">
@@ -981,7 +623,7 @@
         </div>
       </div>
 
-      </div><!-- /settings-panel-general -->
+      </div><!-- /settings-panel-discord -->
 
       <!-- ── Panel: Raccourcis ── -->
       <div class="settings-panel" id="settings-panel-shortcuts">
@@ -1141,6 +783,233 @@
       </div>
 
       </div><!-- /settings-panel-logs -->
+      <div class="settings-panel" id="settings-panel-tests">
+        <div class="header-actions" id="tests-header-actions-windows" style="display:none;justify-content:flex-end;margin-bottom:10px">
+          <button class="btn btn-secondary" onclick="refreshWindows()" title="Rafraîchir fenêtres">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+          </button>
+        </div>
+
+      <!-- ── Sub-tab bar ── -->
+      <div class="tests-tab-bar" id="tests-subtab-bar">
+        <button class="tests-tab active" data-tab="conditions" onclick="switchTestTab('conditions')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Conditions
+        </button>
+        <button class="tests-tab" data-tab="actions" onclick="switchTestTab('actions')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Actions
+        </button>
+        <button class="tests-tab" data-tab="windows" onclick="switchTestTab('windows')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Fenêtres
+        </button>
+      </div>
+
+      <!-- ── Panneau Conditions ── -->
+      <div class="test-panel active" id="test-panel-conditions">
+        <div class="tester-layout">
+          <div class="tester-panel settings-card">
+            <div class="form-group">
+              <label>Type de condition</label>
+              <select id="cond-type" onchange="renderConditionFields()">
+                <optgroup label="─── Vision">
+                  <option value="pixel_color">Couleur d'un pixel</option>
+                  <option value="pixel_color_not">Couleur d'un pixel ≠</option>
+                  <option value="pixel_changed">Pixel a changé (snapshot)</option>
+                  <option value="pixel_not_changed">Pixel n'a pas changé</option>
+                  <option value="region_color_avg">Couleur moyenne d'une zone</option>
+                  <option value="text_contains">Texte contient (OCR)</option>
+                  <option value="text_not_contains">Texte ne contient pas (OCR)</option>
+                  <option value="text_regex">Texte regex (OCR)</option>
+                  <option value="template_match">Image template présente</option>
+                  <option value="template_not_found">Image template absente</option>
+                </optgroup>
+                <optgroup label="─── Fenêtres &amp; Processus">
+                  <option value="window_focused">Fenêtre active (titre)</option>
+                  <option value="window_not_focused">Fenêtre non active</option>
+                  <option value="window_exists">Fenêtre existe</option>
+                  <option value="window_not_exists">Fenêtre absente</option>
+                  <option value="process_running">Processus actif (exe)</option>
+                  <option value="process_not_running">Processus inactif</option>
+                </optgroup>
+                <optgroup label="─── Macros">
+                  <option value="macro_is_running">Macro en cours</option>
+                  <option value="macro_not_running">Macro arrêtée</option>
+                </optgroup>
+                <optgroup label="─── Compteurs">
+                  <option value="counter_eq">Compteur =</option>
+                  <option value="counter_not_eq">Compteur ≠</option>
+                  <option value="counter_gte">Compteur ≥</option>
+                  <option value="counter_lte">Compteur ≤</option>
+                  <option value="counter_gt">Compteur &gt;</option>
+                  <option value="counter_lt">Compteur &lt;</option>
+                  <option value="counter_between">Compteur entre</option>
+                </optgroup>
+                <optgroup label="─── Variables">
+                  <option value="variable_equals">Variable =</option>
+                  <option value="variable_contains">Variable contient</option>
+                </optgroup>
+                <optgroup label="─── Heure &amp; Aléatoire">
+                  <option value="time_between">Heure entre</option>
+                  <option value="random_chance">Chance aléatoire</option>
+                </optgroup>
+                <optgroup label="─── Entrées">
+                  <option value="key_is_held">Touche enfoncée</option>
+                  <option value="key_not_held">Touche relâchée</option>
+                  <option value="clipboard_contains">Presse-papier contient</option>
+                </optgroup>
+                <optgroup label="─── Constantes">
+                  <option value="always">Toujours vrai</option>
+                  <option value="never">Toujours faux</option>
+                </optgroup>
+              </select>
+            </div>
+            <div id="cond-fields" class="cond-fields"></div>
+            <div class="tester-actions">
+              <button class="btn btn-secondary" onclick="previewConditionRegion()" title="Aperçu zone">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </button>
+              <button id="btn-ocr-read" class="btn btn-secondary" onclick="readOcrText()" title="Lire texte OCR" style="display:none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </button>
+              <button class="btn btn-primary" onclick="testCondition()" title="Tester condition">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </button>
+            </div>
+            <div id="cond-result" class="test-result" style="display:none"></div>
+            <div id="cond-ocr-result" style="display:none;margin-top:10px">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);margin-bottom:6px">Texte OCR détecté</div>
+              <pre id="cond-ocr-text" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-family:var(--mono);font-size:12px;color:var(--cyan);white-space:pre-wrap;word-break:break-all;max-height:120px;overflow-y:auto"></pre>
+            </div>
+          </div>
+          <div class="tester-preview-panel settings-card" id="cond-preview-wrap">
+            <div class="preview-label">Aperçu de la zone</div>
+            <div id="cond-preview" class="preview-canvas">
+              <div class="preview-placeholder">Cliquez "Aperçu zone" pour voir la capture</div>
+            </div>
+            <div class="picker-helper">
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label>Picker: X</label>
+                  <input type="number" id="picker-x" value="0" min="0">
+                </div>
+                <div class="form-group flex-1">
+                  <label>Picker: Y</label>
+                  <input type="number" id="picker-y" value="0" min="0">
+                </div>
+                <div class="form-group flex-1" style="justify-content:flex-end">
+                  <button class="btn btn-secondary" style="margin-top:auto" onclick="pickColor()">Lire couleur</button>
+                </div>
+              </div>
+              <div id="color-result" class="color-result" style="display:none">
+                <span class="color-swatch" id="color-swatch"></span>
+                <span id="color-value"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Panneau Actions ── -->
+      <div class="test-panel" id="test-panel-actions">
+        <div class="tester-layout">
+          <div class="tester-panel settings-card">
+            <div class="form-group">
+              <label>Type d'action</label>
+              <select id="act-type" onchange="renderActionFields()">
+                <optgroup label="─── Clavier">
+                  <option value="key_tap">Appui touche (tap)</option>
+                  <option value="key_hold">Maintien touche (hold)</option>
+                  <option value="key_release">Relâcher touche</option>
+                  <option value="key_combo">Combinaison de touches</option>
+                  <option value="type_text">Taper du texte</option>
+                </optgroup>
+                <optgroup label="─── Souris">
+                  <option value="mouse_move">Déplacer souris</option>
+                  <option value="mouse_click">Clic souris</option>
+                  <option value="mouse_double_click">Double-clic souris</option>
+                  <option value="mouse_drag">Drag souris</option>
+                  <option value="scroll">Scroll</option>
+                </optgroup>
+                <optgroup label="─── Temporisation">
+                  <option value="wait">Attendre (fixe)</option>
+                  <option value="random_wait">Attendre (aléatoire)</option>
+                </optgroup>
+                <optgroup label="─── Contrôle macro">
+                  <option value="macro_start">Lancer une macro</option>
+                  <option value="macro_stop">Arrêter une macro</option>
+                  <option value="stop_self">Arrêter cette macro</option>
+                  <option value="repeat">Répéter un bloc d'actions</option>
+                </optgroup>
+                <optgroup label="─── Variables &amp; Compteurs">
+                  <option value="set_variable">Définir variable</option>
+                  <option value="counter_set">Définir compteur</option>
+                  <option value="counter_inc">Incrémenter compteur</option>
+                  <option value="counter_dec">Décrémenter compteur</option>
+                  <option value="counter_reset">Remettre compteur à zéro</option>
+                </optgroup>
+                <optgroup label="─── Notifications">
+                  <option value="send_webhook">Envoyer webhook Discord</option>
+                  <option value="log_message">Message dans les logs</option>
+                  <option value="notify_toast">Notification Windows</option>
+                  <option value="play_sound">Jouer un son</option>
+                </optgroup>
+                <optgroup label="─── Système">
+                  <option value="focus_window">Mettre fenêtre au 1er plan</option>
+                  <option value="screenshot_save">Sauvegarder screenshot</option>
+                  <option value="clipboard_set">Copier dans presse-papier</option>
+                </optgroup>
+              </select>
+            </div>
+            <div id="act-fields" class="cond-fields"></div>
+            <div class="tester-actions">
+              <button class="btn btn-primary" onclick="testAction()" title="Exécuter action">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </button>
+            </div>
+            <div id="act-result" class="test-result" style="display:none"></div>
+          </div>
+          <div class="tester-preview-panel settings-card">
+            <div class="preview-label">Aide des touches</div>
+            <div class="keys-help">
+              <div class="keys-grid">
+                <span>Lettres: a–z</span><span>Chiffres: 0–9</span>
+                <span>f1–f12</span><span>space, enter</span>
+                <span>tab, escape</span><span>backspace</span>
+                <span>ctrl, alt, shift</span><span>up, down, left, right</span>
+                <span>home, end</span><span>pageup, pagedown</span>
+                <span>insert, delete</span><span>numpad0–numpad9</span>
+              </div>
+              <div class="preview-label" style="margin-top:1rem">Boutons souris</div>
+              <div class="keys-grid">
+                <span>left</span><span>right</span><span>middle</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Panneau Fenêtres ── -->
+      <div class="test-panel" id="test-panel-windows">
+        <div class="dash-section" style="margin-bottom:1rem">
+          <div class="dash-section-title">Fenêtre cible</div>
+          <div id="target-window-info" class="target-info" style="display:none"></div>
+          <div id="window-rect-info" class="rect-info" style="display:none"></div>
+        </div>
+        <div class="dash-section" style="margin-bottom:1rem">
+          <div class="dash-section-title">Statut OCR (détection de texte)</div>
+          <div id="ocr-status" class="ocr-status">
+            <button class="btn btn-xs btn-secondary" onclick="checkOcrStatus()">Vérifier OCR</button>
+            <span id="ocr-status-text" style="margin-left:8px"></span>
+          </div>
+        </div>
+        <div id="windows-list" class="windows-list">
+          <div class="empty-state">Cliquez Rafraîchir pour lister les fenêtres</div>
+        </div>
+      </div>
+
+      </div><!-- /settings-panel-tests -->
     </section>
 
   </main>
@@ -1368,7 +1237,7 @@
 <script defer src="js/page-actions.js"></script>
 <script defer src="js/page-windows.js"></script>
 <script defer src="js/page-autoclicker.js"></script>
-<script defer src="js/page-qte.js"></script>
+<script defer src="js/page-autobouffe.js"></script>
 
 <!-- Patch : expose toutes les fonctions critiques sur window APRÈS chargement de tous les scripts -->
 <script>

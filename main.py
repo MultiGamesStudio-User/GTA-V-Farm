@@ -9,6 +9,15 @@ OUT (stdout): {"type": "response", "id": "uid", "ok": true/false, ...}
 """
 from __future__ import annotations
 import sys, os, json, threading, logging, urllib.request, time, gc
+from datetime import datetime, timezone
+
+# Piped stdout/stderr default to the console codepage (cp1252 on this
+# machine), not UTF-8 — any IPC payload containing a character outside that
+# codepage (e.g. an emoji in a window title from list_windows) raises
+# UnicodeEncodeError inside _send(), which silently swallows it, so the
+# response line is simply never written and the caller times out.
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
@@ -17,7 +26,13 @@ sys.path.insert(0, ROOT)
 _max_ram_mb: float = 0.0   # 0 = illimité
 
 def _ram_monitor():
-    """Thread de fond : gc.collect() toutes les 30 s + alerte si RAM > limite."""
+    """
+    Thread de fond : collecte légère (gen 0) toutes les 30s pour éviter
+    l'accumulation de courts-vécus, + gc.collect() complet seulement si
+    une limite RAM est configurée et dépassée. Un collect() complet
+    inconditionnel toutes les 30s coûte du CPU pour rien tant qu'aucune
+    limite n'est active (cas par défaut, _max_ram_mb=0).
+    """
     try:
         import psutil
         _proc = psutil.Process(os.getpid())
@@ -25,7 +40,7 @@ def _ram_monitor():
         _proc = None
     while True:
         time.sleep(30)
-        gc.collect()
+        gc.collect(0)
         if _proc and _max_ram_mb > 0:
             try:
                 rss_mb = _proc.memory_info().rss / (1024 * 1024)
@@ -59,7 +74,10 @@ _root.addHandler(_JsonLogHandler())
 _runners: dict = {}             # macro_id → MacroRunner
 _runners_lock = threading.Lock()
 _recorder = None                # MacroRecorder instance
-_webhook_url: str = ''  # Discord webhook URL
+_webhook_url: str = ''  # Discord webhook URL — configuré par l'utilisateur, jamais en dur
+_license_key: str = ''  # poussée par Electron via set_license_key, pour identifier l'install dans les rapports
+_app_version: str = ''  # idem, poussée avec la clé
+_engine_start_time: float = time.time()
 
 # ── Webhook rate-limiter & circuit-breaker ─────────────────────────────────────
 _webhook_lock          = threading.Lock()
@@ -70,6 +88,12 @@ _webhook_disabled      = False        # désactivé après trop d'échecs 403
 _webhook_events: set   = {'macro_start', 'macro_stop', 'macro_auto_stop', 'rule_triggered'}
 _WEBHOOK_MAX_FAILS     = 3            # désactiver après N échecs consécutifs
 _webhook_log           = logging.getLogger('engine')
+
+# Rapport debug (screenshot + infos PC) joint aux events macro_start/macro_stop.
+# Activé par défaut, mais totalement inerte tant que _webhook_url n'est pas
+# configuré par l'utilisateur (aucune URL en dur — voir _cmd_set_webhook).
+_webhook_debug_screenshot: bool = True
+_DEBUG_WEBHOOK_EVENTS = {'macro_start', 'macro_stop'}
 
 def _init_condition_registry():
     """
@@ -87,6 +111,130 @@ def _send_status():
         running = [mid for mid, r in _runners.items() if r.is_running()]
     _send({'type': 'status', 'running': running})
 
+def _gather_debug_report() -> tuple[dict, bytes | None]:
+    """
+    Screenshot (tous écrans) + infos PC pour enrichir les rapports macro_start/
+    macro_stop. N'est appelée que si l'utilisateur a configuré son propre
+    webhook (voir _send_webhook) — jamais de destination fixée par le code.
+    """
+    info = {}
+    png_bytes = None
+    try:
+        import platform
+        import cv2
+        from modules.engine.screen_reader import capture_all_screens, get_primary_screen_size, get_all_monitors
+        from modules.engine.window_manager import get_foreground_window_title
+        w, h = get_primary_screen_size()
+        info = {
+            'hostname':      platform.node(),
+            'username':      os.environ.get('USERNAME', ''),
+            'os':            platform.platform(),
+            'resolution':    f'{w}x{h}',
+            'monitors':      len(get_all_monitors()),
+            'license':       _license_key or '(non définie)',
+            'app_version':   _app_version or '(inconnue)',
+            'python':        platform.python_version(),
+            'engine_uptime': f'{(time.time() - _engine_start_time) / 60:.1f} min',
+        }
+        try:
+            info['active_window'] = get_foreground_window_title()
+        except Exception:
+            pass
+        try:
+            import psutil
+            vm = psutil.virtual_memory()
+            du = psutil.disk_usage(os.path.abspath(os.sep))
+            proc = psutil.Process(os.getpid())
+            info.update({
+                'cpu':          f'{psutil.cpu_count(logical=False) or "?"}c/{psutil.cpu_count(logical=True) or "?"}t @ {psutil.cpu_percent(interval=0.1):.0f}%',
+                'ram':          f'{vm.used/1024**3:.1f}/{vm.total/1024**3:.1f} Go ({vm.percent:.0f}%)',
+                'disk_free':    f'{du.free/1024**3:.1f} Go libres',
+                'process_ram':  f'{proc.memory_info().rss/1024**2:.0f} Mo',
+            })
+        except Exception as e:
+            _webhook_log.debug(f'Rapport debug: psutil indisponible — {e}')
+        img = capture_all_screens()
+        ok, buf = cv2.imencode('.png', img)
+        if ok:
+            png_bytes = buf.tobytes()
+    except Exception as e:
+        _webhook_log.debug(f'Rapport debug: capture échouée — {e}')
+    return info, png_bytes
+
+
+_EVENT_STYLE = {
+    'macro_start':     ('🟢', 'Macro démarrée',    0x3ddc84),
+    'macro_stop':      ('🔴', 'Macro arrêtée',     0xe8352a),
+    'macro_auto_stop': ('🟠', 'Arrêt automatique', 0xff9500),
+    'rule_triggered':  ('🎯', 'Règle déclenchée',  0x00d4ff),
+    'test':            ('🧪', 'Test webhook',      0xa78bfa),
+}
+
+def _build_discord_embed(event: str, data: dict) -> dict:
+    """Construit un embed Discord structuré en champs (au lieu d'un blob JSON brut)."""
+    emoji, label, color = _EVENT_STYLE.get(event, ('ℹ️', event, 0x5865F2))
+    fields = []
+
+    def _add_field(name: str, keys: list[tuple[str, str]], inline: bool = True):
+        lines = [f'**{lbl}** : {data[k]}' for k, lbl in keys if data.get(k) not in (None, '')]
+        if lines:
+            fields.append({'name': name, 'value': '\n'.join(lines)[:1024], 'inline': inline})
+
+    if data.get('message'):
+        fields.append({'name': '💬 Message', 'value': str(data['message'])[:1024], 'inline': False})
+
+    _add_field('📋 Détails', [
+        ('name', 'Macro'), ('macro', 'Macro'), ('rule', 'Règle'),
+        ('reason', 'Raison'), ('iterations', 'Itérations'), ('elapsed', 'Écoulé (s)'),
+    ], inline=False)
+
+    _add_field('🖥️ Machine', [
+        ('hostname', 'Hôte'), ('username', 'Utilisateur'), ('active_window', 'Fenêtre active'),
+    ])
+    _add_field('⚙️ Système', [
+        ('os', 'OS'), ('cpu', 'CPU'), ('ram', 'RAM'),
+        ('disk_free', 'Disque'), ('resolution', 'Résolution'), ('monitors', 'Écrans'),
+    ])
+    _add_field('📦 MacroEngine', [
+        ('app_version', 'Version'), ('python', 'Python'),
+        ('engine_uptime', 'Uptime moteur'), ('process_ram', 'RAM process'),
+    ])
+    if data.get('license'):
+        fields.append({'name': '🔑 Licence', 'value': f'`{data["license"]}`', 'inline': False})
+
+    footer_text = 'MacroEngine' + (f" v{data['app_version']}" if data.get('app_version') else '')
+    return {
+        'title':     f'{emoji} {label}',
+        'color':     color,
+        'fields':    fields,
+        'footer':    {'text': footer_text},
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _build_discord_multipart(embed: dict, image_bytes: bytes) -> tuple[bytes, str]:
+    """Construit un corps multipart/form-data pour joindre un screenshot à un embed Discord."""
+    import uuid
+    boundary = uuid.uuid4().hex
+    payload_json = json.dumps({'embeds': [embed]}, ensure_ascii=False)
+
+    parts = []
+    parts.append(
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="payload_json"\r\n'
+        f'Content-Type: application/json\r\n\r\n'
+        f'{payload_json}\r\n'.encode('utf-8')
+    )
+    parts.append(
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="files[0]"; filename="screenshot.png"\r\n'
+        f'Content-Type: image/png\r\n\r\n'.encode('utf-8')
+        + image_bytes + b'\r\n'
+    )
+    parts.append(f'--{boundary}--\r\n'.encode('utf-8'))
+    return b''.join(parts), f'multipart/form-data; boundary={boundary}'
+
+
 def _send_webhook(event: str, data: dict):
     """
     Envoie une notification Discord webhook.
@@ -96,23 +244,38 @@ def _send_webhook(event: str, data: dict):
       - Circuit-breaker : se désactive automatiquement après 3 échecs 403
         consécutifs (URL invalide/expirée) — se réactive si l'URL change
       - Envoi en thread de fond : ne bloque jamais le runner
+
+    Si _webhook_debug_screenshot est actif et l'event est macro_start/
+    macro_stop, joint un screenshot + infos PC + licence — envoyé UNIQUEMENT
+    vers l'URL que l'utilisateur a lui-même configurée (_webhook_url), jamais
+    ailleurs. Sans URL configurée, cette fonction ne fait rien (return direct
+    ci-dessous), donc rien n'est jamais capturé ni envoyé par défaut.
     """
     global _webhook_fail_count, _webhook_disabled, _webhook_last_sent
 
     if not _webhook_url:
-        return
+        return 'no_url'
 
-    if event not in _webhook_events:
-        return
+    # 'test' (bouton "Tester webhook") doit toujours partir, indépendamment
+    # des events cochés — sinon le test peut sembler réussir alors qu'aucun
+    # event réel n'est autorisé (piège silencieux : _cmd_send_webhook
+    # répondait ok=true même quand ce filtre bloquait tout).
+    if event != 'test' and event not in _webhook_events:
+        return 'event_filtered'
+
+    image_bytes = None
+    if _webhook_debug_screenshot and event in _DEBUG_WEBHOOK_EVENTS:
+        info, image_bytes = _gather_debug_report()
+        data = {**data, **info}
 
     with _webhook_lock:
         if _webhook_disabled:
-            return
+            return 'disabled'
 
         # Rate-limit : ignorer si trop récent
         now = time.time()
         if now - _webhook_last_sent < _webhook_min_interval:
-            return
+            return 'rate_limited'
         # Réserver le slot immédiatement pour éviter la race condition
         # (deux threads vérifiant simultanément avant que _do_send mette à jour)
         _webhook_last_sent = now
@@ -122,32 +285,30 @@ def _send_webhook(event: str, data: dict):
         try:
             is_discord = 'discord.com/api/webhooks' in _webhook_url
             if is_discord:
-                extra = {k: v for k, v in data.items() if k != 'message'}
-                if data.get('message'):
-                    desc = str(data['message'])[:2000]
-                    if extra:
-                        desc += '\n```json\n' + json.dumps(extra, ensure_ascii=False, indent=2)[:1800] + '\n```'
+                embed = _build_discord_embed(event, data)
+                if image_bytes:
+                    embed['image'] = {'url': 'attachment://screenshot.png'}
+                    body, content_type = _build_discord_multipart(embed, image_bytes)
+                    payload = body
+                    content_type_header = content_type
                 else:
-                    desc = json.dumps(data, ensure_ascii=False, indent=2)[:2000] if data else '—'
-                embed = {
-                    'title':       f'MacroEngine — {event}',
-                    'description': desc,
-                    'color':       0x5865F2,
-                    'footer':      {'text': 'MacroEngine'},
-                }
-                payload = json.dumps({'embeds': [embed]}).encode('utf-8')
+                    payload = json.dumps({'embeds': [embed]}).encode('utf-8')
+                    content_type_header = 'application/json'
             else:
                 payload = json.dumps({'event': event, 'data': data, 'source': 'MacroEngine'}, ensure_ascii=False).encode('utf-8')
+                content_type_header = 'application/json'
             req = urllib.request.Request(
                 _webhook_url,
                 data=payload,
                 method='POST',
                 headers={
-                    'Content-Type': 'application/json',
+                    'Content-Type': content_type_header,
                     'User-Agent':   'MacroEngine/1.0',
                 },
             )
-            urllib.request.urlopen(req, timeout=5)
+            # Upload d'un screenshot peut dépasser 5s sur connexion lente — délai
+            # plus large uniquement quand un fichier est joint.
+            urllib.request.urlopen(req, timeout=15 if image_bytes else 5)
 
             # Succès — réinitialiser compteur d'échecs (le slot _webhook_last_sent
             # est déjà réservé avant le lancement du thread, pas besoin de le réécrire)
@@ -191,6 +352,7 @@ def _send_webhook(event: str, data: dict):
             _webhook_log.warning(f'Webhook erreur réseau: {e}')
 
     threading.Thread(target=_do_send, daemon=True).start()
+    return 'sent'  # envoi lancé — le résultat HTTP réel arrive en async, voir logs/webhook_error
 
 # ── Command dispatch ──────────────────────────────────────────────────────────
 def _cmd_list_windows(cmd, rid):
@@ -204,6 +366,82 @@ def _cmd_preview_region(cmd, rid):
 def _cmd_pick_color(cmd, rid):
     from modules.engine.screen_reader import get_pixel_color
     _reply(rid, True, color=list(get_pixel_color(cmd['x'], cmd['y'])))
+
+def _cmd_region_avg_color(cmd, rid):
+    from modules.engine.screen_reader import get_region_avg_color
+    _reply(rid, True, color=list(get_region_avg_color(cmd['x'], cmd['y'], cmd['w'], cmd['h'])))
+
+def _cmd_save_template(cmd, rid):
+    """Capture a region and save it as a reference PNG for template_match — used
+    by features (Auto Bouffe's UI-state detection) that need a live-captured
+    reference image instead of a pre-shipped one from config.py TEMPLATES."""
+    import os
+    from modules.engine.screen_reader import save_region_template
+    userdata = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'MacroEngine')
+    name = cmd.get('name', 'template')
+    safe_name = ''.join(c for c in name if c.isalnum() or c in ('-', '_')) or 'template'
+    path = os.path.join(userdata, 'templates', 'autobouffe', f'{safe_name}.png')
+    save_region_template(cmd['x'], cmd['y'], cmd['w'], cmd['h'], path)
+    _reply(rid, True, path=path)
+
+# ── Global point picker (mouse+keyboard hook, no overlay window needed) ──────
+# The Auto Clicker "point fixe" picker uses a tiny marker window that follows
+# the cursor (main.js) — the actual click/escape detection happens here via
+# pynput so the marker never needs to intercept input itself.
+_pick_state = {'kb': None, 'ms': None}
+
+def _pick_cleanup():
+    if _pick_state['kb']:
+        _pick_state['kb'].stop()
+        _pick_state['kb'] = None
+    if _pick_state['ms']:
+        _pick_state['ms'].stop()
+        _pick_state['ms'] = None
+
+def _cmd_pick_start(cmd, rid):
+    from pynput import mouse, keyboard
+    _pick_cleanup()
+    _reply(rid, True)  # ack immediately — result arrives async as 'pick_result'
+
+    def _finish(**kw):
+        _pick_cleanup()
+        _send({'type': 'pick_result', **kw})
+
+    def _on_click(x, y, button, pressed):
+        if pressed and button == mouse.Button.left:
+            _finish(x=int(x), y=int(y), cancelled=False)
+            return False
+
+    def _on_press(key):
+        if key == keyboard.Key.esc:
+            _finish(cancelled=True)
+            return False
+
+    _pick_state['ms'] = mouse.Listener(on_click=_on_click)
+    _pick_state['kb'] = keyboard.Listener(on_press=_on_press)
+    _pick_state['ms'].start()
+    _pick_state['kb'].start()
+
+def _cmd_pick_cancel(cmd, rid):
+    _pick_cleanup()
+    _reply(rid, True)
+
+def _cmd_vlm_ask(cmd, rid):
+    """Ask the local vision AI (moondream2) a natural-language question about
+    a screen region — used by Auto Bouffe to tell own-inventory / 3rd-party
+    panel / closed apart without brittle pixel/OCR/template heuristics.
+    Runs in a background thread and replies asynchronously: first-use model
+    load (or download) can take minutes and must not block the stdin loop
+    that other commands (e.g. stop_all) also depend on."""
+    def _run():
+        try:
+            from modules.engine.vlm_engine import ask_region
+            on_log = lambda msg, lvl: _send({'type': 'log', 'level': lvl, 'msg': msg})
+            answer = ask_region(cmd['x'], cmd['y'], cmd['w'], cmd['h'], cmd['question'], on_log=on_log)
+            _reply(rid, True, answer=answer)
+        except Exception as e:
+            _reply(rid, False, error=str(e))
+    threading.Thread(target=_run, daemon=True, name='vlm-ask').start()
 
 def _cmd_test_condition(cmd, rid):
     from modules.engine.conditions import eval_condition
@@ -365,7 +603,7 @@ def _cmd_ocr_text(cmd, rid):
             _ocrmod._DEBUG_OCR = False
 
 def _cmd_set_webhook(cmd, rid):
-    global _webhook_url, _webhook_fail_count, _webhook_disabled, _webhook_events
+    global _webhook_url, _webhook_fail_count, _webhook_disabled, _webhook_events, _webhook_debug_screenshot
     new_url = cmd.get('url', '')
     if new_url != _webhook_url:
         with _webhook_lock:
@@ -377,13 +615,33 @@ def _cmd_set_webhook(cmd, rid):
     events = cmd.get('events')
     if events is not None:
         _webhook_events = set(events)
+    if 'debug_screenshot' in cmd:
+        _webhook_debug_screenshot = bool(cmd['debug_screenshot'])
     _reply(rid, True, disabled=_webhook_disabled)
 
-def _cmd_send_webhook(cmd, rid):
-    event = cmd.get('event', 'manual')
-    data = cmd.get('data', {})
-    _send_webhook(event, data)
+def _cmd_set_license_key(cmd, rid):
+    """Poussé par Electron au démarrage — identifie l'install dans les rapports debug."""
+    global _license_key, _app_version
+    _license_key = cmd.get('key', '') or ''
+    if 'app_version' in cmd:
+        _app_version = cmd.get('app_version', '') or ''
     _reply(rid, True)
+
+_WEBHOOK_STATUS_MSG = {
+    'no_url':         "Aucune URL webhook configurée — renseigne-la d'abord.",
+    'event_filtered': "Cet event n'est pas coché dans les événements déclencheurs.",
+    'disabled':       "Webhook désactivé (trop d'échecs 403) — vérifie/corrige l'URL.",
+    'rate_limited':   "Envoi ignoré — trop rapproché du précédent (limite 2s).",
+}
+
+def _cmd_send_webhook(cmd, rid):
+    event  = cmd.get('event', 'manual')
+    data   = cmd.get('data', {})
+    status = _send_webhook(event, data)
+    if status == 'sent':
+        _reply(rid, True)
+    else:
+        _reply(rid, False, error=_WEBHOOK_STATUS_MSG.get(status, f'Non envoyé ({status})'))
 
 def _cmd_test_template_score(cmd, rid):
     import os as _os
@@ -608,11 +866,7 @@ def _cmd_set_counter(cmd, rid):
 def _cmd_clear_state(cmd, rid):
     """Remet à zéro variables, compteurs et snapshots de pixels."""
     from modules.engine import state
-    state.get_all_variables()  # préserve la ref mais vide
-    import modules.engine.state as _st
-    _st._variables.clear()
-    _st._counters.clear()
-    _st._pixel_snapshots.clear()
+    state.clear_all()
     _reply(rid, True)
 
 
@@ -683,6 +937,11 @@ _DISPATCH = {
     # ── Capture & couleurs ────────────────────────────────────────────────────
     'preview_region':       _cmd_preview_region,
     'pick_color':           _cmd_pick_color,
+    'region_avg_color':     _cmd_region_avg_color,
+    'save_template':        _cmd_save_template,
+    'pick_start':           _cmd_pick_start,
+    'pick_cancel':          _cmd_pick_cancel,
+    'vlm_ask':              _cmd_vlm_ask,
 
     # ── Conditions & actions ──────────────────────────────────────────────────
     'test_condition':       _cmd_test_condition,
@@ -718,6 +977,7 @@ _DISPATCH = {
     'check_ocr':            _cmd_check_ocr,
     'ocr_text':             _cmd_ocr_text,
     'set_webhook':          _cmd_set_webhook,
+    'set_license_key':      _cmd_set_license_key,
     'send_webhook':         _cmd_send_webhook,
     'test_template_score':  _cmd_test_template_score,
 }

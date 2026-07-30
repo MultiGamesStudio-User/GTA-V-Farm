@@ -1114,6 +1114,7 @@ select.cf, select.af {
 /* ── Tests page — tab bar ────────────────────────────────────── */
 .tests-tab-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 0 0 16px 0;
   border-bottom: 1px solid var(--border);
@@ -1156,11 +1157,15 @@ select.cf, select.af {
   overflow: hidden;
   flex-direction: column;
 }
+
+/* ── Auto Bouffe — mode panels ────────────────────────────────── */
+.abf-mode-panel        { display: none; }
+.abf-mode-panel.active { display: block; }
 .test-panel.active { display: flex; }
 
 /* settings page tabs */
 .settings-panel        { display: none; }
-.settings-panel.active { display: block; }
+.settings-panel.active { display: flex; flex-direction: column; gap: 16px; }
 #page-settings.active  { flex-direction: column; }
 
 /* page-tests needs column flex to contain tab-bar + panels */
@@ -1173,6 +1178,8 @@ select.cf, select.af {
 .tester-layout { display: flex; gap: 16px; height: 100%; overflow: hidden; }
 .tester-panel { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 4px; }
 .tester-preview-panel { width: 270px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+/* .settings-card sets overflow:hidden (for the ::before top-line) — restore scroll when combined */
+.tester-panel.settings-card, .tester-preview-panel.settings-card { overflow-y: auto; }
 .tester-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .cond-fields, .act-fields { display: flex; flex-direction: column; gap: 10px; }
 

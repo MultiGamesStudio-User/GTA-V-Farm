@@ -11,10 +11,10 @@ let allLogs         = [];
 
 /* ── Navigation ───────────────────────────────────────────── */
 function navigate(page, testTab) {
-  // Redirect legacy page names to the unified tests page
-  if (page === 'conditions' || page === 'actions' || page === 'windows') {
-    testTab = page;
-    page    = 'tests';
+  // Tests (conditions/actions/windows) live under Paramètres now
+  if (page === 'conditions' || page === 'actions' || page === 'windows' || page === 'tests') {
+    testTab = testTab || (page === 'tests' ? null : page);
+    page    = 'settings';
   }
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -24,18 +24,17 @@ function navigate(page, testTab) {
   if (pageEl) pageEl.classList.add('active');
   if (navEl)  navEl.classList.add('active');
 
-  if (page === 'tests')       switchTestTab(testTab || null);
   if (page === 'macros')      renderMacroList();
   if (page === 'dashboard')   renderDashboard();
   if (page === 'syslog')      refreshSyslog();
-  if (page === 'settings')    switchSettingsTab(null);
+  if (page === 'settings')    switchSettingsTab(testTab ? 'tests' : null, testTab);
   if (page === 'autoclicker') initAutoClicker();
-  if (page === 'qte')         initQtePage();
+  if (page === 'autobouffe') initAutoBouffe();
 
   _saveUiPref('lastPage', page);
 }
 
-/* ── Tests page tab switching ─────────────────────────────── */
+/* ── Tests sub-tab switching (nested under Paramètres > Tests) ── */
 function switchTestTab(tab) {
   // Default to last saved tab or conditions
   if (!tab) {
@@ -45,11 +44,11 @@ function switchTestTab(tab) {
   }
   window._lastTestTab = tab;
 
-  document.querySelectorAll('.test-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tests-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#settings-panel-tests .test-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#tests-subtab-bar .tests-tab').forEach(t => t.classList.remove('active'));
 
   const panel  = document.getElementById('test-panel-' + tab);
-  const tabBtn = document.querySelector(`.tests-tab[data-tab="${tab}"]`);
+  const tabBtn = document.querySelector(`#tests-subtab-bar .tests-tab[data-tab="${tab}"]`);
   if (panel)  panel.classList.add('active');
   if (tabBtn) tabBtn.classList.add('active');
 
@@ -65,16 +64,17 @@ function switchTestTab(tab) {
 }
 
 /* ── Settings page tab switching ─────────────────────────── */
-function switchSettingsTab(tab) {
+function switchSettingsTab(tab, testSubTab) {
   if (!tab) tab = window._lastSettingsTab || 'general';
   window._lastSettingsTab = tab;
-  document.querySelectorAll('#page-settings .tests-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#settings-tab-bar .tests-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
-  const tabBtn = document.querySelector(`#page-settings .tests-tab[data-tab="${tab}"]`);
+  const tabBtn = document.querySelector(`#settings-tab-bar .tests-tab[data-tab="${tab}"]`);
   const panel  = document.getElementById(`settings-panel-${tab}`);
   if (tabBtn) tabBtn.classList.add('active');
   if (panel)  panel.classList.add('active');
-  if (tab === 'logs') refreshSyslog();
+  if (tab === 'logs')  refreshSyslog();
+  if (tab === 'tests') switchTestTab(testSubTab || window._lastTestTab || 'conditions');
   _saveUiPref('lastSettingsTab', tab);
 }
 
@@ -304,12 +304,9 @@ async function init() {
 
   setSplashMsg('Chargement...');
 
-  /* Licence vérifiée en fond (réseau, jusqu'à 5s) — ne bloque plus l'affichage.
-     Elle pose son propre overlay par-dessus l'UI si invalide/révoquée. */
-  checkLicense().catch(() => {});
-
-  /* Macros + settings : lecture locale, rapide, seule chose qui gate le splash */
+  /* License check + macros + settings en parallèle */
   await Promise.all([
+    checkLicense(),
     loadMacros(),
     loadAppSettings(),
   ]);
@@ -449,7 +446,7 @@ async function loadAppSettings() {
     if (s.shortcutStop)       _globalShortcutMap.stop        = keyToAccelerator(s.shortcutStop);
     if (s.shortcutPause)      _globalShortcutMap.pause       = keyToAccelerator(s.shortcutPause);
     if (s.shortcutRecordStop) _globalShortcutMap.record_stop = keyToAccelerator(s.shortcutRecordStop);
-    else                      _globalShortcutMap.record_stop = 'F6';
+    else                      _globalShortcutMap.record_stop = 'F9';
     // Also load ACP hotkeys saved in localStorage
     try {
       const acp = JSON.parse(localStorage.getItem('acp_settings') || '{}');
@@ -562,7 +559,7 @@ async function saveShortcutSettings() {
     else            delete _globalShortcutMap.stop;
     if (pauseKey)   _globalShortcutMap.pause       = keyToAccelerator(pauseKey);
     else            delete _globalShortcutMap.pause;
-    _globalShortcutMap.record_stop = recStopKey ? keyToAccelerator(recStopKey) : 'F6';
+    _globalShortcutMap.record_stop = recStopKey ? keyToAccelerator(recStopKey) : 'F9';
     await _applyGlobalShortcuts();
     statusEl.textContent = '✅ Raccourcis activés';
     statusEl.style.color = 'var(--success)';

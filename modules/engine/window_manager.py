@@ -9,6 +9,7 @@ Nouvelles fonctions :
 """
 import ctypes
 import ctypes.wintypes
+import win32api
 import win32gui
 import win32con
 import win32process
@@ -119,10 +120,39 @@ def get_window_info(hwnd: int) -> dict | None:
 
 # ── Focus ──────────────────────────────────────────────────────────────────────
 def focus_window(hwnd: int) -> bool:
-    """Met la fenêtre au premier plan."""
+    """
+    Met la fenêtre au premier plan.
+
+    Windows bloque silencieusement SetForegroundWindow() quand l'appelant
+    n'est pas déjà le processus au premier plan (protection anti-vol-de-focus)
+    — sans exception, l'appel ne fait juste rien. C'est exactement le cas ici
+    (ce process tourne en arrière-plan pendant qu'Electron a le focus) : il
+    faut attacher notre thread d'input à celui de la fenêtre cible le temps
+    de l'appel pour contourner la restriction.
+    """
     try:
         win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-        win32gui.SetForegroundWindow(hwnd)
+
+        cur_thread = win32api.GetCurrentThreadId()
+        fg_hwnd = win32gui.GetForegroundWindow()
+        target_thread, _ = win32process.GetWindowThreadProcessId(hwnd)
+        fg_thread, _ = win32process.GetWindowThreadProcessId(fg_hwnd) if fg_hwnd else (0, 0)
+
+        attached_cur = attached_fg = False
+        try:
+            if target_thread and target_thread != cur_thread:
+                win32process.AttachThreadInput(cur_thread, target_thread, True)
+                attached_cur = True
+            if fg_thread and fg_thread not in (cur_thread, target_thread):
+                win32process.AttachThreadInput(fg_thread, target_thread, True)
+                attached_fg = True
+            win32gui.BringWindowToTop(hwnd)
+            win32gui.SetForegroundWindow(hwnd)
+        finally:
+            if attached_cur:
+                win32process.AttachThreadInput(cur_thread, target_thread, False)
+            if attached_fg:
+                win32process.AttachThreadInput(fg_thread, target_thread, False)
         return True
     except Exception:
         return False

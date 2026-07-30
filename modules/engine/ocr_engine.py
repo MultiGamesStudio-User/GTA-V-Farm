@@ -20,6 +20,10 @@ import cv2
 
 logger = logging.getLogger('engine.ocr')
 
+# Project root (modules/engine/ocr_engine.py → up 2 levels) — used to locate
+# the bundled tesseract/tesseract.exe below.
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 # Stockage userData (APPDATA) pour éviter les problèmes de droits
 if sys.platform == 'win32':

@@ -59,3 +59,10 @@ macros.json
 # license.json
 # config.py
 
+# ── Outillage local (Claude Code) ──────────────────────────
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# ── Graphe de connaissance (régénérable via `graphify update .`) ──
+graphify-out/
+

@@ -58,7 +58,7 @@ electron-app/assets/
 
 ```bash
 cd "d:/GTAV/Script/GTA V FARM"
-git remote add origin https://github.com/YOUR-USERNAME/GTA-V-FARM.git
+git remote add origin https://github.com/YOUR-USERNAME/GTA-V-Farm.git
 git branch -M main
 git push -u origin main
 ```
@@ -83,7 +83,7 @@ Update `electron-app/package.json` with your GitHub repo:
 "publish": {
   "provider": "github",
   "owner": "YOUR-USERNAME",
-  "repo": "GTA-V-FARM"
+  "repo": "GTA-V-Farm"
 }
 ```
 
@@ -166,4 +166,4 @@ GTA V FARM/
 
 ---
 
-**Questions?** Check [DEVELOPMENT.md](./DEVELOPMENT.md) or open an [Issue](https://github.com/Multigames-studio/GTA-V-FARM/issues)!
+**Questions?** Check [DEVELOPMENT.md](./DEVELOPMENT.md) or open an [Issue](https://github.com/MultiGamesStudio-User/GTA-V-Farm/issues)!

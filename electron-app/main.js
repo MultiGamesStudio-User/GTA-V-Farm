@@ -355,9 +355,12 @@ app.whenReady().then(() => {
     writeLog('INFO', 'Python OK →', PYTHON_EXE);
     mainWindow?.webContents.send('setup:done');
     startEngine(); // pré-démarre Python dès que l'UI est prête
+    _pushLicenseKeyToEngine();
 
     // ── Vérification automatique des mises à jour ──────────────
-    _runAutoUpdate();
+    // IS_PACKED only: en dev, RENDERER_DIR pointe sur le dossier source réel —
+    // l'updater écraserait les modifs locales non commit à chaque lancement.
+    if (IS_PACKED) _runAutoUpdate();
 
     // ── Surveillance périodique de la licence ──────────────────
     _startLicenseWatcher();
@@ -438,6 +441,17 @@ function killEngine() {
   engineProc = null;
 }
 
+// Pousse la clé de licence locale vers le moteur Python — sert uniquement à
+// identifier l'install dans les rapports debug webhook (screenshot on
+// macro start/stop), jamais transmise ailleurs qu'au process Python local.
+async function _pushLicenseKeyToEngine() {
+  for (let i = 0; i < 300; i++) {
+    if (engineProc?.stdin?.writable) break;
+    await new Promise(r => setTimeout(r, 10));
+  }
+  try { await engineCmd({ cmd: 'set_license_key', key: readLicense() || '', app_version: app.getVersion() }); } catch (_) {}
+}
+
 // ── Engine message router ─────────────────────────────────────────────────────
 function _dispatchFromEngine(msg) {
   if (msg.type === 'response') {
@@ -461,11 +475,13 @@ function _dispatchFromEngine(msg) {
     mainWindow?.webContents.send('engine:webhook_error', { msg: msg.msg });
   } else if (msg.type === 'macro_start_request') {
     mainWindow?.webContents.send('engine:macro_start_request', { name: msg.name });
+  } else if (msg.type === 'pick_result') {
+    _pickerOnResult?.(msg);
   }
 }
 
 // ── Send command to engine and await response ─────────────────────────────────
-function engineCmd(cmd) {
+function engineCmd(cmd, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     if (!engineProc) { reject(new Error('Engine not running')); return; }
     const id = `${cmd.cmd}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -475,7 +491,7 @@ function engineCmd(cmd) {
         _pending.delete(id);
         reject(new Error('Engine timeout'));
       }
-    }, 15000);
+    }, timeoutMs);
     _pending.set(id, {
       resolve: (v) => { clearTimeout(timer); resolve(v); },
       reject:  (e) => { clearTimeout(timer); reject(e); },
@@ -519,7 +535,7 @@ for (const cmd of [
   // Coords
   'validate_point', 'validate_region', 'scale_coords',
   // Vision & OCR
-  'preview_region', 'pick_color', 'check_ocr', 'ocr_text', 'test_template_score',
+  'preview_region', 'pick_color', 'region_avg_color', 'save_template', 'check_ocr', 'ocr_text', 'test_template_score',
   // Macros
   'macro_start', 'macro_stop', 'macro_pause', 'macro_resume', 'stop_all',
   // Conditions / Actions testing
@@ -552,14 +568,50 @@ for (const cmd of [
   });
 }
 
-// ── IPC: Screen picker overlay ───────────────────────────────────────────────
-// One BrowserWindow per display — avoids Windows DPI clipping of transparent
-// windows that span monitors with different scale factors.
-let _pickerWindows = [];
+// ── IPC: Auto Bouffe local vision AI ─────────────────────────────────────────
+// Own handler (not in the generic forwarded-command loop above) because it
+// needs a much longer timeout: first call can trigger a multi-GB model
+// download + CPU load, taking minutes instead of the usual 15s ceiling.
+ipcMain.handle('engine:vlm_ask', async (_evt, params) => {
+  if (!engineProc) {
+    startEngine();
+    for (let _i = 0; _i < 300; _i++) {
+      if (engineProc?.stdin?.writable) break;
+      await new Promise(r => setTimeout(r, 10));
+    }
+  }
+  try {
+    return await engineCmd({ cmd: 'vlm_ask', ...params }, 300000);
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// ── IPC: Screen picker ───────────────────────────────────────────────────────
+// GPU hardware acceleration is disabled on this machine (by design), so any
+// transparent full-screen window renders solid black (Chromium's software
+// rendering path can't composite per-pixel alpha with the desktop).
+//   - Point mode: a tiny OPAQUE marker (fixed pixel size, no transparency
+//     needed at all) follows the cursor; pynput (main.py _cmd_pick_start)
+//     detects the actual click/escape system-wide. The real screen stays
+//     100% visible everywhere outside that small marker.
+//   - Region mode: still needs to actually see the content inside the drag
+//     rectangle to align it precisely, so it uses a full-screen window per
+//     display, background-composited from a real screenshot (mss/GDI) since
+//     live transparency isn't possible here.
+let _pickerWindows = [];   // region mode — one full-screen window per display
+let _pickerWin = null;     // point mode — single tiny marker window
+let _pickerPollTimer = null;
+let _pickerOnResult = null;
+const PICKER_MARKER_SIZE = 22;
 
 function _closeAllPickers() {
   _pickerWindows.forEach(w => { try { if (!w.isDestroyed()) w.close(); } catch (_) {} });
   _pickerWindows = [];
+  if (_pickerPollTimer) { clearInterval(_pickerPollTimer); _pickerPollTimer = null; }
+  if (_pickerWin && !_pickerWin.isDestroyed()) { try { _pickerWin.close(); } catch (_) {} }
+  _pickerWin = null;
+  _pickerOnResult = null;
 }
 
 function _logicalToPhysical(screen, result) {
@@ -600,11 +652,112 @@ function _logicalToPhysical(screen, result) {
 }
 
 ipcMain.handle('picker:start', (_evt, opts) => {
-  return new Promise((resolve) => {
-    _closeAllPickers();
+  _closeAllPickers();
+  const mode = opts?.mode || 'point';
+  return mode === 'region' ? _startRegionPicker(opts) : _startPointPicker(opts);
+});
 
-    const { screen } = require('electron');
-    const displays = screen.getAllDisplays();
+// Point mode: tiny opaque marker (no transparency needed) + pynput click detection.
+function _startPointPicker(opts) {
+  const { screen } = require('electron');
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (result) => {
+      if (resolved) return;
+      resolved = true;
+      _closeAllPickers();
+      resolve(result);
+    };
+
+    _pickerOnResult = (msg) => finish(msg.cancelled ? null : { x: msg.x, y: msg.y });
+
+    const startPt = screen.getCursorScreenPoint();
+    const win = new BrowserWindow({
+      x: startPt.x - PICKER_MARKER_SIZE / 2,
+      y: startPt.y - PICKER_MARKER_SIZE / 2,
+      width:  PICKER_MARKER_SIZE,
+      height: PICKER_MARKER_SIZE,
+      frame: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      focusable: false,
+      hasShadow: false,
+      show: false,
+      webPreferences: {
+        preload: path.join(__dirname, 'picker-preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+    win.setIgnoreMouseEvents(true); // clicks pass through — pynput detects them globally
+    win.loadFile(path.join(__dirname, 'renderer', 'picker.html'));
+    _pickerWin = win;
+
+    win.once('ready-to-show', () => {
+      if (win.isDestroyed()) return;
+      win.showInactive();
+      win.webContents.send('picker:init', { mode: 'point', markerSize: PICKER_MARKER_SIZE });
+
+      // setBounds (not setPosition) re-asserts the size every frame — on
+      // this machine (GPU accel off, software rendering path) setPosition
+      // alone let the window's size drift/grow over repeated calls.
+      // Skipping the native call when the cursor hasn't moved still avoids
+      // ~60 no-op calls/sec while the mouse sits still.
+      let lastX = null, lastY = null;
+      const half = PICKER_MARKER_SIZE / 2;
+      const tick = () => {
+        if (win.isDestroyed()) return;
+        const pt = screen.getCursorScreenPoint();
+        if (pt.x === lastX && pt.y === lastY) return;
+        lastX = pt.x; lastY = pt.y;
+        win.setBounds({
+          x: pt.x - half, y: pt.y - half,
+          width: PICKER_MARKER_SIZE, height: PICKER_MARKER_SIZE,
+        });
+      };
+      tick();
+      _pickerPollTimer = setInterval(tick, 16);
+    });
+
+    win.on('closed', () => finish(null));
+
+    engineCmd({ cmd: 'pick_start', mode: 'point' }).catch(err => {
+      writeLog('ERROR', 'picker: pick_start a échoué —', err.message);
+      finish(null);
+    });
+  });
+}
+
+// Region mode: full-screen window per display, background composited from a
+// real screenshot (mss/GDI) since live transparency isn't possible here —
+// needed so the user can actually see what's inside the drag rectangle.
+async function _startRegionPicker(opts) {
+  const { screen } = require('electron');
+  const displays = screen.getAllDisplays();
+
+  const cropRects = displays.map(display => _logicalToPhysical(screen, {
+    x: display.bounds.x, y: display.bounds.y,
+    w: display.bounds.width, h: display.bounds.height,
+  }));
+  const bboxX0 = Math.min(...cropRects.map(r => r.x));
+  const bboxY0 = Math.min(...cropRects.map(r => r.y));
+  const bboxX1 = Math.max(...cropRects.map(r => r.x + r.w));
+  const bboxY1 = Math.max(...cropRects.map(r => r.y + r.h));
+
+  let desktopB64 = null;
+  try {
+    const res = await engineCmd({
+      cmd: 'preview_region',
+      x: bboxX0, y: bboxY0, w: bboxX1 - bboxX0, h: bboxY1 - bboxY0,
+    });
+    desktopB64 = res?.b64 || null;
+  } catch (err) {
+    writeLog('ERROR', 'picker: preview_region (desktop) a échoué —', err.message);
+  }
+
+  return new Promise((resolve) => {
     let resolved = false;
 
     const _resultListener = (_e, result) => {
@@ -616,7 +769,7 @@ ipcMain.handle('picker:start', (_evt, opts) => {
     };
     ipcMain.on('picker:result', _resultListener);
 
-    for (const display of displays) {
+    displays.forEach((display, i) => {
       const win = new BrowserWindow({
         x:      display.bounds.x,
         y:      display.bounds.y,
@@ -624,6 +777,7 @@ ipcMain.handle('picker:start', (_evt, opts) => {
         height: display.bounds.height,
         frame: false,
         transparent: true,
+        backgroundColor: '#00000000',
         alwaysOnTop: true,
         skipTaskbar: true,
         resizable: false,
@@ -637,12 +791,16 @@ ipcMain.handle('picker:start', (_evt, opts) => {
 
       win.loadFile(path.join(__dirname, 'renderer', 'picker.html'));
       const _win = win;
+      const r = cropRects[i];
+      const cropRect = { x: r.x - bboxX0, y: r.y - bboxY0, w: r.w, h: r.h };
       win.once('ready-to-show', () => {
         if (_win.isDestroyed()) return;
         _win.webContents.send('picker:init', {
-          mode:    opts?.mode || 'point',
-          offsetX: display.bounds.x,
-          offsetY: display.bounds.y,
+          mode:     'region',
+          offsetX:  display.bounds.x,
+          offsetY:  display.bounds.y,
+          desktopImage: desktopB64 ? `data:image/png;base64,${desktopB64}` : null,
+          cropRect,
         });
       });
 
@@ -656,9 +814,9 @@ ipcMain.handle('picker:start', (_evt, opts) => {
       });
 
       _pickerWindows.push(win);
-    }
+    });
   });
-});
+}
 
 // ── Overlay window ────────────────────────────────────────────────────────────
 function createOverlayWindow() {
@@ -965,7 +1123,10 @@ ipcMain.handle('license:verify', async (_evt, key) => {
     return { valid: false, reason: 'empty' };
   }
   const result = await verifyLicenseOnline(key.trim());
-  if (result.valid) saveLicense(key.trim());
+  if (result.valid) {
+    saveLicense(key.trim());
+    _pushLicenseKeyToEngine();
+  }
   if (!result.valid && result.offline) return { valid: false, reason: 'network' };
   return result;
 });
@@ -974,6 +1135,8 @@ ipcMain.handle('license:verify', async (_evt, key) => {
 ipcMain.handle('settings:read', () => {
   return { ok: true, settings: readSettings() };
 });
+
+ipcMain.handle('app:userDataPath', () => USERDATA_DIR);
 
 ipcMain.handle('settings:write', (_evt, data) => {
   try {
@@ -992,6 +1155,7 @@ ipcMain.handle('settings:write', (_evt, data) => {
 // ── IPC: global shortcuts ────────────────────────────────────────────────────
 function registerGlobalShortcuts(shortcuts) {
   const next = shortcuts || {};
+  writeLog('DEBUG', 'shortcuts: next =', JSON.stringify(next), '| current =', JSON.stringify(registeredShortcuts));
 
   // Unregister removed or changed shortcuts only
   for (const [action, accelerator] of Object.entries(registeredShortcuts)) {
@@ -1006,10 +1170,14 @@ function registerGlobalShortcuts(shortcuts) {
     if (!accelerator || registeredShortcuts[action] === accelerator) continue;
     try {
       const ok = globalShortcut.register(accelerator, () => {
+        writeLog('DEBUG', 'shortcut fired:', action, accelerator);
         mainWindow?.webContents.send('shortcut:triggered', { action });
       });
+      writeLog('DEBUG', 'shortcuts: register', action, accelerator, '→', ok);
       if (ok) registeredShortcuts[action] = accelerator;
-    } catch (_) {}
+    } catch (err) {
+      writeLog('ERROR', 'shortcuts: register a échoué', action, accelerator, '—', err.message);
+    }
   }
 }
 

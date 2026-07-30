@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
 <title>Picker</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -11,9 +11,15 @@
     cursor: crosshair;
     -webkit-app-region: no-drag;
   }
+  #bg {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+  }
   #overlay {
     position: fixed; inset: 0;
     background: rgba(0,0,0,0.15);
+    z-index: 1;
   }
   #info {
     position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
@@ -44,9 +50,29 @@
   }
   #crosshair-h { left: 0; right: 0; height: 1px; }
   #crosshair-v { top: 0; bottom: 0; width: 1px; }
+
+  /* Point mode: tiny fixed-size marker — width/height are absolute px, not
+     a percentage of the window, so it can never stretch even if the window
+     ends up a different size than expected. */
+  #marker {
+    display: none;
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 18px; height: 18px;
+    margin: -9px 0 0 -9px;
+    border: 2px solid #0ff;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(0,255,255,.8);
+    box-sizing: border-box;
+  }
+  #marker::before, #marker::after { content: ''; position: absolute; background: rgba(0,255,255,.9); }
+  #marker::before { left: 50%; top: -5px; bottom: -5px; width: 1px; transform: translateX(-50%); }
+  #marker::after  { top: 50%; left: -5px; right: -5px; height: 1px; transform: translateY(-50%); }
 </style>
 </head>
 <body>
+  <div id="marker"></div>
+  <canvas id="bg"></canvas>
   <div id="overlay"></div>
   <div id="crosshair-h"></div>
   <div id="crosshair-v"></div>
@@ -70,8 +96,32 @@
       mode = data.mode || 'point';
       offsetX = data.offsetX || 0;
       offsetY = data.offsetY || 0;
-      if (mode === 'region') {
-        infoEl.textContent = 'Cliquez et glissez pour sélectionner une zone — Échap pour annuler';
+
+      if (mode === 'point') {
+        // Tiny marker window — pynput (main.py) detects the click/escape,
+        // nothing here needs to listen for input at all.
+        document.getElementById('marker').style.display = 'block';
+        document.getElementById('bg').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+        chH.style.display = 'none';
+        chV.style.display = 'none';
+        infoEl.style.display = 'none';
+        coordsEl.style.display = 'none';
+        return;
+      }
+
+      infoEl.textContent = 'Cliquez et glissez pour sélectionner une zone — Échap pour annuler';
+      if (data.desktopImage && data.cropRect) {
+        const bg = document.getElementById('bg');
+        bg.width  = window.innerWidth;
+        bg.height = window.innerHeight;
+        const ctx = bg.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+          const r = data.cropRect;
+          ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, bg.width, bg.height);
+        };
+        img.src = data.desktopImage;
       }
     });
 

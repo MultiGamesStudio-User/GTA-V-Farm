@@ -18,7 +18,7 @@ Complete these steps to enable automated builds via GitHub Actions.
 
 1. Click **+** (top right) → **New repository**
 2. Fill in:
-   - **Repository name:** `GTA-V-FARM`
+   - **Repository name:** `GTA-V-Farm`
    - **Description:** GTA V Farming Automation Bot
    - **Visibility:** Public (for auto-updates) or Private (security)
    - **License:** MIT (will be auto-detected)
@@ -34,7 +34,7 @@ Open Command Prompt in `d:\GTAV\Script\GTA V FARM`:
 git config --global user.name "Your Name"
 git config --global user.email "your.email@example.com"
 
-git remote add origin https://github.com/YOUR-USERNAME/GTA-V-FARM.git
+git remote add origin https://github.com/YOUR-USERNAME/GTA-V-Farm.git
 git branch -M main
 git add .
 git commit -m "Initial commit"
@@ -89,7 +89,7 @@ Auto-update is **already configured** in your code. Users will get notifications
 ## Repository Structure on GitHub
 
 ```
-YOUR-USERNAME/GTA-V-FARM
+YOUR-USERNAME/GTA-V-Farm
 ├── .github/
 │   └── workflows/
 │       ├── test-build.yml       ← Tests on PR

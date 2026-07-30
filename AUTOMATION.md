@@ -75,7 +75,7 @@ git push --tags
 ### 1. Push Your Code to GitHub
 
 ```bash
-git remote add origin https://github.com/YOUR-USERNAME/GTA-V-FARM.git
+git remote add origin https://github.com/YOUR-USERNAME/GTA-V-Farm.git
 git branch -M main
 git push -u origin main
 ```
@@ -165,7 +165,7 @@ npm run build-nsis        # Create installer locally
 Add to your README.md:
 
 ```markdown
-![Build Status](https://github.com/YOUR-USERNAME/GTA-V-FARM/workflows/Build%20%26%20Release%20MacroEngine/badge.svg)
+![Build Status](https://github.com/YOUR-USERNAME/GTA-V-Farm/workflows/Build%20%26%20Release%20MacroEngine/badge.svg)
 ```
 
 ---

