@@ -57,13 +57,6 @@ changelog = changelog.replace(/^# Changelog/m, `# Changelog\n\n${changelogHeader
 fs.writeFileSync(changelogPath, changelog);
 console.log(`✅ Updated CHANGELOG.md (edit the entries!)`);
 
-// Update electron-app/package.json
-const electronPackagePath = path.join(__dirname, '..', 'electron-app', 'package.json');
-const electronPackage = JSON.parse(fs.readFileSync(electronPackagePath, 'utf8'));
-electronPackage.version = newVersion;
-fs.writeFileSync(electronPackagePath, JSON.stringify(electronPackage, null, 2) + '\n');
-console.log(`✅ Updated electron-app/package.json`);
-
 // Next steps
 console.log(`\n📝 Next steps:`);
 console.log(`1. Edit CHANGELOG.md with your changes`);
