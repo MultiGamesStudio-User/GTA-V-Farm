@@ -642,14 +642,7 @@ for (const cmd of [
   'pixel_snapshot',
 ]) {
   ipcMain.handle(`engine:${cmd}`, async (_evt, params) => {
-    if (!engineProc) {
-      // auto-start engine on first use; poll up to 3 s for stdin readiness
-      startEngine();
-      for (let _i = 0; _i < 300; _i++) {
-        if (engineProc?.stdin?.writable) break;
-        await new Promise(r => setTimeout(r, 10));
-      }
-    }
+    await _ensureEngineStarted();
     try {
       return await engineCmd({ cmd, ...params });
     } catch (e) {
@@ -658,24 +651,34 @@ for (const cmd of [
   });
 }
 
+// Auto-start the engine on first use, then poll up to 3s for stdin readiness
+// — shared by the generic forwarded commands above and the AI-specific
+// handlers below (which need a longer engineCmd timeout, so aren't in that
+// generic list).
+async function _ensureEngineStarted() {
+  if (engineProc) return;
+  startEngine();
+  for (let _i = 0; _i < 300; _i++) {
+    if (engineProc?.stdin?.writable) break;
+    await new Promise(r => setTimeout(r, 10));
+  }
+}
+
 // ── IPC: Auto Bouffe local vision AI ─────────────────────────────────────────
-// Own handler (not in the generic forwarded-command loop above) because it
-// needs a much longer timeout: first call can trigger a multi-GB model
-// download + CPU load, taking minutes instead of the usual 15s ceiling.
-ipcMain.handle('engine:vlm_ask', async (_evt, params) => {
-  if (!engineProc) {
-    startEngine();
-    for (let _i = 0; _i < 300; _i++) {
-      if (engineProc?.stdin?.writable) break;
-      await new Promise(r => setTimeout(r, 10));
+// Own handlers (not in the generic forwarded-command loop above) because they
+// need a much longer timeout: a cold vlm_ask/vlm_warmup can trigger a
+// multi-GB model download + GPU/CPU load, taking minutes instead of the
+// usual 15s ceiling. vlm_unload is fast but shares the handler for symmetry.
+for (const cmd of ['vlm_ask', 'vlm_warmup', 'vlm_unload']) {
+  ipcMain.handle(`engine:${cmd}`, async (_evt, params) => {
+    await _ensureEngineStarted();
+    try {
+      return await engineCmd({ cmd, ...params }, 300000);
+    } catch (e) {
+      return { ok: false, error: e.message };
     }
-  }
-  try {
-    return await engineCmd({ cmd: 'vlm_ask', ...params }, 300000);
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
-});
+  });
+}
 
 // ── IPC: Screen picker ───────────────────────────────────────────────────────
 // GPU hardware acceleration is disabled on this machine (by design), so any

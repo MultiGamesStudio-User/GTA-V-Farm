@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('api', {
   ocrText:           (p) => ipcRenderer.invoke('engine:ocr_text', p),
   testTemplateScore: (p) => ipcRenderer.invoke('engine:test_template_score', p),
   vlmAsk:            (p) => ipcRenderer.invoke('engine:vlm_ask', p),
+  vlmWarmup:         ()  => ipcRenderer.invoke('engine:vlm_warmup'),
+  vlmUnload:         ()  => ipcRenderer.invoke('engine:vlm_unload'),
 
   // ── Conditions / Actions testing ─────────────────────────
   testCondition:  (p) => ipcRenderer.invoke('engine:test_condition', p),

@@ -64,6 +64,31 @@ def _load(on_log=None):
             on_log('IA locale (moondream2): prête.', 'INFO')
 
 
+def warmup(on_log=None) -> None:
+    """Load the model without asking anything — used to pre-warm VRAM a few
+    seconds before a scheduled scan instead of eagerly on first use."""
+    _load(on_log)
+
+
+def unload(on_log=None) -> None:
+    """Free the model and its VRAM. Auto Bouffe's interval is typically
+    hours — there's no reason to hold ~2-3 Go of VRAM reserved the whole
+    time between scans, so the caller unloads right after each cycle and
+    calls warmup() again shortly before the next one."""
+    global _model, _tokenizer
+    with _lock:
+        if _model is None:
+            return
+        was_cuda = next(_model.parameters()).is_cuda
+        _model = None
+        _tokenizer = None
+        if was_cuda:
+            import torch
+            torch.cuda.empty_cache()
+        if on_log:
+            on_log('IA locale (moondream2): déchargée (VRAM libérée) jusqu\'au prochain scan.', 'INFO')
+
+
 def ask_image(pil_image, question: str, on_log=None) -> str:
     """Ask a natural-language question about a PIL image, return the answer text."""
     _load(on_log)

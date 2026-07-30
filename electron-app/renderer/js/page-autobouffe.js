@@ -35,6 +35,11 @@ let _abfStateZoneRel   = null; // { relX, relY, relW, relH } — fractions 0..1 
 const _ABF_MAX_CLOSE_RETRIES = 3;
 const _ABF_UI_DELAY_MS       = 500; // wait for inventory open/close animation
 
+// Auto Bouffe's interval is typically hours — the model is unloaded (VRAM
+// freed) right after each cycle and reloaded this many ms before the next
+// scheduled scan, instead of sitting resident the whole idle stretch.
+const _ABF_VLM_WARMUP_LEAD_MS = 10000;
+
 // Fraction of the calibrated zone's width checked on each side (own title on
 // the far left, 3rd-party title on the far right) — deliberately less than
 // 50% so the middle (action button column, always present) is never read.
@@ -89,6 +94,7 @@ function stopAutoBouffe() {
   document.getElementById('abf-btn-start').disabled = false;
   document.getElementById('abf-btn-stop').disabled  = true;
   document.getElementById('abf-status').textContent = 'Arrêté';
+  _abfVlmUnload(); // no reason to keep VRAM reserved once stopped
 }
 
 /* ── Low-level helpers (single action/wait, checked against _abfRunning) ── */
@@ -127,6 +133,21 @@ async function _abfClick(x, y, button) {
 function _abfNoTitleDetected(raw) {
   const norm = raw.trim().toLowerCase();
   return !norm || /\bnone\b/.test(norm) || norm.includes('no discernible') || norm.includes('no text');
+}
+
+async function _abfVlmWarmup() {
+  try {
+    appendLog('INFO', 'Auto Bouffe: préchauffage IA…');
+    const res = await window.api.vlmWarmup();
+    if (!res?.ok) appendLog('WARNING', 'Auto Bouffe: préchauffage IA échoué: ' + (res?.error || '?'));
+  } catch (e) { appendLog('WARNING', 'Auto Bouffe: préchauffage IA indisponible: ' + (e.message || e)); }
+}
+
+async function _abfVlmUnload() {
+  try {
+    const res = await window.api.vlmUnload();
+    if (!res?.ok) appendLog('WARNING', 'Auto Bouffe: déchargement IA échoué: ' + (res?.error || '?'));
+  } catch (e) { appendLog('WARNING', 'Auto Bouffe: déchargement IA indisponible: ' + (e.message || e)); }
 }
 
 async function _abfAskTitle(zone, debug, label) {
@@ -398,9 +419,17 @@ async function _abfIntervalLoop() {
       }
     }
 
-    // 5. Wait the configured interval before the next cycle
-    appendLog('INFO', `Auto Bouffe: cycle terminé — prochain dans ${Math.round(intervalMs / 1000)}s.`);
-    if (!(await _abfWait(intervalMs))) return;
+    // 5. Free the model's VRAM until shortly before the next scan — Auto
+    //    Bouffe's interval is typically hours, no reason to hold ~2-3 Go of
+    //    VRAM reserved (and briefly competing with the game's own GPU use)
+    //    the whole time between scans.
+    await _abfVlmUnload();
+    const leadMs = Math.min(_ABF_VLM_WARMUP_LEAD_MS, intervalMs);
+    appendLog('INFO', `Auto Bouffe: cycle terminé — prochain dans ${Math.round(intervalMs / 1000)}s ` +
+      `(IA relancée ${Math.round(leadMs / 1000)}s avant).`);
+    if (!(await _abfWait(intervalMs - leadMs))) return;
+    await _abfVlmWarmup();
+    if (!(await _abfWait(leadMs))) return;
   }
 }
 

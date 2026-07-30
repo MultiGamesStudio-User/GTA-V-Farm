@@ -443,6 +443,31 @@ def _cmd_vlm_ask(cmd, rid):
             _reply(rid, False, error=str(e))
     threading.Thread(target=_run, daemon=True, name='vlm-ask').start()
 
+def _cmd_vlm_warmup(cmd, rid):
+    """Load the vision model without asking anything — Auto Bouffe calls this
+    ~10s before a scheduled scan (its interval is typically hours) instead of
+    keeping the model (and its VRAM) resident the whole time. Background
+    thread for the same reason as vlm_ask."""
+    def _run():
+        try:
+            from modules.engine.vlm_engine import warmup
+            on_log = lambda msg, lvl: _send({'type': 'log', 'level': lvl, 'msg': msg})
+            warmup(on_log=on_log)
+            _reply(rid, True)
+        except Exception as e:
+            _reply(rid, False, error=str(e))
+    threading.Thread(target=_run, daemon=True, name='vlm-warmup').start()
+
+def _cmd_vlm_unload(cmd, rid):
+    """Free the vision model's VRAM between Auto Bouffe cycles."""
+    try:
+        from modules.engine.vlm_engine import unload
+        on_log = lambda msg, lvl: _send({'type': 'log', 'level': lvl, 'msg': msg})
+        unload(on_log=on_log)
+        _reply(rid, True)
+    except Exception as e:
+        _reply(rid, False, error=str(e))
+
 def _cmd_test_condition(cmd, rid):
     from modules.engine.conditions import eval_condition
     _reply(rid, True, result=eval_condition(cmd))
@@ -942,6 +967,8 @@ _DISPATCH = {
     'pick_start':           _cmd_pick_start,
     'pick_cancel':          _cmd_pick_cancel,
     'vlm_ask':              _cmd_vlm_ask,
+    'vlm_warmup':           _cmd_vlm_warmup,
+    'vlm_unload':           _cmd_vlm_unload,
 
     # ── Conditions & actions ──────────────────────────────────────────────────
     'test_condition':       _cmd_test_condition,
