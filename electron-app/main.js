@@ -365,14 +365,19 @@ function _hasNvidiaGpu() {
 function _runChildStreaming(exe, args, onLine, opts) {
   return new Promise((resolve, reject) => {
     const proc = spawn(exe, args, { windowsHide: true, ...opts });
+    let lastLine = '';
     const relay = d => {
       const text = d.toString().trim();
-      if (text) onLine(text.slice(-200)); // last line usually carries the useful bit (e.g. pip's progress %)
+      if (text) {
+        lastLine = text.slice(-300);
+        onLine(text.slice(-200)); // last line usually carries the useful bit (e.g. pip's progress %)
+      }
     };
     proc.stdout.on('data', relay);
     proc.stderr.on('data', relay);
     proc.on('error', reject);
-    proc.on('close', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
+    proc.on('close', code => code === 0 ? resolve()
+      : reject(new Error(`exit ${code}${lastLine ? ' — ' + lastLine : ''}`)));
   });
 }
 
@@ -400,21 +405,24 @@ async function ensureAiDeps() {
   if (_aiDepsInstalled()) return;
   const send = (message) => mainWindow?.webContents.send('setup:progress', { message });
 
-  // Cheap import check first: the marker file is only missing the very
-  // first time this ran, but a dev machine (or a rebuilt python-embed that
-  // already had these packages some other way) can already have everything
-  // — running pip again anyway would race actual Auto Bouffe usage against
-  // a concurrent reinstall of the exact modules it just imported, which can
-  // corrupt in-flight inference (observed: a stray pip/huggingface_hub
-  // console line ending up as a "model answer").
-  if (_aiDepsAlreadyImportable()) {
-    try { fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8'); } catch (_) {}
-    writeLog('INFO', 'IA locale Auto Bouffe: dépendances déjà présentes, rien à installer.');
-    return;
-  }
-
+  // Set BEFORE the (async) import check below, not just around the actual
+  // pip install — Auto Bouffe can fire a vlm_ask within the first instant
+  // of app start (e.g. resuming a loop left running), which raced ahead of
+  // this flag when it was only set right before the install steps.
   _aiDepsInstalling = true;
   try {
+    // Cheap import check first: the marker file is only missing the very
+    // first time this ran, but a dev machine (or a rebuilt python-embed
+    // that already had these packages some other way) can already have
+    // everything — running pip again anyway would race actual Auto Bouffe
+    // usage against a concurrent reinstall of the exact modules it just
+    // imported, which can corrupt in-flight inference (observed: a stray
+    // pip/huggingface_hub console line ending up as a "model answer").
+    if (_aiDepsAlreadyImportable()) {
+      try { fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8'); } catch (_) {}
+      writeLog('INFO', 'IA locale Auto Bouffe: dépendances déjà présentes, rien à installer.');
+      return;
+    }
     send('IA locale Auto Bouffe : vérification GPU…');
     const hasGpu = _hasNvidiaGpu();
 
