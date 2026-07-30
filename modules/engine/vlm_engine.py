@@ -44,6 +44,12 @@ def _load(on_log=None):
             on_log('IA locale (moondream2): chargement — le premier lancement peut '
                    'télécharger plusieurs Go et prendre quelques minutes.', 'INFO')
         import torch
+        import transformers
+        # moondream2's custom modeling code triggers a benign transformers
+        # deprecation notice (GenerationMixin/PreTrainedModel split) on every
+        # load — harmless, but shows up as an alarming ERROR/PYERR line in
+        # the app's logs since it's emitted via the library's logger.
+        transformers.logging.set_verbosity_error()
         from transformers import AutoModelForCausalLM, AutoTokenizer
         use_cuda = torch.cuda.is_available()
         device = torch.device('cuda') if use_cuda else torch.device('cpu')
