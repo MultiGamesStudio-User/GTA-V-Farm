@@ -4,7 +4,7 @@
 
 ### Windows 10/11 (64-bit)
 
-1. **Download** `MacroEngine-Setup.exe` from [Releases](https://github.com/MultiGamesStudio-User/GTA-V-Farm/releases)
+1. **Download** `MacroEngine-Setup.exe` from [Releases](https://github.com/Multigames-Studio-fr/GTA-V-Farm/releases)
 2. **Run** the installer
 3. **Follow** the setup wizard
 4. **Launch** from Start Menu → "MacroEngine"
@@ -29,7 +29,7 @@ Requires: Node.js 16+, Python 3.11+
 
 ```bash
 # Clone
-git clone https://github.com/MultiGamesStudio-User/GTA-V-Farm.git
+git clone https://github.com/Multigames-Studio-fr/GTA-V-Farm.git
 cd "GTA V FARM"
 
 # Install dependencies
@@ -66,8 +66,8 @@ Built files are in `electron-app/dist/`.
 1. Open MacroEngine
 2. Read the **Quick Start** in-app guide
 3. Create your first macro!
-4. Check [FAQ](https://github.com/MultiGamesStudio-User/GTA-V-Farm/discussions) for common questions
+4. Check [FAQ](https://github.com/Multigames-Studio-fr/GTA-V-Farm/discussions) for common questions
 
 ---
 
-**Need help?** Open an [Issue](https://github.com/MultiGamesStudio-User/GTA-V-Farm/issues) or [Discussion](https://github.com/MultiGamesStudio-User/GTA-V-Farm/discussions)
+**Need help?** Open an [Issue](https://github.com/Multigames-Studio-fr/GTA-V-Farm/issues) or [Discussion](https://github.com/Multigames-Studio-fr/GTA-V-Farm/discussions)

@@ -166,4 +166,4 @@ GTA V FARM/
 
 ---
 
-**Questions?** Check [DEVELOPMENT.md](./DEVELOPMENT.md) or open an [Issue](https://github.com/MultiGamesStudio-User/GTA-V-Farm/issues)!
+**Questions?** Check [DEVELOPMENT.md](./DEVELOPMENT.md) or open an [Issue](https://github.com/Multigames-Studio-fr/GTA-V-Farm/issues)!

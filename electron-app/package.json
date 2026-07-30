@@ -96,8 +96,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "Multigames-studio",
-      "repo": "GTA-V-FARM",
+      "owner": "Multigames-Studio-fr",
+      "repo": "GTA-V-Farm",
       "releaseType": "release"
     }
   },

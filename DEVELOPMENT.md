@@ -10,7 +10,7 @@
 ### Clone & Install
 
 ```bash
-git clone https://github.com/MultiGamesStudio-User/GTA-V-Farm.git
+git clone https://github.com/Multigames-Studio-fr/GTA-V-Farm.git
 cd "GTA V FARM"
 cd electron-app
 npm install
@@ -208,4 +208,4 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ---
 
-**Questions?** Open an [Issue](https://github.com/MultiGamesStudio-User/GTA-V-Farm/issues) or [Discussion](https://github.com/MultiGamesStudio-User/GTA-V-Farm/discussions)!
+**Questions?** Open an [Issue](https://github.com/Multigames-Studio-fr/GTA-V-Farm/issues) or [Discussion](https://github.com/Multigames-Studio-fr/GTA-V-Farm/discussions)!

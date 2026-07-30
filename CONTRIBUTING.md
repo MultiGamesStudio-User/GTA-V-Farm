@@ -5,7 +5,7 @@ First off, thanks for your interest in contributing! 🎉
 ## How to Contribute
 
 ### 1. Report Bugs
-- Check [Issues](https://github.com/MultiGamesStudio-User/GTA-V-Farm/issues) first (don't create duplicates)
+- Check [Issues](https://github.com/Multigames-Studio-fr/GTA-V-Farm/issues) first (don't create duplicates)
 - Provide:
   - Clear description
   - Steps to reproduce
@@ -13,7 +13,7 @@ First off, thanks for your interest in contributing! 🎉
   - Screenshots/logs if relevant
 
 ### 2. Suggest Features
-- Open a [Discussion](https://github.com/MultiGamesStudio-User/GTA-V-Farm/discussions)
+- Open a [Discussion](https://github.com/Multigames-Studio-fr/GTA-V-Farm/discussions)
 - Explain the use case
 - Discuss before implementing
 
@@ -21,7 +21,7 @@ First off, thanks for your interest in contributing! 🎉
 
 #### Setup
 ```bash
-git clone https://github.com/MultiGamesStudio-User/GTA-V-Farm.git
+git clone https://github.com/Multigames-Studio-fr/GTA-V-Farm.git
 cd "GTA V FARM"
 npm install
 npm run dev
@@ -42,4 +42,4 @@ npm run dev          # Test locally
 
 ---
 
-**Questions?** Open a [Discussion](https://github.com/MultiGamesStudio-User/GTA-V-Farm/discussions) or [Issue](https://github.com/MultiGamesStudio-User/GTA-V-Farm/issues)!
+**Questions?** Open a [Discussion](https://github.com/Multigames-Studio-fr/GTA-V-Farm/discussions) or [Issue](https://github.com/Multigames-Studio-fr/GTA-V-Farm/issues)!
