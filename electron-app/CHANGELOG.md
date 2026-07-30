@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.5.1] – 2026-07-30
+
+### Fixed
+- Suppression du warning `GenerationMixin` inoffensif de `transformers`, affiché à tort en ERROR à chaque chargement du modèle IA
+- Race condition : l'installation des dépendances IA au premier lancement pouvait tourner en même temps qu'une utilisation réelle d'Auto Bouffe et corrompre une réponse en cours (texte de pip mélangé à la réponse du modèle) — skip l'install si déjà présente, et bloque les appels IA tant qu'une installation réelle est en cours
+
+---
+
+
+
 ## [2.5.0] – 2026-07-30
 
 ### Added
