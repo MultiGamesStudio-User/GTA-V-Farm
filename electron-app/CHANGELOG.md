@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.5.3] – 2026-08-01
+
+### Fixed
+- 🐛 Version portable : le patch de cache persistant NSIS (extraction unique par version au lieu de réextraction/suppression à chaque lancement) n'était jamais appliqué au build — `build-portable`/`build`/`release` n'appelaient pas `patch-portable-nsis.js` avant `electron-builder`. Corrigé et validé (build réel + 2 lancements successifs : 371ms au 2e lancement, aucune réextraction).
+- 🐛 Dépendances IA Auto Bouffe (torch/transformers/modèle) et OCR (easyocr/winrt) réinstallées intégralement à chaque mise à jour de version ou réinstallation, car pip-installées à l'intérieur de `python-embed/` (recréé à chaque install/portable). Déplacées vers `%APPDATA%\MacroEngine\ai-deps` (`pip install --target`, indépendant du dossier d'installation) — installées une fois, survivent à toute réinstallation/mise à jour.
+
+### Changed
+- 📝 Commentaires explicatifs du système Auto Bouffe/OCR (`main.js`) déplacés en messages `writeLog` (visibles dans `app.log`) plutôt qu'en commentaires source figés.
+
+---
+
+
+
 ## [2.5.2] – 2026-07-30
 
 ### Added

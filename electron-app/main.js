@@ -63,6 +63,12 @@ const USERDATA_DIR  = app.getPath('userData');
 const MACROS_PATH   = path.join(USERDATA_DIR, 'macros.json');
 const LICENSE_PATH  = path.join(USERDATA_DIR, 'license.json');
 const SETTINGS_PATH = path.join(USERDATA_DIR, 'settings.json');
+// Cible pip stable, hors de python-embed/ (qui, lui, est recree a chaque
+// install/mise a jour/reextraction portable) — torch/transformers/easyocr
+// installes ici survivent aux reinstalls, seul le marker + `pip install
+// --target` change, plus jamais de re-telechargement une fois fait une fois.
+const AI_DEPS_DIR   = path.join(USERDATA_DIR, 'ai-deps');
+try { fs.mkdirSync(AI_DEPS_DIR, { recursive: true }); } catch (_) {}
 
 // ── Résolution du chemin Python ───────────────────────────────────────────────
 function resolvePython() {
@@ -339,14 +345,8 @@ function ensureUserFiles() {
 }
 
 // ── Auto Bouffe IA — first-launch dependency install ──────────────────────────
-// torch/transformers (+ the moondream2 model weights) are never bundled in the
-// installer/portable build (multi-GB, and most users never touch this
-// feature) — instead they're fetched once, here, on the first real launch,
-// with progress surfaced through the existing "deps-banner" setup UI so the
-// user isn't left staring at a frozen app. Runs in the background alongside
-// normal startup (engine + macros already work while this downloads).
 function _aiDepsMarkerPath() {
-  return path.join(path.dirname(PYTHON_EXE), '.ai_deps_installed');
+  return path.join(AI_DEPS_DIR, '.ai_deps_installed');
 }
 
 function _aiDepsInstalled() {
@@ -383,7 +383,7 @@ function _runChildStreaming(exe, args, onLine, opts) {
 
 function _aiDepsAlreadyImportable() {
   try {
-    execSync(`"${PYTHON_EXE}" -c "import torch, torchvision, transformers, einops"`,
+    execSync(`"${PYTHON_EXE}" -c "import sys; sys.path.insert(0, r'${AI_DEPS_DIR}'); import torch, torchvision, transformers, einops"`,
       { stdio: 'ignore', windowsHide: true, timeout: 30000 });
     return true;
   } catch (_) {
@@ -391,26 +391,18 @@ function _aiDepsAlreadyImportable() {
   }
 }
 
-// True while pip is actively installing/upgrading torch/transformers into
-// python-embed — vlm_ask/vlm_warmup/vlm_unload refuse to run meanwhile
-// instead of racing main.py's own `import torch` against pip rewriting the
-// exact same files (this is what caused a stray pip/huggingface_hub console
-// line to come back as if it were a model answer).
 let _aiDepsInstalling = false;
 
-// One full attempt: GPU detect, torch (+ CPU fallback), transformers/einops,
-// model download, marker write. Pip re-running an already-satisfied package
-// is fast, so simply redoing every step on retry (rather than trying to
-// resume from whichever one failed) is simplest and safe.
 async function _installAiDepsOnce(send) {
+  writeLog('INFO', "IA locale Auto Bouffe: tentative d'installation complète (détection GPU, torch + repli CPU, transformers/einops, téléchargement modèle, écriture marker). Pip re-tourner sur un paquet déjà satisfait étant rapide, chaque tentative refait tout depuis le début plutôt que de reprendre à l'étape échouée — plus simple et sûr.");
   send('IA locale Auto Bouffe : vérification GPU…');
   const hasGpu = _hasNvidiaGpu();
 
   send(hasGpu ? 'GPU NVIDIA détecté — installation de torch (GPU)…'
               : 'Pas de GPU NVIDIA détecté — installation de torch (CPU)…');
-  const gpuArgs = ['-m', 'pip', 'install', 'torch', 'torchvision',
+  const gpuArgs = ['-m', 'pip', 'install', '--target', AI_DEPS_DIR, 'torch', 'torchvision',
                    '--index-url', 'https://download.pytorch.org/whl/cu126'];
-  const cpuArgs = ['-m', 'pip', 'install', 'torch', 'torchvision'];
+  const cpuArgs = ['-m', 'pip', 'install', '--target', AI_DEPS_DIR, 'torch', 'torchvision'];
   try {
     await _runChildStreaming(PYTHON_EXE, hasGpu ? gpuArgs : cpuArgs, send, { cwd: path.dirname(PYTHON_EXE) });
   } catch (e) {
@@ -422,16 +414,15 @@ async function _installAiDepsOnce(send) {
   send('Installation de transformers/einops…');
   await _runChildStreaming(
     PYTHON_EXE,
-    ['-m', 'pip', 'install', 'transformers>=4.46.0,<4.50.0', 'einops', 'safetensors'],
+    ['-m', 'pip', 'install', '--target', AI_DEPS_DIR, 'transformers>=4.46.0,<4.50.0', 'einops', 'safetensors'],
     send, { cwd: path.dirname(PYTHON_EXE) }
   );
 
   send('Téléchargement du modèle IA (moondream2, ~2 Go) — peut prendre plusieurs minutes…');
-  // -c mode doesn't add the cwd to sys.path on this embeddable Python (its
-  // ._pth file overrides the default search path), so the `modules`
-  // package needs an explicit insert here — same reason main.py does it.
+  writeLog('INFO', "IA locale Auto Bouffe: le mode -c n'ajoute pas le cwd au sys.path sur ce Python embarqué (son fichier ._pth écrase le chemin de recherche par défaut), donc le package `modules` et AI_DEPS_DIR ont besoin d'un insert explicite ici — même raison que main.py le fait.");
   const loadModelCode =
     "import sys; sys.stdout.reconfigure(encoding='utf-8'); " +
+    `sys.path.insert(0, r'${AI_DEPS_DIR}'); ` +
     `sys.path.insert(0, r'${BOT_DIR}'); ` +
     'from modules.engine.vlm_engine import _load; _load(lambda m,l: print(m, flush=True))';
   await _runChildStreaming(PYTHON_EXE, ['-c', loadModelCode], send, { cwd: BOT_DIR });
@@ -439,37 +430,91 @@ async function _installAiDepsOnce(send) {
   fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8');
 }
 
+// ── OCR — first-launch dependency install (EasyOCR + WinRT) ───────────────────
+function _ocrDepsMarkerPath() {
+  return path.join(AI_DEPS_DIR, '.ocr_deps_installed');
+}
+
+function _ocrDepsInstalled() {
+  try { return fs.existsSync(_ocrDepsMarkerPath()); } catch (_) { return false; }
+}
+
+function _ocrDepsAlreadyImportable() {
+  try {
+    execSync(`"${PYTHON_EXE}" -c "import sys; sys.path.insert(0, r'${AI_DEPS_DIR}'); import easyocr, winsdk.windows.media.ocr"`,
+      { stdio: 'ignore', windowsHide: true, timeout: 30000 });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+const _OCR_DEPS_MAX_ATTEMPTS = 3;
+const _OCR_DEPS_RETRY_DELAY_MS = 5000;
+
+async function _installOcrDepsOnce(send) {
+  send('OCR : installation d\'EasyOCR + WinRT…');
+  await _runChildStreaming(
+    PYTHON_EXE,
+    ['-m', 'pip', 'install', '--target', AI_DEPS_DIR, 'easyocr', 'winsdk'],
+    send, { cwd: path.dirname(PYTHON_EXE) }
+  );
+  fs.writeFileSync(_ocrDepsMarkerPath(), new Date().toISOString(), 'utf-8');
+}
+
+async function ensureOcrDeps() {
+  writeLog('INFO', "OCR: EasyOCR/WinRT non embarqués dans python-embed (dépendances lourdes, entraînent leur propre torch/opencv/scipy) — installation en tâche de fond au premier lancement, chaînée après ensureAiDeps pour ne jamais faire tourner deux pip install en parallèle sur le même site-packages. Sans ça, ocr_engine.py retombe silencieusement sur Tesseract.");
+  if (!PYTHON_EXE || !PYTHON_EXE.toLowerCase().includes('python-embed')) return;
+  if (_ocrDepsInstalled()) return;
+  const send = (message) => mainWindow?.webContents.send('setup:progress', { message });
+
+  try {
+    if (_ocrDepsAlreadyImportable()) {
+      try { fs.writeFileSync(_ocrDepsMarkerPath(), new Date().toISOString(), 'utf-8'); } catch (_) {}
+      writeLog('INFO', 'OCR: EasyOCR/WinRT déjà présents, rien à installer.');
+      return;
+    }
+
+    for (let attempt = 1; attempt <= _OCR_DEPS_MAX_ATTEMPTS; attempt++) {
+      try {
+        await _installOcrDepsOnce(send);
+        writeLog('INFO', 'OCR: EasyOCR/WinRT installés.');
+        return;
+      } catch (e) {
+        writeLog('WARNING', `OCR: tentative ${attempt}/${_OCR_DEPS_MAX_ATTEMPTS} échouée —`, e.message);
+        if (attempt === _OCR_DEPS_MAX_ATTEMPTS) throw e;
+        send(`Échec (${e.message}) — nouvel essai dans ${_OCR_DEPS_RETRY_DELAY_MS / 1000}s…`);
+        await new Promise(r => setTimeout(r, _OCR_DEPS_RETRY_DELAY_MS));
+      }
+    }
+  } catch (e) {
+    writeLog('ERROR', 'OCR: installation EasyOCR/WinRT échouée après plusieurs tentatives —', e.message);
+    // Non-fatal — ocr_engine.py falls back to native WinRT / Tesseract on its own.
+  }
+}
+
 const _AI_DEPS_MAX_ATTEMPTS = 3;
 const _AI_DEPS_RETRY_DELAY_MS = 5000;
 
 async function ensureAiDeps() {
+  writeLog('INFO', "IA locale Auto Bouffe: torch/transformers/modèle moondream2 (~2-4 Go) non embarqués dans l'installeur/portable (trop lourd, feature peu utilisée) — récupérés une fois ici au premier lancement réel, progression affichée via le setup-banner, en tâche de fond (moteur + macros restent utilisables pendant le téléchargement).");
   // Only ever touch the app's own bundled python-embed — never an arbitrary
   // system Python a developer or advanced user might have configured.
   if (!PYTHON_EXE || !PYTHON_EXE.toLowerCase().includes('python-embed')) return;
   if (_aiDepsInstalled()) return;
   const send = (message) => mainWindow?.webContents.send('setup:progress', { message });
 
-  // Set BEFORE the (async) import check below, not just around the actual
-  // pip install — Auto Bouffe can fire a vlm_ask within the first instant
-  // of app start (e.g. resuming a loop left running), which raced ahead of
-  // this flag when it was only set right before the install steps.
+  writeLog('INFO', "IA locale Auto Bouffe: _aiDepsInstalling passe à true dès maintenant (avant même le check d'import), pas seulement autour du pip install — sinon un vlm_ask tiré dans le tout premier instant du démarrage (ex: boucle reprise en cours) court-circuite ce flag et court-circuiterait un pip qui réécrit torch/transformers pendant que main.py les importe (déjà observé: une ligne pip/huggingface_hub prise pour une réponse du modèle).");
   _aiDepsInstalling = true;
   try {
-    // Cheap import check first: the marker file is only missing the very
-    // first time this ran, but a dev machine (or a rebuilt python-embed
-    // that already had these packages some other way) can already have
-    // everything — running pip again anyway would race actual Auto Bouffe
-    // usage against a concurrent reinstall of the exact modules it just
-    // imported, which can corrupt in-flight inference (observed: a stray
-    // pip/huggingface_hub console line ending up as a "model answer").
+    writeLog('INFO', "IA locale Auto Bouffe: check d'import rapide d'abord — le marker manque seulement au tout premier lancement, mais une machine de dev (ou un python-embed reconstruit qui les avait déjà autrement) peut déjà tout avoir ; relancer pip quand même ferait courir un vrai usage Auto Bouffe contre une réinstallation concurrente des modules qu'il vient d'importer, ce qui peut corrompre une inférence en cours (déjà observé: une ligne pip/huggingface_hub prise pour une réponse du modèle).");
     if (_aiDepsAlreadyImportable()) {
       try { fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8'); } catch (_) {}
       writeLog('INFO', 'IA locale Auto Bouffe: dépendances déjà présentes, rien à installer.');
       return;
     }
 
-    // Self-heal transient failures (network blip, HF rate-limit, etc.)
-    // within this same launch instead of making the user restart the app.
+    writeLog('INFO', `IA locale Auto Bouffe: auto-guérison des échecs transitoires (coupure réseau, rate-limit HF, etc.) — ${_AI_DEPS_MAX_ATTEMPTS} tentatives dans ce même lancement plutôt que forcer l'utilisateur à redémarrer l'appli.`);
     for (let attempt = 1; attempt <= _AI_DEPS_MAX_ATTEMPTS; attempt++) {
       try {
         await _installAiDepsOnce(send);
@@ -511,7 +556,10 @@ app.whenReady().then(() => {
     mainWindow?.webContents.send('setup:done');
     startEngine(); // pré-démarre Python dès que l'UI est prête
     _pushLicenseKeyToEngine();
-    ensureAiDeps(); // en arrière-plan — n'attend pas, l'app est utilisable pendant ce temps
+    // en arrière-plan — n'attend pas, l'app est utilisable pendant ce temps.
+    // Chaîné (pas en parallèle) pour ne jamais faire tourner deux pip install
+    // en même temps sur le même site-packages.
+    ensureAiDeps().then(() => ensureOcrDeps());
 
     // ── Vérification automatique des mises à jour ──────────────
     // IS_PACKED only: en dev, RENDERER_DIR pointe sur le dossier source réel —
@@ -543,7 +591,7 @@ function startEngine() {
   engineProc = spawn(PYTHON_EXE, ['-u', MAIN_PY], {
     cwd:         ROOT_DIR,
     windowsHide: true,
-    env:         { ...process.env, PYTHONUNBUFFERED: '1' },
+    env:         { ...process.env, PYTHONUNBUFFERED: '1', MACROENGINE_AI_DEPS_DIR: AI_DEPS_DIR },
   });
 
   // Line-by-line stdout reader

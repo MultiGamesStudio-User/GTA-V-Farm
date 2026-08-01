@@ -1,6 +1,6 @@
 {
   "name": "macro-engine",
-  "version": "2.5.2",
+  "version": "2.5.3",
   "description": "MacroEngine — Système d'automatisation par macros",
   "main": "main.js",
   "scripts": {
@@ -8,10 +8,10 @@
     "dev": "electron . --inspect",
     "check-icons": "node scripts/generate-icons.js",
     "prepare-python": "node scripts/prepare-python.js",
-    "build": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win --publish=never",
+    "build": "npm run check-icons && npm run prepare-python && node scripts/patch-portable-nsis.js && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win --publish=never",
     "build-nsis": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win nsis --publish=never",
-    "build-portable": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win portable --publish=never",
-    "release": "npm run check-icons && npm run prepare-python && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win --publish=always",
+    "build-portable": "npm run check-icons && npm run prepare-python && node scripts/patch-portable-nsis.js && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win portable --publish=never",
+    "release": "npm run check-icons && npm run prepare-python && node scripts/patch-portable-nsis.js && set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win --publish=always",
     "release-prepare": "node scripts/release.js",
     "generate-manifest": "node scripts/generate-manifest.js"
   },

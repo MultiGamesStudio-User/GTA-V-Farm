@@ -81,7 +81,7 @@ cd electron-app && npm run build-portable
 
 Build output goes to `electron-app/dist/`. There is no lint script and no project-level automated test suite (Python or JS) — `.github/workflows/test-build.yml` runs `npm run build-portable` on PRs as a build-success smoke test, not a unit test gate.
 
-**Known dependency gap:** `ocr_engine.py`'s EasyOCR and WinRT backends are used at runtime but `easyocr` and `winsdk`/`winrt` are not listed in `requirements.txt` (only `pytesseract` is) — install them manually if working on OCR.
+**EasyOCR / WinRT are not in `requirements.txt`:** deliberately excluded from the build-time bundle (like torch/transformers below) — `easyocr` and `winsdk` are pip-installed automatically, in the background, on first real launch by `ensureOcrDeps()` in `electron-app/main.js` (same pattern as `ensureAiDeps()`, chained after it so the two pip installs never race). If running `main.py` directly outside Electron (e.g. `python -m pdb main.py`), install them manually — `ocr_engine.py` otherwise silently falls back to Tesseract.
 
 ## Release Process
 

@@ -22,6 +22,14 @@ sys.stderr.reconfigure(encoding='utf-8')
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
+# torch/transformers/easyocr/winsdk sont pip-installes a part (Auto Bouffe,
+# voir electron-app/main.js) dans un dossier stable hors de python-embed/ pour
+# survivre aux reinstalls/mises a jour — pas sur le sys.path par defaut de ce
+# Python embarque, d'ou l'insert explicite ici.
+_ai_deps_dir = os.environ.get('MACROENGINE_AI_DEPS_DIR')
+if _ai_deps_dir and os.path.isdir(_ai_deps_dir):
+    sys.path.insert(0, _ai_deps_dir)
+
 # ── RAM monitor ───────────────────────────────────────────────────────────────
 _max_ram_mb: float = 0.0   # 0 = illimité
 

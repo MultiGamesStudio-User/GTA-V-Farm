@@ -52,5 +52,29 @@ complet nécessite de supprimer ce dossier manuellement.
 
 ## Statut
 
-Test exploratoire ("dans un premier temps") — à valider en conditions réelles avant
-de le considérer comme le comportement définitif du build portable.
+Implémenté mais jamais câblé : `package.json`'s `build-portable`/`build`/`release`
+scripts n'appelaient pas `patch-portable-nsis.js` avant `electron-builder` — le
+build portable utilisait donc toujours le template stock (re-extraction +
+suppression à chaque lancement), rendant `.ai_deps_installed`/`.ocr_deps_installed`
+(voir `electron-app/main.js`) inutiles en pratique : re-téléchargement complet
+(torch/transformers/modèle IA, easyocr/winrt) à *chaque* lancement du portable,
+pas seulement au premier. Corrigé (2026-07-31) : les trois scripts appellent
+maintenant `node scripts/patch-portable-nsis.js` avant `electron-builder`.
+Validé (2026-08-01) avec un vrai `npm run build-portable` + deux lancements
+successifs : le 2e lancement ne réextrait rien (371ms vs plusieurs secondes,
+mtimes identiques).
+
+Restait un trou : une *nouvelle version* du portable (ou une réinstallation)
+déclenche quand même `RMDir /r` + réextraction complète de `$INSTDIR`, ce qui
+aurait effacé `.ai_deps_installed`/`.ocr_deps_installed` et les paquets
+pip-installés puisqu'ils vivaient dans `python-embed/` (à l'intérieur du cache
+réextrait). Corrigé (2026-08-01) : torch/transformers/modèle IA et
+easyocr/winrt sont maintenant installés via `pip install --target` dans
+`%APPDATA%\MacroEngine\ai-deps` (calculé depuis `app.getPath('userData')`,
+donc indépendant de `python-embed/`, du dossier d'installation NSIS et du
+cache portable `%LOCALAPPDATA%\MacroEngine\runtime`) — survit à une
+réinstallation, une mise à jour de version, ou un changement d'installeur ↔
+portable. `main.py` lit le chemin via la variable d'env
+`MACROENGINE_AI_DEPS_DIR` (injectée par `startEngine()`) et l'insère dans
+`sys.path`, nécessaire car le fichier `._pth` du Python embarqué ignore
+`PYTHONPATH`.
