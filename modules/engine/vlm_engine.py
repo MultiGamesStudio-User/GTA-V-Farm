@@ -70,11 +70,24 @@ def _load(on_log=None):
             gpu_name = torch.cuda.get_device_name(0) if use_cuda else None
             on_log(f'IA locale (moondream2): GPU détecté ({gpu_name}), inférence accélérée.'
                    if use_cuda else 'IA locale (moondream2): pas de GPU CUDA, inférence CPU.', 'INFO')
-        tokenizer = AutoTokenizer.from_pretrained(_MODEL_ID, revision=_MODEL_REVISION)
-        model = AutoModelForCausalLM.from_pretrained(
-            _MODEL_ID, revision=_MODEL_REVISION, trust_remote_code=True,
-            torch_dtype=dtype,
-        ).to(device)
+        # La revision est figee (un commit precis, jamais "main") donc les
+        # fichiers en cache ne peuvent pas etre perimes — tente d'abord en
+        # mode 100% local (aucun HEAD vers huggingface.co, gain de plusieurs
+        # secondes), ne retombe en ligne que si le cache est incomplet
+        # (tout premier telechargement).
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(
+                _MODEL_ID, revision=_MODEL_REVISION, local_files_only=True)
+            model = AutoModelForCausalLM.from_pretrained(
+                _MODEL_ID, revision=_MODEL_REVISION, trust_remote_code=True,
+                torch_dtype=dtype, local_files_only=True,
+            ).to(device)
+        except Exception:
+            tokenizer = AutoTokenizer.from_pretrained(_MODEL_ID, revision=_MODEL_REVISION)
+            model = AutoModelForCausalLM.from_pretrained(
+                _MODEL_ID, revision=_MODEL_REVISION, trust_remote_code=True,
+                torch_dtype=dtype,
+            ).to(device)
         model.eval()
         _tokenizer = tokenizer
         _model = model

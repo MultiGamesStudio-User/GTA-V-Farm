@@ -568,16 +568,13 @@ app.whenReady().then(() => {
     // en arrière-plan — n'attend pas, l'app est utilisable pendant ce temps.
     // Chaîné (pas en parallèle) pour ne jamais faire tourner deux pip install
     // en même temps sur le même site-packages.
-    ensureAiDeps().then(() => {
-      ensureOcrDeps();
-      // Précharge le modèle IA (moondream2) dès l'ouverture du logiciel au
-      // lieu d'attendre le premier vlm_ask (souvent en plein milieu du tout
-      // premier cycle Auto Bouffe) — le temps de chargement (~10s) est ainsi
-      // absorbé pendant que l'utilisateur navigue dans l'UI. Fire-and-forget :
-      // long timeout pour laisser le temps au chargement à froid, erreur
-      // ignorée (non-fatal, se rechargera de toute façon au premier usage réel).
-      engineCmd({ cmd: 'vlm_warmup' }, 300000).catch(() => {});
-    });
+    ensureAiDeps().then(() => ensureOcrDeps());
+    // NB: le préchargement auto du modèle IA (vlm_warmup) au démarrage a été
+    // retiré — il a fait planter tout le moteur Python (access violation,
+    // code 3221225477) sur un warning PyTorch bénin (quantized RNN de
+    // moondream2), transformant un crash potentiel rare en crash systématique
+    // à chaque lancement de l'app. Le modèle reste chargé en lazy (premier
+    // vlm_ask réel), comme avant.
 
     // ── Vérification automatique des mises à jour ──────────────
     // IS_PACKED only: en dev, RENDERER_DIR pointe sur le dossier source réel —

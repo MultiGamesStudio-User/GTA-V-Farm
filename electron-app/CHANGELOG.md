@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.5] – 2026-08-01
+
+### Fixed
+- 🐛 **Régression critique v2.5.4** : le préchargement auto du modèle IA (moondream2) dès l'ouverture du logiciel faisait planter tout le moteur Python (access violation) sur un warning PyTorch bénin lié à une couche RNN quantifiée — plus aucun bouton (macros, stop, etc.) ne répondait après le crash. Le modèle IA revient au chargement lazy (premier `vlm_ask` réel), comme avant v2.5.4.
+
+---
+
+
+
 ## [2.5.4] – 2026-08-01
 
 ### Fixed
