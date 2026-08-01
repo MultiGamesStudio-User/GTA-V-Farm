@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.5.4] – 2026-08-01
+
+### Fixed
+- 🐛 Dossier userData divergent : `ocr_engine.py` (modèles EasyOCR, debug OCR) et `main.py` (templates Auto Bouffe capturés) devinaient chacun leur propre chemin `%APPDATA%\MacroEngine` au lieu d'utiliser le vrai dossier Electron (`%APPDATA%\macro-engine`) — deux dossiers séparés au lieu d'un seul. `main.js` transmet maintenant le vrai chemin via la variable d'env `MACROENGINE_USERDATA_DIR`.
+- 🐛 Warnings pip bénins (ex: "Target directory ... already exists") affichés dans la bannière de setup comme s'ils étaient une erreur — déplacés vers `app.log` uniquement.
+
+### Changed
+- ⚡ IA locale Auto Bouffe (moondream2) : `torch.inference_mode()` autour de l'inférence (pas de graphe autograd inutile), `cudnn.benchmark` + TF32 activés sur GPU Ampere+ — traitement d'image plus rapide.
+- ⚡ Le modèle IA se précharge maintenant dès l'ouverture du logiciel (au lieu d'attendre le premier `vlm_ask`, souvent en plein milieu du premier cycle Auto Bouffe) — le chargement (~10s) se fait en tâche de fond pendant que l'utilisateur navigue dans l'UI.
+
+---
+
+
+
 ## [2.5.3] – 2026-08-01
 
 ### Fixed

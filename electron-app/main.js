@@ -370,7 +370,16 @@ function _runChildStreaming(exe, args, onLine, opts) {
       const text = d.toString().trim();
       if (text) {
         lastLine = text.slice(-300);
-        onLine(text.slice(-200)); // last line usually carries the useful bit (e.g. pip's progress %)
+        // Pip WARNINGs (ex: "Target directory ... already exists. Specify
+        // --upgrade...") sont bénins — normal quand 2 installs --target
+        // partagent un paquet (ex: torch/torchvision et transformers/einops)
+        // — mais font peur affichés tels quels dans la bannière setup. Log
+        // seulement, pas dans la bannière utilisateur.
+        if (/^WARNING:/i.test(text)) {
+          writeLog('WARNING', text.slice(-300));
+        } else {
+          onLine(text.slice(-200)); // last line usually carries the useful bit (e.g. pip's progress %)
+        }
       }
     };
     proc.stdout.on('data', relay);
@@ -559,7 +568,16 @@ app.whenReady().then(() => {
     // en arrière-plan — n'attend pas, l'app est utilisable pendant ce temps.
     // Chaîné (pas en parallèle) pour ne jamais faire tourner deux pip install
     // en même temps sur le même site-packages.
-    ensureAiDeps().then(() => ensureOcrDeps());
+    ensureAiDeps().then(() => {
+      ensureOcrDeps();
+      // Précharge le modèle IA (moondream2) dès l'ouverture du logiciel au
+      // lieu d'attendre le premier vlm_ask (souvent en plein milieu du tout
+      // premier cycle Auto Bouffe) — le temps de chargement (~10s) est ainsi
+      // absorbé pendant que l'utilisateur navigue dans l'UI. Fire-and-forget :
+      // long timeout pour laisser le temps au chargement à froid, erreur
+      // ignorée (non-fatal, se rechargera de toute façon au premier usage réel).
+      engineCmd({ cmd: 'vlm_warmup' }, 300000).catch(() => {});
+    });
 
     // ── Vérification automatique des mises à jour ──────────────
     // IS_PACKED only: en dev, RENDERER_DIR pointe sur le dossier source réel —
@@ -591,7 +609,7 @@ function startEngine() {
   engineProc = spawn(PYTHON_EXE, ['-u', MAIN_PY], {
     cwd:         ROOT_DIR,
     windowsHide: true,
-    env:         { ...process.env, PYTHONUNBUFFERED: '1', MACROENGINE_AI_DEPS_DIR: AI_DEPS_DIR },
+    env:         { ...process.env, PYTHONUNBUFFERED: '1', MACROENGINE_AI_DEPS_DIR: AI_DEPS_DIR, MACROENGINE_USERDATA_DIR: USERDATA_DIR },
   });
 
   // Line-by-line stdout reader

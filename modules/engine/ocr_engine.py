@@ -25,8 +25,14 @@ logger = logging.getLogger('engine.ocr')
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-# Stockage userData (APPDATA) pour éviter les problèmes de droits
-if sys.platform == 'win32':
+# Stockage userData (APPDATA) pour éviter les problèmes de droits — même
+# dossier que l'app Electron (passé via env par main.js), pas une supposition
+# indépendante : divergeait auparavant du vrai dossier ('macro-engine' chez
+# Electron vs 'MacroEngine' ici), causant 2 dossiers différents sur disque.
+_userdata_override = os.environ.get('MACROENGINE_USERDATA_DIR')
+if _userdata_override:
+    _USERDATA = _userdata_override
+elif sys.platform == 'win32':
     _USERDATA = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'MacroEngine')
 else:
     _USERDATA = os.path.join(os.path.expanduser('~/.macroengine'))

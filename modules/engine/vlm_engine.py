@@ -54,6 +54,18 @@ def _load(on_log=None):
         use_cuda = torch.cuda.is_available()
         device = torch.device('cuda') if use_cuda else torch.device('cpu')
         dtype = torch.float16 if use_cuda else torch.float32
+        if use_cuda:
+            # La zone capturée est toujours calibrée à la même taille par
+            # l'utilisateur — cudnn peut donc chercher l'algo de convolution
+            # le plus rapide une fois et le reréutiliser à chaque appel au
+            # lieu de le red-choisir à chaque fois.
+            torch.backends.cudnn.benchmark = True
+            # TF32 : les GPU Ampere+ (ex: RTX 3080 Ti) ont des tensor cores
+            # capables de faire les matmul/conv en précision réduite pour
+            # beaucoup plus de débit — perte de précision négligeable pour
+            # une simple lecture de texte à l'écran.
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
         if on_log:
             gpu_name = torch.cuda.get_device_name(0) if use_cuda else None
             on_log(f'IA locale (moondream2): GPU détecté ({gpu_name}), inférence accélérée.'
@@ -106,8 +118,10 @@ def ask_image(pil_image, question: str, on_log=None) -> str:
         model, tokenizer = _model, _tokenizer
     if model is None:
         raise RuntimeError('vision model was unloaded before inference could run')
-    encoded = model.encode_image(pil_image)
-    return model.answer_question(encoded, question, tokenizer)
+    import torch
+    with torch.inference_mode():
+        encoded = model.encode_image(pil_image)
+        return model.answer_question(encoded, question, tokenizer)
 
 
 def ask_region(x: int, y: int, w: int, h: int, question: str, on_log=None) -> str:

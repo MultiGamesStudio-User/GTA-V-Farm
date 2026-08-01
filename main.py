@@ -30,6 +30,14 @@ _ai_deps_dir = os.environ.get('MACROENGINE_AI_DEPS_DIR')
 if _ai_deps_dir and os.path.isdir(_ai_deps_dir):
     sys.path.insert(0, _ai_deps_dir)
 
+# Meme dossier userData que l'app Electron (app.getPath('userData'), passe via
+# env par main.js) — a utiliser partout au lieu de re-deviner un chemin APPDATA
+# independant, qui divergeait auparavant (ex: ocr_engine.py et
+# _cmd_save_template calculaient chacun leur propre 'MacroEngine' en dur, alors
+# qu'Electron utilise en realite 'macro-engine' d'apres package.json).
+USERDATA_DIR = os.environ.get('MACROENGINE_USERDATA_DIR') or \
+    os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'MacroEngine')
+
 # ── RAM monitor ───────────────────────────────────────────────────────────────
 _max_ram_mb: float = 0.0   # 0 = illimité
 
@@ -383,12 +391,10 @@ def _cmd_save_template(cmd, rid):
     """Capture a region and save it as a reference PNG for template_match — used
     by features (Auto Bouffe's UI-state detection) that need a live-captured
     reference image instead of a pre-shipped one from config.py TEMPLATES."""
-    import os
     from modules.engine.screen_reader import save_region_template
-    userdata = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'MacroEngine')
     name = cmd.get('name', 'template')
     safe_name = ''.join(c for c in name if c.isalnum() or c in ('-', '_')) or 'template'
-    path = os.path.join(userdata, 'templates', 'autobouffe', f'{safe_name}.png')
+    path = os.path.join(USERDATA_DIR, 'templates', 'autobouffe', f'{safe_name}.png')
     save_region_template(cmd['x'], cmd['y'], cmd['w'], cmd['h'], path)
     _reply(rid, True, path=path)
 
