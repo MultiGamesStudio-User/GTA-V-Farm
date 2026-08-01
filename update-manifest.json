@@ -1,5 +1,5 @@
 {
-  "version": "2.5.4",
+  "version": "2.5.5",
   "date": "2026-08-01",
   "files": {
     "main.py": "e555a7f6012ac69808537954c61ac123c1c561ff61ca19fe3f9019f66ee8bae5",
@@ -14,7 +14,7 @@
     "modules/engine/recorder.py": "ed64507d3701c306026b1d7f22df22c1edd328ad14f71ae5fca163432022932f",
     "modules/engine/screen_reader.py": "2dcbc7d9a5e0abb0c04b7fb87abf3a1f4c6e15d10d8b14286a527a78f9035c15",
     "modules/engine/state.py": "b337150b545cb3975a75c4561c3ce55e98802b84ae4ad4fe639e2b7609f79987",
-    "modules/engine/vlm_engine.py": "e60d5705ee23acda973be3cec1529c1c9e35b2c1898fe8b0451fcc5132323706",
+    "modules/engine/vlm_engine.py": "97128721536c6f1c9c2e13a2310e9d81885cb85adb48069362211bdefd2f7ce0",
     "modules/engine/window_manager.py": "3446d5443b790f861a31003e09788fc210106309f93026cbed415756b4967174",
     "modules/engine/__init__.py": "7c4621ac5cf352d2e76cc8b82fa45f7925dc610d4a7873763ab007324e321962",
     "modules/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -35,6 +35,6 @@
     "electron-app/renderer/overlay.html": "f74be1051d2d85758c0ab6eab1fff75ac85ad180e0099b467d73ca8429264c28",
     "electron-app/renderer/picker.html": "69564167c04a19670b19276fe0528bd9a4febbcdc8143aa0f7046a1112192466",
     "electron-app/renderer/styles.css": "45ddbd7b9d9d175bbfec6a4fd8f7fdb75f0918e1cfee9701ca913940a03ee809",
-    "electron-app/package.json": "b55efd90abe4b3facc73b144c8f53cb2c76fe7fce223692ae13f6a39997993ae"
+    "electron-app/package.json": "1a813493c578aef5202093ca861d19b3aeea9fc256683184439b25a1a10c491a"
   }
 }
