@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.5.6] – 2026-08-03
+
+### Changed
+- ⚡ Auto Bouffe : le VLM local (moondream2, torch/transformers, 2-4 Go téléchargés au premier lancement) est remplacé par **Moondream Cloud** — une clé API gratuite (moondream.ai) à renseigner dans l'onglet Auto Bouffe, plus aucune dépendance Python lourde ni téléchargement de modèle.
+- 🧹 Bannière "dépendances en cours d'installation" retirée du haut de l'interface — les messages de setup (installation OCR EasyOCR/WinRT) vont désormais uniquement dans les logs.
+
+---
+
+
+
 ## [2.5.5] – 2026-08-01
 
 ### Fixed
