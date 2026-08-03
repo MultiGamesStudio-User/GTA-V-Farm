@@ -20,6 +20,7 @@ const _ABF_FIELDS = [
   { id: 'abf-drink-x',       type: 'int', def: 0       },
   { id: 'abf-drink-y',       type: 'int', def: 0       },
   { id: 'abf-drink-button',  type: 'str', def: 'right' },
+  { id: 'abf-moondream-key', type: 'str', def: ''      },
 ];
 let _abfZone          = null; // { x, y, w, h } — capture zone for auto mode (hunger/thirst, not yet implemented)
 
@@ -35,9 +36,9 @@ let _abfStateZoneRel   = null; // { relX, relY, relW, relH } — fractions 0..1 
 const _ABF_MAX_CLOSE_RETRIES = 3;
 const _ABF_UI_DELAY_MS       = 500; // wait for inventory open/close animation
 
-// Auto Bouffe's interval is typically hours — the model is unloaded (VRAM
-// freed) right after each cycle and reloaded this many ms before the next
-// scheduled scan, instead of sitting resident the whole idle stretch.
+// Leftover from the local-model era (moondream2 VRAM warmup/unload) — now a
+// no-op round-trip against Moondream Cloud, kept only so the call sites below
+// don't need touching. Harmless either way.
 const _ABF_VLM_WARMUP_LEAD_MS = 10000;
 
 // Fraction of the calibrated zone's width checked on each side (own title on
@@ -127,9 +128,10 @@ async function _abfClick(x, y, button) {
 
 /* ── IA-based detection (single calibration zone, no reference image) ─────
    Pixel-color/OCR/template-matching all proved too brittle for this — a
-   local vision-language model (moondream2, GPU when available else CPU)
-   instead just answers a plain-text question about the calibrated zone:
-   closed / own inventory / own + a 3rd-party panel (vehicle/crate/box). ── */
+   vision-language model hosted on Moondream Cloud instead just answers a
+   plain-text question about the calibrated zone: closed / own inventory /
+   own + a 3rd-party panel (vehicle/crate/box). Requires a free API key
+   (moondream.ai), entered in abf-moondream-key and sent with every ask. ── */
 function _abfNoTitleDetected(raw) {
   const norm = raw.trim().toLowerCase();
   return !norm || /\bnone\b/.test(norm) || norm.includes('no discernible') || norm.includes('no text');
@@ -151,7 +153,12 @@ async function _abfVlmUnload() {
 }
 
 async function _abfAskTitle(zone, debug, label) {
-  const res = await window.api.vlmAsk({ ...zone, question: _ABF_TITLE_QUESTION });
+  const apiKey = document.getElementById('abf-moondream-key')?.value.trim() || '';
+  if (!apiKey) {
+    if (debug) appendLog('WARNING', 'Auto Bouffe IA: clé API Moondream Cloud manquante — configure-la ci-dessus.');
+    return null;
+  }
+  const res = await window.api.vlmAsk({ ...zone, question: _ABF_TITLE_QUESTION, api_key: apiKey });
   if (!res?.ok) {
     if (debug) appendLog('WARNING', `Auto Bouffe IA (${label}) erreur: ` + (res?.error || 'réponse invalide'));
     return null;

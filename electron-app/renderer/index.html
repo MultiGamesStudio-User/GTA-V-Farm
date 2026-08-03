@@ -32,12 +32,6 @@
   </div>
 </div>
 
-<!-- Setup banner -->
-<div id="deps-banner" class="deps-banner deps-hidden">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-  <span id="deps-msg">Vérification des dépendances Python…</span>
-</div>
-
 <!-- Update banner -->
 <div id="update-banner" class="update-banner update-banner--hidden">
   <div class="update-banner__left">
@@ -431,7 +425,11 @@
 
         <div class="ac-section-lbl" style="margin-bottom:10px">Détection IA (état inventaire)</div>
         <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;line-height:1.5">
-          1) Détecte la fenêtre du jeu (FiveM doit être ouvert). 2) Dessine UNE petite bande serrée sur les titres de panneau (TON inventaire à gauche, l'endroit où un panneau tiers véhicule/coffre/carton apparaît à droite) — reste précis, une bande trop large fait lire n'importe quel texte (FPS, watermark) au lieu du titre. La bande est mémorisée en % de la fenêtre : si elle bouge ou change de taille, la détection suit automatiquement. Une IA locale (moondream2, GPU si dispo sinon CPU) lit le titre à chaque cycle — pas de référence à capturer. Premier lancement : téléchargement du modèle (~2 Go), peut prendre plusieurs minutes.
+          1) Détecte la fenêtre du jeu (FiveM doit être ouvert). 2) Dessine UNE petite bande serrée sur les titres de panneau (TON inventaire à gauche, l'endroit où un panneau tiers véhicule/coffre/carton apparaît à droite) — reste précis, une bande trop large fait lire n'importe quel texte (FPS, watermark) au lieu du titre. La bande est mémorisée en % de la fenêtre : si elle bouge ou change de taille, la détection suit automatiquement. Une IA en ligne (Moondream Cloud) lit le titre à chaque cycle — pas de référence à capturer, pas de téléchargement local.
+        </div>
+        <div class="form-group" style="max-width:420px;margin-bottom:10px">
+          <label>Clé API Moondream Cloud</label>
+          <input type="password" id="abf-moondream-key" placeholder="Clé API — gratuite sur moondream.ai" style="width:100%">
         </div>
         <div class="tester-actions" style="flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="_abfListWindowsForPicker()" title="Lister les fenêtres ouvertes">

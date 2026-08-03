@@ -147,11 +147,10 @@ async function main() {
   }
 
   // 6. Remove setuptools/wheel from the bundle (not needed at runtime) — but
-  // KEEP pip: Auto Bouffe's local-AI dependencies (torch/transformers, ~2-4 Go)
-  // are deliberately not bundled here (see requirements-ai.txt) and instead
-  // get pip-installed on the client's own machine at first launch
-  // (electron-app/main.js → ensureAiDeps()), which needs pip to still work
-  // in the shipped python-embed.
+  // KEEP pip: OCR's EasyOCR/WinRT dependencies are deliberately not bundled
+  // here and instead get pip-installed on the client's own machine at first
+  // launch (electron-app/main.js → ensureOcrDeps()), which needs pip to
+  // still work in the shipped python-embed.
   console.log('[prepare-python] Cleaning up build-only packages…');
   for (const pkg of ['setuptools', 'wheel']) {
     try {

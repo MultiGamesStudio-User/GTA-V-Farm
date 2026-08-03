@@ -9,11 +9,3 @@ Pillow>=10.0.0
 pytesseract>=0.3.10
 keyboard>=0.13.5
 pynput>=1.7.6
-
-# Auto Bouffe IA locale (torch/transformers/einops, ~2-4 Go avec le modèle) —
-# volontairement PAS dans ce fichier : prepare-python.js l'utilise pour
-# préparer python-embed/ au moment du build, et ces paquets bundlés dans
-# chaque installeur/portable alourdiraient le téléchargement pour tout le
-# monde, même ceux qui n'utilisent jamais cette fonctionnalité. Ils sont
-# installés automatiquement à la place, au premier lancement réel de l'app
-# (voir electron-app/main.js → ensureAiDeps(), et requirements-ai.txt).

@@ -73,32 +73,14 @@ function setupEngineEvents() {
   });
 
   window.api.onSetupProgress(ev => {
-    const banner = document.getElementById('deps-banner');
-    const msg    = document.getElementById('deps-msg');
-    if (banner && msg) {
-      banner.classList.remove('deps-hidden');
-      msg.textContent = ev.message || ev.msg || '';
-    }
+    appendLog('INFO', ev.message || ev.msg || '');
   });
 
   window.api.onSetupDone(() => {
-    const banner = document.getElementById('deps-banner');
-    const msgEl  = document.getElementById('deps-msg');
-    if (banner) {
-      banner.classList.add('deps-done');
-      if (msgEl) msgEl.textContent = 'Dépendances Python prêtes ✓';
-      setTimeout(() => banner.classList.add('deps-hidden'), 3000);
-    }
     appendLog('INFO', 'Dépendances Python installées');
   });
 
   window.api.onSetupError(err => {
-    const banner = document.getElementById('deps-banner');
-    const msgEl  = document.getElementById('deps-msg');
-    if (banner && msgEl) {
-      banner.classList.add('deps-error');
-      msgEl.textContent = 'Erreur setup: ' + (err?.msg || err || '');
-    }
     appendLog('ERROR', 'Erreur setup Python: ' + (err?.msg || err));
   });
 }

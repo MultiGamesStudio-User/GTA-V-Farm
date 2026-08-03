@@ -1,19 +1,15 @@
 """
-vlm_engine.py — Local vision-language model (moondream2) for Auto Bouffe's
-UI-state detection. Pixel-color / OCR / template-matching heuristics proved
-too brittle for this, so this asks a real (small) vision model a plain-text
-question about a captured screen region instead.
+vlm_engine.py — Moondream Cloud API for Auto Bouffe's UI-state detection.
+Pixel-color / OCR / template-matching heuristics proved too brittle for this,
+so this asks a real (small) vision model a plain-text question about a
+captured screen region instead.
 
-Not the official `moondream` PyPI package: its fast "Photon" runtime only
-supports NVIDIA GPU or Apple Silicon and nothing else, so this loads
-`vikhyatk/moondream2` straight from HuggingFace via `transformers` instead —
-works on any machine, using CUDA automatically when available and falling
-back to CPU (slower, seconds per query) otherwise.
-
-Model + weights are loaded lazily on first use (not at process startup) since
-this is an optional, heavy dependency most features never touch — first call
-may need to download several GB and take minutes; later calls just run
-inference on the already-loaded model.
+Previously ran moondream2 locally via `transformers` (torch + a multi-GB
+model download, minutes on first use, GPU/CPU inference on every call).
+Moved to Moondream's hosted Cloud API instead: no local weights, no torch/
+transformers dependency, works identically on any machine. Costs a free
+API key (https://moondream.ai) that the user pastes into Auto Bouffe's
+settings and that travels with every request — never stored here.
 
 Empirically (see conversation notes), asking this model to directly classify
 the zone ("answer OWN/THIRD/CLOSED") is unreliable — it tends to default to
@@ -23,121 +19,63 @@ should ask a transcription-style question and classify the *returned text*
 themselves (see page-autobouffe.js's _abfDetectState).
 """
 from __future__ import annotations
-import threading
+import base64
+import io
+import json
+import urllib.request
+import urllib.error
 
-_MODEL_ID = 'vikhyatk/moondream2'
-_MODEL_REVISION = '2024-08-26'
-
-_lock = threading.Lock()
-_model = None
-_tokenizer = None
-
-
-def _load(on_log=None):
-    global _model, _tokenizer
-    if _model is not None:
-        return
-    with _lock:
-        if _model is not None:
-            return
-        if on_log:
-            on_log('IA locale (moondream2): chargement — le premier lancement peut '
-                   'télécharger plusieurs Go et prendre quelques minutes.', 'INFO')
-        import torch
-        import transformers
-        # moondream2's custom modeling code triggers a benign transformers
-        # deprecation notice (GenerationMixin/PreTrainedModel split) on every
-        # load — harmless, but shows up as an alarming ERROR/PYERR line in
-        # the app's logs since it's emitted via the library's logger.
-        transformers.logging.set_verbosity_error()
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-        use_cuda = torch.cuda.is_available()
-        device = torch.device('cuda') if use_cuda else torch.device('cpu')
-        dtype = torch.float16 if use_cuda else torch.float32
-        if use_cuda:
-            # La zone capturée est toujours calibrée à la même taille par
-            # l'utilisateur — cudnn peut donc chercher l'algo de convolution
-            # le plus rapide une fois et le reréutiliser à chaque appel au
-            # lieu de le red-choisir à chaque fois.
-            torch.backends.cudnn.benchmark = True
-            # TF32 : les GPU Ampere+ (ex: RTX 3080 Ti) ont des tensor cores
-            # capables de faire les matmul/conv en précision réduite pour
-            # beaucoup plus de débit — perte de précision négligeable pour
-            # une simple lecture de texte à l'écran.
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
-        if on_log:
-            gpu_name = torch.cuda.get_device_name(0) if use_cuda else None
-            on_log(f'IA locale (moondream2): GPU détecté ({gpu_name}), inférence accélérée.'
-                   if use_cuda else 'IA locale (moondream2): pas de GPU CUDA, inférence CPU.', 'INFO')
-        # La revision est figee (un commit precis, jamais "main") donc les
-        # fichiers en cache ne peuvent pas etre perimes — tente d'abord en
-        # mode 100% local (aucun HEAD vers huggingface.co, gain de plusieurs
-        # secondes), ne retombe en ligne que si le cache est incomplet
-        # (tout premier telechargement).
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(
-                _MODEL_ID, revision=_MODEL_REVISION, local_files_only=True)
-            model = AutoModelForCausalLM.from_pretrained(
-                _MODEL_ID, revision=_MODEL_REVISION, trust_remote_code=True,
-                torch_dtype=dtype, local_files_only=True,
-            ).to(device)
-        except Exception:
-            tokenizer = AutoTokenizer.from_pretrained(_MODEL_ID, revision=_MODEL_REVISION)
-            model = AutoModelForCausalLM.from_pretrained(
-                _MODEL_ID, revision=_MODEL_REVISION, trust_remote_code=True,
-                torch_dtype=dtype,
-            ).to(device)
-        model.eval()
-        _tokenizer = tokenizer
-        _model = model
-        if on_log:
-            on_log('IA locale (moondream2): prête.', 'INFO')
+_API_URL = 'https://api.moondream.ai/v1/query'
+_MODEL = 'moondream3.1-9B-A2B'
+_TIMEOUT_S = 30
 
 
-def warmup(on_log=None) -> None:
-    """Load the model without asking anything — used to pre-warm VRAM a few
-    seconds before a scheduled scan instead of eagerly on first use."""
-    _load(on_log)
+def ask_image(pil_image, question: str, api_key: str, on_log=None) -> str:
+    """Ask a natural-language question about a PIL image via Moondream Cloud,
+    return the answer text."""
+    if not api_key:
+        raise RuntimeError("clé API Moondream manquante — configure-la dans l'onglet Auto Bouffe.")
+
+    buf = io.BytesIO()
+    pil_image.convert('RGB').save(buf, format='JPEG', quality=85)
+    image_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+
+    payload = json.dumps({
+        'model': _MODEL,
+        'image_url': f'data:image/jpeg;base64,{image_b64}',
+        'question': question,
+    }).encode('utf-8')
+
+    req = urllib.request.Request(
+        _API_URL,
+        data=payload,
+        method='POST',
+        headers={
+            'Content-Type':      'application/json',
+            'X-Moondream-Auth':  api_key,
+            'User-Agent':        'MacroEngine/1.0',
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
+            body = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode('utf-8', errors='ignore')[:300]
+        if e.code == 401:
+            raise RuntimeError("Moondream Cloud: clé API invalide (401).") from e
+        raise RuntimeError(f"Moondream Cloud: erreur HTTP {e.code} — {detail}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Moondream Cloud: connexion impossible — {e.reason}") from e
+
+    answer = body.get('answer')
+    if answer is None:
+        raise RuntimeError(f"Moondream Cloud: réponse inattendue — {body}")
+    if on_log:
+        on_log(f'Moondream Cloud → "{answer}"', 'INFO')
+    return answer
 
 
-def unload(on_log=None) -> None:
-    """Free the model and its VRAM. Auto Bouffe's interval is typically
-    hours — there's no reason to hold ~4 Go of VRAM reserved the whole
-    time between scans, so the caller unloads right after each cycle and
-    calls warmup() again shortly before the next one."""
-    global _model, _tokenizer
-    with _lock:
-        if _model is None:
-            return
-        was_cuda = next(_model.parameters()).is_cuda
-        _model = None
-        _tokenizer = None
-        if was_cuda:
-            import torch
-            torch.cuda.empty_cache()
-        if on_log:
-            on_log('IA locale (moondream2): déchargée (VRAM libérée) jusqu\'au prochain scan.', 'INFO')
-
-
-def ask_image(pil_image, question: str, on_log=None) -> str:
-    """Ask a natural-language question about a PIL image, return the answer text."""
-    _load(on_log)
-    # Capture local references under the lock instead of using the globals
-    # directly below: a concurrent unload() (e.g. the interval loop freeing
-    # VRAM right as a manual "Tester" click is mid-request) could otherwise
-    # null out _model/_tokenizer between this call and encode_image().
-    with _lock:
-        model, tokenizer = _model, _tokenizer
-    if model is None:
-        raise RuntimeError('vision model was unloaded before inference could run')
-    import torch
-    with torch.inference_mode():
-        encoded = model.encode_image(pil_image)
-        return model.answer_question(encoded, question, tokenizer)
-
-
-def ask_region(x: int, y: int, w: int, h: int, question: str, on_log=None) -> str:
+def ask_region(x: int, y: int, w: int, h: int, question: str, api_key: str, on_log=None) -> str:
     from .screen_reader import capture_region_pil
     img = capture_region_pil(x, y, w, h)
-    return ask_image(img, question, on_log)
+    return ask_image(img, question, api_key, on_log)

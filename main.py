@@ -441,46 +441,31 @@ def _cmd_pick_cancel(cmd, rid):
     _reply(rid, True)
 
 def _cmd_vlm_ask(cmd, rid):
-    """Ask the local vision AI (moondream2) a natural-language question about
-    a screen region — used by Auto Bouffe to tell own-inventory / 3rd-party
-    panel / closed apart without brittle pixel/OCR/template heuristics.
-    Runs in a background thread and replies asynchronously: first-use model
-    load (or download) can take minutes and must not block the stdin loop
-    that other commands (e.g. stop_all) also depend on."""
+    """Ask Moondream Cloud a natural-language question about a screen region —
+    used by Auto Bouffe to tell own-inventory / 3rd-party panel / closed
+    apart without brittle pixel/OCR/template heuristics. Runs in a background
+    thread and replies asynchronously so a slow network round-trip doesn't
+    block the stdin loop that other commands (e.g. stop_all) also depend on."""
     def _run():
         try:
             from modules.engine.vlm_engine import ask_region
             on_log = lambda msg, lvl: _send({'type': 'log', 'level': lvl, 'msg': msg})
-            answer = ask_region(cmd['x'], cmd['y'], cmd['w'], cmd['h'], cmd['question'], on_log=on_log)
+            answer = ask_region(cmd['x'], cmd['y'], cmd['w'], cmd['h'], cmd['question'],
+                                 cmd.get('api_key', ''), on_log=on_log)
             _reply(rid, True, answer=answer)
         except Exception as e:
             _reply(rid, False, error=str(e))
     threading.Thread(target=_run, daemon=True, name='vlm-ask').start()
 
 def _cmd_vlm_warmup(cmd, rid):
-    """Load the vision model without asking anything — Auto Bouffe calls this
-    ~10s before a scheduled scan (its interval is typically hours) instead of
-    keeping the model (and its VRAM) resident the whole time. Background
-    thread for the same reason as vlm_ask."""
-    def _run():
-        try:
-            from modules.engine.vlm_engine import warmup
-            on_log = lambda msg, lvl: _send({'type': 'log', 'level': lvl, 'msg': msg})
-            warmup(on_log=on_log)
-            _reply(rid, True)
-        except Exception as e:
-            _reply(rid, False, error=str(e))
-    threading.Thread(target=_run, daemon=True, name='vlm-warmup').start()
+    """No-op: Moondream Cloud has no local model/VRAM to pre-load. Kept as a
+    command so the renderer's pre-scan warmup call (a leftover from the local
+    moondream2 era) doesn't need to be ripped out for a no-op."""
+    _reply(rid, True)
 
 def _cmd_vlm_unload(cmd, rid):
-    """Free the vision model's VRAM between Auto Bouffe cycles."""
-    try:
-        from modules.engine.vlm_engine import unload
-        on_log = lambda msg, lvl: _send({'type': 'log', 'level': lvl, 'msg': msg})
-        unload(on_log=on_log)
-        _reply(rid, True)
-    except Exception as e:
-        _reply(rid, False, error=str(e))
+    """No-op: Moondream Cloud has no local model/VRAM to free."""
+    _reply(rid, True)
 
 def _cmd_test_condition(cmd, rid):
     from modules.engine.conditions import eval_condition

@@ -344,24 +344,6 @@ function ensureUserFiles() {
   }
 }
 
-// ── Auto Bouffe IA — first-launch dependency install ──────────────────────────
-function _aiDepsMarkerPath() {
-  return path.join(AI_DEPS_DIR, '.ai_deps_installed');
-}
-
-function _aiDepsInstalled() {
-  try { return fs.existsSync(_aiDepsMarkerPath()); } catch (_) { return false; }
-}
-
-function _hasNvidiaGpu() {
-  try {
-    execSync('nvidia-smi', { stdio: 'ignore', windowsHide: true, timeout: 5000 });
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
 function _runChildStreaming(exe, args, onLine, opts) {
   return new Promise((resolve, reject) => {
     const proc = spawn(exe, args, { windowsHide: true, ...opts });
@@ -388,55 +370,6 @@ function _runChildStreaming(exe, args, onLine, opts) {
     proc.on('close', code => code === 0 ? resolve()
       : reject(new Error(`exit ${code}${lastLine ? ' — ' + lastLine : ''}`)));
   });
-}
-
-function _aiDepsAlreadyImportable() {
-  try {
-    execSync(`"${PYTHON_EXE}" -c "import sys; sys.path.insert(0, r'${AI_DEPS_DIR}'); import torch, torchvision, transformers, einops"`,
-      { stdio: 'ignore', windowsHide: true, timeout: 30000 });
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-let _aiDepsInstalling = false;
-
-async function _installAiDepsOnce(send) {
-  writeLog('INFO', "IA locale Auto Bouffe: tentative d'installation complète (détection GPU, torch + repli CPU, transformers/einops, téléchargement modèle, écriture marker). Pip re-tourner sur un paquet déjà satisfait étant rapide, chaque tentative refait tout depuis le début plutôt que de reprendre à l'étape échouée — plus simple et sûr.");
-  send('IA locale Auto Bouffe : vérification GPU…');
-  const hasGpu = _hasNvidiaGpu();
-
-  send(hasGpu ? 'GPU NVIDIA détecté — installation de torch (GPU)…'
-              : 'Pas de GPU NVIDIA détecté — installation de torch (CPU)…');
-  const gpuArgs = ['-m', 'pip', 'install', '--target', AI_DEPS_DIR, 'torch', 'torchvision',
-                   '--index-url', 'https://download.pytorch.org/whl/cu126'];
-  const cpuArgs = ['-m', 'pip', 'install', '--target', AI_DEPS_DIR, 'torch', 'torchvision'];
-  try {
-    await _runChildStreaming(PYTHON_EXE, hasGpu ? gpuArgs : cpuArgs, send, { cwd: path.dirname(PYTHON_EXE) });
-  } catch (e) {
-    if (!hasGpu) throw e;
-    send('Échec installation GPU — bascule en CPU…');
-    await _runChildStreaming(PYTHON_EXE, cpuArgs, send, { cwd: path.dirname(PYTHON_EXE) });
-  }
-
-  send('Installation de transformers/einops…');
-  await _runChildStreaming(
-    PYTHON_EXE,
-    ['-m', 'pip', 'install', '--target', AI_DEPS_DIR, 'transformers>=4.46.0,<4.50.0', 'einops', 'safetensors'],
-    send, { cwd: path.dirname(PYTHON_EXE) }
-  );
-
-  send('Téléchargement du modèle IA (moondream2, ~2 Go) — peut prendre plusieurs minutes…');
-  writeLog('INFO', "IA locale Auto Bouffe: le mode -c n'ajoute pas le cwd au sys.path sur ce Python embarqué (son fichier ._pth écrase le chemin de recherche par défaut), donc le package `modules` et AI_DEPS_DIR ont besoin d'un insert explicite ici — même raison que main.py le fait.");
-  const loadModelCode =
-    "import sys; sys.stdout.reconfigure(encoding='utf-8'); " +
-    `sys.path.insert(0, r'${AI_DEPS_DIR}'); ` +
-    `sys.path.insert(0, r'${BOT_DIR}'); ` +
-    'from modules.engine.vlm_engine import _load; _load(lambda m,l: print(m, flush=True))';
-  await _runChildStreaming(PYTHON_EXE, ['-c', loadModelCode], send, { cwd: BOT_DIR });
-
-  fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8');
 }
 
 // ── OCR — first-launch dependency install (EasyOCR + WinRT) ───────────────────
@@ -472,7 +405,7 @@ async function _installOcrDepsOnce(send) {
 }
 
 async function ensureOcrDeps() {
-  writeLog('INFO', "OCR: EasyOCR/WinRT non embarqués dans python-embed (dépendances lourdes, entraînent leur propre torch/opencv/scipy) — installation en tâche de fond au premier lancement, chaînée après ensureAiDeps pour ne jamais faire tourner deux pip install en parallèle sur le même site-packages. Sans ça, ocr_engine.py retombe silencieusement sur Tesseract.");
+  writeLog('INFO', "OCR: EasyOCR/WinRT non embarqués dans python-embed (dépendances lourdes, entraînent leur propre torch/opencv/scipy) — installation en tâche de fond au premier lancement. Sans ça, ocr_engine.py retombe silencieusement sur Tesseract.");
   if (!PYTHON_EXE || !PYTHON_EXE.toLowerCase().includes('python-embed')) return;
   if (_ocrDepsInstalled()) return;
   const send = (message) => mainWindow?.webContents.send('setup:progress', { message });
@@ -502,51 +435,6 @@ async function ensureOcrDeps() {
   }
 }
 
-const _AI_DEPS_MAX_ATTEMPTS = 3;
-const _AI_DEPS_RETRY_DELAY_MS = 5000;
-
-async function ensureAiDeps() {
-  writeLog('INFO', "IA locale Auto Bouffe: torch/transformers/modèle moondream2 (~2-4 Go) non embarqués dans l'installeur/portable (trop lourd, feature peu utilisée) — récupérés une fois ici au premier lancement réel, progression affichée via le setup-banner, en tâche de fond (moteur + macros restent utilisables pendant le téléchargement).");
-  // Only ever touch the app's own bundled python-embed — never an arbitrary
-  // system Python a developer or advanced user might have configured.
-  if (!PYTHON_EXE || !PYTHON_EXE.toLowerCase().includes('python-embed')) return;
-  if (_aiDepsInstalled()) return;
-  const send = (message) => mainWindow?.webContents.send('setup:progress', { message });
-
-  writeLog('INFO', "IA locale Auto Bouffe: _aiDepsInstalling passe à true dès maintenant (avant même le check d'import), pas seulement autour du pip install — sinon un vlm_ask tiré dans le tout premier instant du démarrage (ex: boucle reprise en cours) court-circuite ce flag et court-circuiterait un pip qui réécrit torch/transformers pendant que main.py les importe (déjà observé: une ligne pip/huggingface_hub prise pour une réponse du modèle).");
-  _aiDepsInstalling = true;
-  try {
-    writeLog('INFO', "IA locale Auto Bouffe: check d'import rapide d'abord — le marker manque seulement au tout premier lancement, mais une machine de dev (ou un python-embed reconstruit qui les avait déjà autrement) peut déjà tout avoir ; relancer pip quand même ferait courir un vrai usage Auto Bouffe contre une réinstallation concurrente des modules qu'il vient d'importer, ce qui peut corrompre une inférence en cours (déjà observé: une ligne pip/huggingface_hub prise pour une réponse du modèle).");
-    if (_aiDepsAlreadyImportable()) {
-      try { fs.writeFileSync(_aiDepsMarkerPath(), new Date().toISOString(), 'utf-8'); } catch (_) {}
-      writeLog('INFO', 'IA locale Auto Bouffe: dépendances déjà présentes, rien à installer.');
-      return;
-    }
-
-    writeLog('INFO', `IA locale Auto Bouffe: auto-guérison des échecs transitoires (coupure réseau, rate-limit HF, etc.) — ${_AI_DEPS_MAX_ATTEMPTS} tentatives dans ce même lancement plutôt que forcer l'utilisateur à redémarrer l'appli.`);
-    for (let attempt = 1; attempt <= _AI_DEPS_MAX_ATTEMPTS; attempt++) {
-      try {
-        await _installAiDepsOnce(send);
-        writeLog('INFO', 'IA locale Auto Bouffe: dépendances installées.');
-        mainWindow?.webContents.send('setup:done');
-        return;
-      } catch (e) {
-        writeLog('WARNING', `IA locale Auto Bouffe: tentative ${attempt}/${_AI_DEPS_MAX_ATTEMPTS} échouée —`, e.message);
-        if (attempt === _AI_DEPS_MAX_ATTEMPTS) throw e;
-        send(`Échec (${e.message}) — nouvel essai dans ${_AI_DEPS_RETRY_DELAY_MS / 1000}s…`);
-        await new Promise(r => setTimeout(r, _AI_DEPS_RETRY_DELAY_MS));
-      }
-    }
-  } catch (e) {
-    writeLog('ERROR', 'IA locale Auto Bouffe: installation échouée après plusieurs tentatives —', e.message);
-    mainWindow?.webContents.send('setup:error', {
-      msg: 'Installation IA (Auto Bouffe) échouée: ' + e.message + ' — réessai au prochain lancement.',
-    });
-  } finally {
-    _aiDepsInstalling = false;
-  }
-}
-
 app.whenReady().then(() => {
   writeLog('INFO', 'app ready');
   ensureUserFiles();
@@ -566,15 +454,7 @@ app.whenReady().then(() => {
     startEngine(); // pré-démarre Python dès que l'UI est prête
     _pushLicenseKeyToEngine();
     // en arrière-plan — n'attend pas, l'app est utilisable pendant ce temps.
-    // Chaîné (pas en parallèle) pour ne jamais faire tourner deux pip install
-    // en même temps sur le même site-packages.
-    ensureAiDeps().then(() => ensureOcrDeps());
-    // NB: le préchargement auto du modèle IA (vlm_warmup) au démarrage a été
-    // retiré — il a fait planter tout le moteur Python (access violation,
-    // code 3221225477) sur un warning PyTorch bénin (quantized RNN de
-    // moondream2), transformant un crash potentiel rare en crash systématique
-    // à chaque lancement de l'app. Le modèle reste chargé en lazy (premier
-    // vlm_ask réel), comme avant.
+    ensureOcrDeps();
 
     // ── Vérification automatique des mises à jour ──────────────
     // IS_PACKED only: en dev, RENDERER_DIR pointe sur le dossier source réel —
@@ -793,16 +673,14 @@ async function _ensureEngineStarted() {
   }
 }
 
-// ── IPC: Auto Bouffe local vision AI ─────────────────────────────────────────
+// ── IPC: Auto Bouffe vision AI (Moondream Cloud) ─────────────────────────────
 // Own handlers (not in the generic forwarded-command loop above) because they
-// need a much longer timeout: a cold vlm_ask/vlm_warmup can trigger a
-// multi-GB model download + GPU/CPU load, taking minutes instead of the
-// usual 15s ceiling. vlm_unload is fast but shares the handler for symmetry.
+// need a longer timeout than the usual 15s ceiling — a network round-trip to
+// the cloud API can occasionally be slow. vlm_warmup/vlm_unload are no-ops on
+// the Python side now (no local model/VRAM) but keep the same handler for
+// symmetry with vlm_ask.
 for (const cmd of ['vlm_ask', 'vlm_warmup', 'vlm_unload']) {
   ipcMain.handle(`engine:${cmd}`, async (_evt, params) => {
-    if (_aiDepsInstalling) {
-      return { ok: false, error: 'Installation des dépendances IA en cours — réessaie dans un instant.' };
-    }
     await _ensureEngineStarted();
     try {
       return await engineCmd({ cmd, ...params }, 300000);

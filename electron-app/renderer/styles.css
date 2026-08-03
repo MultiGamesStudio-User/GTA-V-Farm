@@ -212,20 +212,6 @@ body::before {
 }
 .license-buy-link:hover { color: var(--accent); }
 
-/* ── Deps banner ─────────────────────────────────────────────── */
-.deps-banner {
-  position: relative; z-index: 9999;
-  background: rgba(20,16,0,.9);
-  border-bottom: 1px solid rgba(245,200,66,.2);
-  padding: 7px 20px; font-size: 11px; color: var(--gold);
-  display: flex; align-items: center; gap: 9px;
-  backdrop-filter: blur(4px);
-  animation: deps-pulse 1.8s ease-in-out infinite;
-}
-.deps-banner.deps-error  { border-color: rgba(232,53,42,.3); color: #ff6060; animation: none; }
-.deps-banner.deps-hidden { display: none; }
-@keyframes deps-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-
 /* ── Titlebar ─────────────────────────────────────────────────── */
 #titlebar {
   height: var(--titlebar-h);
