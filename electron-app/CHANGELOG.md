@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.7] – 2026-08-04
+
+### Added
+- 🎉 Page Auto Bouffe BETA — sandbox de test isolé, séparé de la page Auto Bouffe production
+
+---
+
+
+
 ## [2.5.6] – 2026-08-03
 
 ### Changed
