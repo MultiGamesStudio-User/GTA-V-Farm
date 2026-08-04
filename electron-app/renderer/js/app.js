@@ -30,6 +30,7 @@ function navigate(page, testTab) {
   if (page === 'settings')    switchSettingsTab(testTab ? 'tests' : null, testTab);
   if (page === 'autoclicker') initAutoClicker();
   if (page === 'autobouffe') initAutoBouffe();
+  if (page === 'autobouffe-beta') initAutoBouffeBeta();
 
   _saveUiPref('lastPage', page);
 }
