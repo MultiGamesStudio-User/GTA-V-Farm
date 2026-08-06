@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.10] – 2026-08-06
+
+### Changed
+- 📝 Bump technique — re-déclenche le build CI (le run précédent n'a jamais eu de runner alloué)
+
+---
+
+
+
 ## [2.5.9] – 2026-08-06
 
 ### Added
