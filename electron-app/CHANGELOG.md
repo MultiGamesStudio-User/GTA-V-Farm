@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.8] – 2026-08-06
+
+### Changed
+- 🔄 Mise à jour de version applicative vers 2.5.8.
+
+---
+
 ## [2.5.7] – 2026-08-04
 
 ### Added
