@@ -10,8 +10,8 @@ const _ABF_MIN_INTERVAL_S = 30;
 const _ABF_FIELDS = [
   { id: 'abf-key-inventory', type: 'str', def: ''      },
   { id: 'abf-key-trunk',     type: 'str', def: ''      },
-  { id: 'abf-h',             type: 'int', def: 0       },
-  { id: 'abf-m',             type: 'int', def: 1       },
+  { id: 'abf-h',             type: 'int', def: 2       },
+  { id: 'abf-m',             type: 'int', def: 0       },
   { id: 'abf-s',             type: 'int', def: 0       },
   { id: 'abf-eat-x',         type: 'int', def: 0       },
   { id: 'abf-eat-y',         type: 'int', def: 0       },

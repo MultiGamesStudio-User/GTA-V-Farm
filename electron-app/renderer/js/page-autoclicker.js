@@ -11,11 +11,11 @@ const _ACP_STORAGE_KEY = 'acp_settings';
 const _ACP_FIELDS = [
   { id: 'acp-h',           type: 'int',   def: 0   },
   { id: 'acp-m',           type: 'int',   def: 0   },
-  { id: 'acp-s',           type: 'int',   def: 0   },
+  { id: 'acp-s',           type: 'int',   def: 15  },
   { id: 'acp-ms',          type: 'int',   def: 100 },
   { id: 'acp-rand-offset', type: 'bool',  def: false },
   { id: 'acp-rand-ms',     type: 'int',   def: 40  },
-  { id: 'acp-button',      type: 'str',   def: 'left' },
+  { id: 'acp-button',      type: 'str',   def: 'right' },
   { id: 'acp-click-type',  type: 'str',   def: 'single' },
   { id: 'acp-repeat-mode', type: 'str',   def: 'until_stopped' },
   { id: 'acp-repeat-count',type: 'int',   def: 1   },
