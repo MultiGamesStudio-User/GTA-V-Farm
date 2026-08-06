@@ -1,6 +1,5 @@
 /* ── Auto Bouffe page ────────────────────────────────────── */
 let _abfRunning  = false;
-let _abfMode     = 'interval'; // 'interval' | 'auto'
 let _abfBound    = false;      // guard against duplicate event listener registration
 let _abfCapturing = null;      // { el, fieldId } while waiting for key press
 
@@ -17,12 +16,13 @@ const _ABF_FIELDS = [
   { id: 'abf-eat-x',         type: 'int', def: 0       },
   { id: 'abf-eat-y',         type: 'int', def: 0       },
   { id: 'abf-eat-button',    type: 'str', def: 'right' },
+  { id: 'abf-eat-clicks',    type: 'int', def: 1       },
   { id: 'abf-drink-x',       type: 'int', def: 0       },
   { id: 'abf-drink-y',       type: 'int', def: 0       },
   { id: 'abf-drink-button',  type: 'str', def: 'right' },
+  { id: 'abf-drink-clicks',  type: 'int', def: 1       },
   { id: 'abf-moondream-key', type: 'str', def: ''      },
 ];
-let _abfZone          = null; // { x, y, w, h } — capture zone for auto mode (hunger/thirst, not yet implemented)
 
 // IA state-detection zone is calibrated once as a % of the game window's rect
 // (not absolute screen pixels) so it keeps tracking correctly if the window
@@ -66,27 +66,15 @@ async function initAutoBouffe() {
   _abfLoad();
   _abfBindAutoSave();
   _abfEnforceMinInterval();
-  switchAbfMode(_abfMode);
-}
-
-function switchAbfMode(mode) {
-  _abfMode = mode;
-  document.querySelectorAll('#abf-mode-tab-bar .tests-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.abf-mode-panel').forEach(p => p.classList.remove('active'));
-  document.querySelector(`#abf-mode-tab-bar .tests-tab[data-abf-mode="${mode}"]`)?.classList.add('active');
-  document.getElementById(`abf-panel-${mode}`)?.classList.add('active');
 }
 
 function startAutoBouffe() {
   if (_abfRunning) return;
-  if (_abfMode === 'auto') {
-    appendLog('WARNING', 'Auto Bouffe: mode Auto (détection) pas encore implémenté — utilise le mode Intervalle.');
-    return;
-  }
   _abfRunning = true;
   document.getElementById('abf-btn-start').disabled = true;
   document.getElementById('abf-btn-stop').disabled  = false;
   document.getElementById('abf-status').textContent = '🟢 En cours…';
+  _abfNotifyWebhook('autobouffe_start');
   _abfIntervalLoop();
 }
 
@@ -95,7 +83,22 @@ function stopAutoBouffe() {
   document.getElementById('abf-btn-start').disabled = false;
   document.getElementById('abf-btn-stop').disabled  = true;
   document.getElementById('abf-status').textContent = 'Arrêté';
+  _abfNotifyWebhook('autobouffe_stop');
   _abfVlmUnload(); // no reason to keep VRAM reserved once stopped
+}
+
+/* Auto Bouffe never touches the engine's macro registry (pure JS interval
+   loop, see _abfIntervalLoop) so unlike macros/Auto Clicker it never goes
+   through macro_runner.py's webhook path — sent directly here instead.
+   Same debug-report attachment (screenshot/PC info/IP) as any other event,
+   since 'autobouffe_start'/'autobouffe_stop' are in _DEBUG_WEBHOOK_EVENTS. */
+async function _abfNotifyWebhook(event) {
+  try {
+    const settings = await window.api.readSettings().catch(() => ({}));
+    if (!settings?.webhookUrl) return;
+    await window.api.setWebhook({ url: settings.webhookUrl, events: settings.webhookEvents }).catch(() => {});
+    await window.api.sendWebhook({ event, data: { name: 'Auto Bouffe' } });
+  } catch (_) {}
 }
 
 /* ── Low-level helpers (single action/wait, checked against _abfRunning) ── */
@@ -325,6 +328,121 @@ async function _abfDetectStateLogged() {
   return state;
 }
 
+/* Non-gated wait for _abfForceCycle (manual one-shot, runs to completion
+   regardless of _abfRunning) — same signature as _abfWait (resolves a bool)
+   so _abfRunCycle below doesn't need to know which caller it's in. */
+function _abfPlainWait(ms) {
+  return new Promise(resolve => setTimeout(() => resolve(true), ms));
+}
+
+/* ── Shared cycle body: open inventory, close any 3rd panel, eat, drink,
+   close, restore 3rd panel — used by both _abfIntervalLoop (passes _abfWait,
+   abortable by Stop) and _abfForceCycle (passes _abfPlainWait, always runs to
+   completion). Returns { ok, outcome }: ok is false only if wait() aborted
+   mid-cycle (caller should stop immediately, outcome is unset); ok is true
+   otherwise, with outcome a short human-readable summary of what happened
+   (surfaced by _abfForceCycle next to its button). ── */
+async function _abfRunCycle(wait) {
+  const invKey = document.getElementById('abf-key-inventory').value;
+  const trunkKey = document.getElementById('abf-key-trunk').value;
+  let hadThirdPanel = false; // was a trunk/vehicle/crate open before we forced it closed to eat?
+  let outcome = '';
+  let closeUncertain = false;
+
+  appendLog('INFO', 'Auto Bouffe: cycle — analyse de l\'écran…');
+  let state = await _abfDetectStateLogged();
+
+  // 1. Make sure OUR OWN inventory is actually open — the key toggles, so
+  //    pressing it blind could just as easily close it if it were already
+  //    open (e.g. left open from a previous failed cycle).
+  if (state === 'closed') {
+    appendLog('INFO', 'Auto Bouffe: inventaire fermé — ouverture…');
+    await _abfKeyTap(invKey);
+    if (!(await wait(_ABF_UI_DELAY_MS))) return { ok: false };
+    state = await _abfDetectStateLogged();
+    if (state === 'closed') {
+      appendLog('WARNING', 'Auto Bouffe: impossible de confirmer l\'ouverture de l\'inventaire — cycle passé.');
+      return { ok: true, outcome: 'inventaire jamais confirmé ouvert' };
+    }
+  }
+
+  // 2. If a 3rd panel (vehicle/crate/etc.) is also open, close EVERYTHING
+  //    with the inventory key (it closes any open panel, own or 3rd-party —
+  //    the trunk key is only for opening the trunk, never for closing it)
+  //    then reopen just our own inventory. Retry a bounded number of times.
+  //    Remember it was open so step 4b can restore it later with trunkKey.
+  let aborted = false;
+  for (let i = 0; i < _ABF_MAX_CLOSE_RETRIES && state === 'third' && !aborted; i++) {
+    hadThirdPanel = true;
+    appendLog('INFO', `Auto Bouffe: panneau tiers détecté — fermeture puis réouverture inventaire seul (tentative ${i + 1}/${_ABF_MAX_CLOSE_RETRIES})…`);
+    await _abfKeyTap(invKey); // close everything
+    if (!(await wait(_ABF_UI_DELAY_MS))) { aborted = true; break; }
+    await _abfKeyTap(invKey); // reopen our own inventory only
+    if (!(await wait(_ABF_UI_DELAY_MS))) { aborted = true; break; }
+    state = await _abfDetectStateLogged();
+  }
+  if (aborted) return { ok: false };
+
+  if (state === 'third') {
+    appendLog('WARNING', 'Auto Bouffe: panneau tiers toujours ouvert après plusieurs tentatives — cycle passé.');
+    outcome = 'panneau tiers toujours ouvert — repas sauté';
+  } else if (state !== 'own') {
+    appendLog('WARNING', 'Auto Bouffe: inventaire fermé après les tentatives de réouverture — cycle passé.');
+    outcome = 'inventaire refermé avant de pouvoir manger';
+  } else {
+    // 3. Eat, then drink — each repeated abf-*-clicks times (configurable,
+    //    e.g. eating 2+ items per cycle), one _ABF_UI_DELAY_MS pause
+    //    between clicks so the game processes each one individually.
+    const eatX = parseInt(document.getElementById('abf-eat-x').value) || 0;
+    const eatY = parseInt(document.getElementById('abf-eat-y').value) || 0;
+    const eatBtn = document.getElementById('abf-eat-button').value;
+    const eatClicks = Math.max(1, parseInt(document.getElementById('abf-eat-clicks').value) || 1);
+    appendLog('INFO', `Auto Bouffe: mange (${eatClicks}×)…`);
+    for (let i = 0; i < eatClicks; i++) {
+      await _abfClick(eatX, eatY, eatBtn);
+      if (!(await wait(_ABF_UI_DELAY_MS))) return { ok: false };
+    }
+
+    const drinkX = parseInt(document.getElementById('abf-drink-x').value) || 0;
+    const drinkY = parseInt(document.getElementById('abf-drink-y').value) || 0;
+    const drinkBtn = document.getElementById('abf-drink-button').value;
+    const drinkClicks = Math.max(1, parseInt(document.getElementById('abf-drink-clicks').value) || 1);
+    appendLog('INFO', `Auto Bouffe: boit (${drinkClicks}×)…`);
+    for (let i = 0; i < drinkClicks; i++) {
+      await _abfClick(drinkX, drinkY, drinkBtn);
+      if (!(await wait(_ABF_UI_DELAY_MS))) return { ok: false };
+    }
+    outcome = `mangé ${eatClicks}×, bu ${drinkClicks}×`;
+  }
+
+  // 4. Close inventory — unconditional tap, not gated on the AI check: we
+  //    just used items from it in step 3 so it must be open, and the
+  //    trunk key (step 4b) only opens the trunk correctly from a fully
+  //    closed menu state.
+  appendLog('INFO', 'Auto Bouffe: ferme l\'inventaire…');
+  await _abfKeyTap(invKey);
+  if (!(await wait(_ABF_UI_DELAY_MS))) return { ok: false };
+  state = await _abfDetectStateLogged();
+  if (state !== 'closed') {
+    appendLog('WARNING', 'Auto Bouffe: l\'inventaire semble toujours ouvert après fermeture.');
+    closeUncertain = true;
+  }
+
+  // 4b. A trunk/vehicle/crate was open before we ate — reopen it with its
+  //     own key (separate from the inventory toggle) to restore the state
+  //     the player was in. Inventory is now confirmed closed (step 4).
+  if (hadThirdPanel) {
+    if (!trunkKey) {
+      appendLog('WARNING', 'Auto Bouffe: panneau tiers refermé mais touche coffre non configurée — pas de réouverture.');
+    } else {
+      appendLog('INFO', 'Auto Bouffe: réouverture du coffre/véhicule…');
+      await _abfKeyTap(trunkKey);
+      if (!(await wait(_ABF_UI_DELAY_MS))) return { ok: false };
+    }
+  }
+  return { ok: true, outcome: outcome + (closeUncertain ? ' (fermeture incertaine)' : '') };
+}
+
 /* ── Main interval-mode cycle ─────────────────────────────── */
 async function _abfIntervalLoop() {
   try { await ensureEngine(); } catch (e) {
@@ -334,9 +452,22 @@ async function _abfIntervalLoop() {
   }
   while (_abfRunning) {
     const invKey = document.getElementById('abf-key-inventory').value;
-    const trunkKey = document.getElementById('abf-key-trunk').value;
     if (!invKey) {
       appendLog('WARNING', 'Auto Bouffe: touche inventaire non configurée — arrêt.');
+      stopAutoBouffe();
+      return;
+    }
+    const eatX0 = parseInt(document.getElementById('abf-eat-x').value) || 0;
+    const eatY0 = parseInt(document.getElementById('abf-eat-y').value) || 0;
+    const drinkX0 = parseInt(document.getElementById('abf-drink-x').value) || 0;
+    const drinkY0 = parseInt(document.getElementById('abf-drink-y').value) || 0;
+    if (eatX0 === 0 && eatY0 === 0) {
+      appendLog('WARNING', 'Auto Bouffe: point Manger non configuré (0,0) — arrêt.');
+      stopAutoBouffe();
+      return;
+    }
+    if (drinkX0 === 0 && drinkY0 === 0) {
+      appendLog('WARNING', 'Auto Bouffe: point Boire non configuré (0,0) — arrêt.');
       stopAutoBouffe();
       return;
     }
@@ -344,87 +475,9 @@ async function _abfIntervalLoop() {
     const m = parseInt(document.getElementById('abf-m').value) || 0;
     const s = parseInt(document.getElementById('abf-s').value) || 0;
     const intervalMs = Math.max(_ABF_MIN_INTERVAL_S, h * 3600 + m * 60 + s) * 1000;
-    let hadThirdPanel = false; // was a trunk/vehicle/crate open before we forced it closed to eat?
 
-    appendLog('INFO', 'Auto Bouffe: cycle — analyse de l\'écran…');
-    let state = await _abfDetectStateLogged();
-
-    // 1. Make sure OUR OWN inventory is actually open — the key toggles, so
-    //    pressing it blind could just as easily close it if it were already
-    //    open (e.g. left open from a previous failed cycle).
-    if (state === 'closed') {
-      appendLog('INFO', 'Auto Bouffe: inventaire fermé — ouverture…');
-      await _abfKeyTap(invKey);
-      if (!(await _abfWait(_ABF_UI_DELAY_MS))) return;
-      state = await _abfDetectStateLogged();
-      if (state === 'closed') {
-        appendLog('WARNING', 'Auto Bouffe: impossible de confirmer l\'ouverture de l\'inventaire — cycle passé.');
-        if (!(await _abfWait(intervalMs))) return;
-        continue;
-      }
-    }
-
-    // 2. If a 3rd panel (vehicle/crate/etc.) is also open, close EVERYTHING
-    //    with the inventory key (it closes any open panel, own or 3rd-party —
-    //    the trunk key is only for opening the trunk, never for closing it)
-    //    then reopen just our own inventory. Retry a bounded number of times.
-    //    Remember it was open so step 4b can restore it later with trunkKey.
-    for (let i = 0; i < _ABF_MAX_CLOSE_RETRIES && state === 'third' && _abfRunning; i++) {
-      hadThirdPanel = true;
-      appendLog('INFO', `Auto Bouffe: panneau tiers détecté — fermeture puis réouverture inventaire seul (tentative ${i + 1}/${_ABF_MAX_CLOSE_RETRIES})…`);
-      await _abfKeyTap(invKey); // close everything
-      if (!(await _abfWait(_ABF_UI_DELAY_MS))) return;
-      await _abfKeyTap(invKey); // reopen our own inventory only
-      if (!(await _abfWait(_ABF_UI_DELAY_MS))) return;
-      state = await _abfDetectStateLogged();
-    }
-    if (!_abfRunning) return;
-
-    if (state === 'third') {
-      appendLog('WARNING', 'Auto Bouffe: panneau tiers toujours ouvert après plusieurs tentatives — cycle passé.');
-    } else if (state !== 'own') {
-      appendLog('WARNING', 'Auto Bouffe: inventaire fermé après les tentatives de réouverture — cycle passé.');
-    } else {
-      // 3. Eat, then drink
-      appendLog('INFO', 'Auto Bouffe: mange…');
-      const eatX = parseInt(document.getElementById('abf-eat-x').value) || 0;
-      const eatY = parseInt(document.getElementById('abf-eat-y').value) || 0;
-      const eatBtn = document.getElementById('abf-eat-button').value;
-      await _abfClick(eatX, eatY, eatBtn);
-      if (!(await _abfWait(_ABF_UI_DELAY_MS))) return;
-
-      appendLog('INFO', 'Auto Bouffe: boit…');
-      const drinkX = parseInt(document.getElementById('abf-drink-x').value) || 0;
-      const drinkY = parseInt(document.getElementById('abf-drink-y').value) || 0;
-      const drinkBtn = document.getElementById('abf-drink-button').value;
-      await _abfClick(drinkX, drinkY, drinkBtn);
-      if (!(await _abfWait(_ABF_UI_DELAY_MS))) return;
-    }
-
-    // 4. Close inventory — unconditional tap, not gated on the AI check: we
-    //    just used items from it in step 3 so it must be open, and the
-    //    trunk key (step 4b) only opens the trunk correctly from a fully
-    //    closed menu state.
-    appendLog('INFO', 'Auto Bouffe: ferme l\'inventaire…');
-    await _abfKeyTap(invKey);
-    if (!(await _abfWait(_ABF_UI_DELAY_MS))) return;
-    state = await _abfDetectStateLogged();
-    if (state !== 'closed') {
-      appendLog('WARNING', 'Auto Bouffe: l\'inventaire semble toujours ouvert après fermeture.');
-    }
-
-    // 4b. A trunk/vehicle/crate was open before we ate — reopen it with its
-    //     own key (separate from the inventory toggle) to restore the state
-    //     the player was in. Inventory is now confirmed closed (step 4).
-    if (hadThirdPanel) {
-      if (!trunkKey) {
-        appendLog('WARNING', 'Auto Bouffe: panneau tiers refermé mais touche coffre non configurée — pas de réouverture.');
-      } else {
-        appendLog('INFO', 'Auto Bouffe: réouverture du coffre/véhicule…');
-        await _abfKeyTap(trunkKey);
-        if (!(await _abfWait(_ABF_UI_DELAY_MS))) return;
-      }
-    }
+    const result = await _abfRunCycleExclusive(_abfWait);
+    if (!result.ok) return;
 
     // 5. Free the model's VRAM until shortly before the next scan — Auto
     //    Bouffe's interval is typically hours, no reason to hold ~4 Go of
@@ -432,11 +485,77 @@ async function _abfIntervalLoop() {
     //    the whole time between scans.
     await _abfVlmUnload();
     const leadMs = Math.min(_ABF_VLM_WARMUP_LEAD_MS, intervalMs);
-    appendLog('INFO', `Auto Bouffe: cycle terminé — prochain dans ${Math.round(intervalMs / 1000)}s ` +
+    appendLog('INFO', `Auto Bouffe: cycle terminé (${result.outcome}) — prochain dans ${Math.round(intervalMs / 1000)}s ` +
       `(IA relancée ${Math.round(leadMs / 1000)}s avant).`);
     if (!(await _abfWait(intervalMs - leadMs))) return;
     await _abfVlmWarmup();
     if (!(await _abfWait(leadMs))) return;
+  }
+}
+
+// True while a cycle (interval tick or forced) is executing, from either
+// caller — without this, the interval loop firing at the same moment as a
+// user-triggered "Forcer un cycle" ran two _abfRunCycle()s concurrently,
+// each tapping the inventory/eat/drink keys against the same game window
+// with no awareness of the other (one cycle's "open inventory" step could
+// close what the other had just opened).
+let _abfCycleInFlight = false;
+
+async function _abfRunCycleExclusive(wait) {
+  if (_abfCycleInFlight) {
+    appendLog('WARNING', 'Auto Bouffe: un autre cycle est déjà en cours — celui-ci est sauté.');
+    return { ok: true, outcome: 'sauté (un autre cycle était déjà en cours)' };
+  }
+  _abfCycleInFlight = true;
+  try {
+    return await _abfRunCycle(wait);
+  } finally {
+    _abfCycleInFlight = false;
+  }
+}
+
+/* ── Manual "force a cycle now" — same steps as the interval loop (open,
+   close 3rd panel, eat, drink, close, restore) but triggered once, on
+   demand, independent of the h/m/s interval and _abfRunning. Runs to
+   completion (uses _abfPlainWait, not the abortable _abfWait) since it's a
+   short one-shot foreground action, not something Stop needs to interrupt. */
+let _abfForcing = false; // re-entrancy guard — ignore a second click while one is in flight
+async function _abfForceCycle() {
+  if (_abfForcing) {
+    appendLog('WARNING', 'Auto Bouffe: cycle forcé déjà en cours.');
+    return;
+  }
+  const invKey = document.getElementById('abf-key-inventory').value;
+  if (!invKey) {
+    appendLog('WARNING', 'Auto Bouffe: touche inventaire non configurée.');
+    return;
+  }
+  const eatX = parseInt(document.getElementById('abf-eat-x').value) || 0;
+  const eatY = parseInt(document.getElementById('abf-eat-y').value) || 0;
+  const drinkX = parseInt(document.getElementById('abf-drink-x').value) || 0;
+  const drinkY = parseInt(document.getElementById('abf-drink-y').value) || 0;
+  if ((eatX === 0 && eatY === 0) || (drinkX === 0 && drinkY === 0)) {
+    appendLog('WARNING', 'Auto Bouffe: point Manger/Boire non configuré (0,0).');
+    return;
+  }
+  const resultEl = document.getElementById('abf-force-cycle-result');
+  if (resultEl) { resultEl.textContent = '⏳ Cycle forcé en cours…'; resultEl.style.color = 'var(--text-2)'; }
+  _abfForcing = true;
+  try {
+    await ensureEngine();
+    appendLog('INFO', 'Auto Bouffe: cycle forcé…');
+    const result = await _abfRunCycleExclusive(_abfPlainWait);
+    appendLog('INFO', 'Auto Bouffe: cycle forcé terminé — ' + result.outcome);
+    const succeeded = result.outcome.startsWith('mangé');
+    if (resultEl) {
+      resultEl.textContent = (succeeded ? '✅ ' : '⚠️ ') + result.outcome;
+      resultEl.style.color = succeeded ? 'var(--green)' : 'var(--accent)';
+    }
+  } catch (e) {
+    appendLog('ERROR', 'Auto Bouffe: cycle forcé — ' + e.message);
+    if (resultEl) { resultEl.textContent = '❌ ' + e.message; resultEl.style.color = 'var(--accent)'; }
+  } finally {
+    _abfForcing = false;
   }
 }
 
@@ -471,7 +590,6 @@ function _abfSave() {
     if (!el) return;
     data[f.id] = f.type === 'bool' ? el.checked : el.value;
   });
-  data.zone = _abfZone;
   data.windowTitle = _abfWindowTitle;
   data.windowExe = _abfWindowExe;
   data.stateZoneRel = _abfStateZoneRel;
@@ -488,8 +606,6 @@ function _abfLoad() {
     if (f.type === 'bool') { el.checked = val === true || val === 'true'; }
     else                   { el.value = val; }
   });
-  _abfZone = data.zone || null;
-  _abfUpdateZoneLabel();
   _abfWindowTitle = data.windowTitle || null;
   _abfWindowExe = data.windowExe || null;
   _abfUpdateWindowLabel();
@@ -559,37 +675,20 @@ async function _abfPickPoint(which) {
   } catch (e) { appendLog('WARNING', 'Sélecteur de point indisponible: ' + (e.message || e)); }
 }
 
-/* ── Zone picker (détection, mode auto) ──────────────────── */
-async function _abfPickZone() {
-  try {
-    const res = await window.api.pickRegion();
-    if (!res) return;
-    _abfZone = { x: res.x, y: res.y, w: res.w, h: res.h };
-    _abfUpdateZoneLabel();
-    _abfSave();
-  } catch (e) { appendLog('WARNING', 'Sélecteur de zone indisponible: ' + (e.message || e)); }
-}
-
-async function _abfPreviewZone() {
-  const wrap = document.getElementById('abf-zone-preview');
-  if (!_abfZone) {
-    if (wrap) wrap.innerHTML = '<div class="preview-placeholder">Sélectionne d\'abord une zone</div>';
+/* Single immediate click, outside the interval cycle — lets the user verify
+   a Manger/Boire point lands correctly without waiting for a full cycle. */
+async function _abfTestPoint(which) {
+  const x = parseInt(document.getElementById(`abf-${which}-x`).value) || 0;
+  const y = parseInt(document.getElementById(`abf-${which}-y`).value) || 0;
+  const btn = document.getElementById(`abf-${which}-button`).value;
+  const label = which === 'eat' ? 'Manger' : 'Boire';
+  if (x === 0 && y === 0) {
+    appendLog('WARNING', `Auto Bouffe: point ${label} non configuré (0,0).`);
     return;
   }
-  try {
-    const res = await window.api.previewRegion(_abfZone);
-    if (res?.b64 && wrap) {
-      wrap.innerHTML = `<img src="data:image/png;base64,${res.b64}" style="width:100%;display:block">`;
-    }
-  } catch (e) { appendLog('WARNING', 'Aperçu zone indisponible: ' + (e.message || e)); }
-}
-
-function _abfUpdateZoneLabel() {
-  const lbl = document.getElementById('abf-zone-lbl');
-  if (!lbl) return;
-  lbl.textContent = _abfZone
-    ? `${_abfZone.x},${_abfZone.y} — ${_abfZone.w}×${_abfZone.h}`
-    : '';
+  await ensureEngine();
+  appendLog('INFO', `Auto Bouffe: test clic ${label} à (${x},${y})…`);
+  await _abfClick(x, y, btn);
 }
 
 /* ── Single IA calibration zone picker (stored relative to the game

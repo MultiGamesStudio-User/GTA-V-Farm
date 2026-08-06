@@ -30,6 +30,9 @@ app.log
 logs/
 *.pid
 license.json
+macro_history.json
+report.html
+webhook_debug.log
 
 # ── Fichiers temporaires ────────────────────────────────────
 *.tmp

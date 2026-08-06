@@ -39,6 +39,15 @@ from . import state
 
 logger = logging.getLogger('engine')
 
+# Auto Clicker runs as a regular macro under the hood (see page-autoclicker.js
+# _acpBuildMacro) using this fixed name as both its runner registry key and
+# its macro.name — detected here so its webhook notifications get their own
+# event name/label (and their own on/off toggle in Settings > Discord)
+# instead of showing up as an anonymous "Macro démarrée: __auto_clicker__".
+_SYNTHETIC_MACRO_EVENTS = {
+    '__auto_clicker__': ('Auto Clicker', 'autoclicker'),
+}
+
 
 class MacroRunner:
     """Exécute une macro dans un thread de fond avec support des couches de cycle de vie."""
@@ -160,6 +169,10 @@ class MacroRunner:
         rules      = macro.get('rules', [])
         ctx        = self._build_ctx()
 
+        display_name, event_prefix = _SYNTHETIC_MACRO_EVENTS.get(name, (name, None))
+        start_event = f'{event_prefix}_start' if event_prefix else 'macro_start'
+        stop_event  = f'{event_prefix}_stop'  if event_prefix else 'macro_stop'
+
         state.stats_init(name)
         self._log(
             f'Macro "{name}" démarrée '
@@ -170,7 +183,7 @@ class MacroRunner:
             + ')',
             'INFO'
         )
-        self.on_webhook('macro_start', {'name': name})
+        self.on_webhook(start_event, {'name': display_name})
 
         start_time       = time.time()
         iteration        = 0
@@ -293,7 +306,7 @@ class MacroRunner:
         if self._pre_stop_actions:
             self._log('Exécution des actions pre_stop...', 'DEBUG')
             try:
-                self._exec_actions(self._pre_stop_actions, ctx)
+                self._exec_actions(self._pre_stop_actions, ctx, ignore_stop=True)
             except Exception as e:
                 self._log(f'Erreur pre_stop_actions : {e}', 'WARNING')
 
@@ -304,11 +317,20 @@ class MacroRunner:
             f'{stats.get("errors", 0)} erreur(s).',
             'INFO'
         )
-        self.on_webhook('macro_stop', {
-            'name':       name,
+        self.on_webhook(stop_event, {
+            'name':       display_name,
             'iterations': iteration,
             'elapsed_s':  elapsed,
             'errors':     stats.get('errors', 0),
+        })
+        state.history_append({
+            'name':       display_name,
+            'started_at': start_time,
+            'ended_at':   time.time(),
+            'iterations': iteration,
+            'elapsed_s':  elapsed,
+            'errors':     stats.get('errors', 0),
+            'rules_triggered': stats.get('rules_triggered', {}),
         })
         try:
             from .screen_reader import release_thread_sct
@@ -325,15 +347,22 @@ class MacroRunner:
         results = [eval_condition(c) for c in conditions]
         return any(results) if mode == 'any' else all(results)
 
-    def _exec_actions(self, actions: list[dict], ctx: dict) -> None:
+    def _exec_actions(self, actions: list[dict], ctx: dict, ignore_stop: bool = False) -> None:
+        # ignore_stop=True is for pre_stop_actions only: stop() sets
+        # self._stop BEFORE the post-loop cleanup that runs pre_stop_actions,
+        # so the normal `if self._stop.is_set(): return` guard used to bail
+        # out before a single pre-stop action ran on every manual/emergency
+        # stop (F12, macro_stop, kill-switch) — the one case a "cleanup on
+        # stop" feature exists for. Auto-stop paths (stop_conditions/
+        # timeout/max_iterations) never set _stop, so they were unaffected.
         for action in actions:
-            if self._stop.is_set():
+            if not ignore_stop and self._stop.is_set():
                 return
             if not self._pause_lock.wait(timeout=0.5):
-                if self._stop.is_set():
+                if not ignore_stop and self._stop.is_set():
                     return
                 continue
-            if self._stop.is_set():
+            if not ignore_stop and self._stop.is_set():
                 return
             exec_action(action, ctx)
 

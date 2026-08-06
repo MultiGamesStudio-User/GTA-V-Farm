@@ -147,9 +147,24 @@ function _acpSetRunning(running) {
   document.getElementById('acp-status').textContent  = running ? '🟢 En cours…' : '⚪ Arrêté';
 }
 
-async function startAutoClicker() {
-  if (_acpRunning) return;
+// Guards re-entrancy DURING the start-delay countdown, before _acpRunning
+// becomes true. startAutoClicker() is also reachable via the global F6
+// hotkey (registered through Electron globalShortcut, independent of the
+// Start button's `disabled` state) — without this, two F6 presses during a
+// configured delay launched two concurrent countdowns/pollers.
+let _acpStarting = false;
 
+async function startAutoClicker() {
+  if (_acpRunning || _acpStarting) return;
+  _acpStarting = true;
+  try {
+    await _startAutoClickerInner();
+  } finally {
+    _acpStarting = false;
+  }
+}
+
+async function _startAutoClickerInner() {
   const delay = parseInt(document.getElementById('acp-start-delay').value) || 0;
 
   if (delay > 0) {
@@ -187,16 +202,22 @@ async function startAutoClicker() {
     }
     await window.api.macroStart({ macro, macro_id: '__auto_clicker__' });
     _acpSetRunning(true);
-    _acpStatusPoller = setInterval(async () => {
+    // Captured locally (not read back from the shared _acpStatusPoller
+    // global) so this callback always clears ITS OWN interval — if a second
+    // poller had ever been created (re-entrancy is now guarded above, but
+    // this stays correct even so), reading the mutable global here could
+    // clear the wrong one and leak the other running forever.
+    const pollerId = setInterval(async () => {
       try {
         const st = await window.api.engineStatus();
         if (!st?.running?.includes('__auto_clicker__')) {
           _acpSetRunning(false);
-          clearInterval(_acpStatusPoller);
-          _acpStatusPoller = null;
+          clearInterval(pollerId);
+          if (_acpStatusPoller === pollerId) _acpStatusPoller = null;
         }
       } catch (_) {}
     }, 1000);
+    _acpStatusPoller = pollerId;
   } catch (e) {
     appendLog('ERROR', 'Auto Clicker: ' + e.message);
     _acpSetRunning(false);

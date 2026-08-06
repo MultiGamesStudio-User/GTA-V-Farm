@@ -16,26 +16,49 @@ const crypto = require('crypto');
 let MANIFEST_URL = '';
 let BASE_URL     = '';
 
+// No activity (not even a connection) for this long aborts the request —
+// an inactivity timeout, not a hard cap, so it's reset on every chunk
+// received: a legitimately slow-but-progressing download of a large file
+// isn't killed, while a stalled connection (DNS hang, dead socket, proxy
+// swallowing the request) can no longer hang checkForUpdates() forever
+// with no 'updater:done'/'updater:error' ever firing.
+const _GET_INACTIVITY_TIMEOUT_MS = 20000;
+
 // ── Helpers réseau ────────────────────────────────────────────────────────────
 function _get(url, asBuffer = false) {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https') ? https : http;
-    mod.get(url, { headers: { 'User-Agent': 'MacroEngine-Updater/1.0', 'Cache-Control': 'no-cache' } }, (res) => {
+    const controller = new AbortController();
+    let timer;
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => controller.abort(), _GET_INACTIVITY_TIMEOUT_MS);
+    };
+    resetTimer();
+
+    mod.get(url, {
+      headers: { 'User-Agent': 'MacroEngine-Updater/1.0', 'Cache-Control': 'no-cache' },
+      signal: controller.signal,
+    }, (res) => {
+      resetTimer();
       if (res.statusCode === 301 || res.statusCode === 302) {
+        clearTimeout(timer);
         return _get(res.headers.location, asBuffer).then(resolve).catch(reject);
       }
       if (res.statusCode !== 200) {
+        clearTimeout(timer);
         res.resume();
         return reject(new Error(`HTTP ${res.statusCode} — ${url}`));
       }
       const chunks = [];
-      res.on('data', c => chunks.push(c));
+      res.on('data', c => { resetTimer(); chunks.push(c); });
       res.on('end', () => {
+        clearTimeout(timer);
         const buf = Buffer.concat(chunks);
         resolve(asBuffer ? buf : buf.toString('utf-8'));
       });
-      res.on('error', reject);
-    }).on('error', reject);
+      res.on('error', (e) => { clearTimeout(timer); reject(e); });
+    }).on('error', (e) => { clearTimeout(timer); reject(e); });
   });
 }
 

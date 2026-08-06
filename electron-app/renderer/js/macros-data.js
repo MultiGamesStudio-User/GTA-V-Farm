@@ -22,7 +22,7 @@ function exposeMacroFunctions() {
 
 async function loadMacros() {
   try {
-    const data = await window.api.readMacros();
+    const data = await window.api.readMacros({ beta: _macrosBetaMode });
     macros = Array.isArray(data) ? data : (Array.isArray(data?.macros) ? data.macros : []);
   } catch (_) { macros = []; }
   renderMacroList();
@@ -34,8 +34,8 @@ async function saveMacros() {
     try { flushEditorToMacro(); } catch (e) { console.error('[saveMacros] flush error:', e); }
   }
   try {
-    await window.api.writeMacros(macros);
-    appendLog('INFO', 'Macros sauvegardées');
+    await window.api.writeMacros(macros, { beta: _macrosBetaMode });
+    appendLog('INFO', 'Macros sauvegardées' + (_macrosBetaMode ? ' (beta)' : ''));
     showToast('Macros sauvegardées', 'success', 2000);
   } catch (e) { appendLog('ERROR', 'Erreur sauvegarde: ' + e.message); }
 }

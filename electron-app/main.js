@@ -39,6 +39,12 @@ try {
 // Capture globale des exceptions non gérées
 process.on('uncaughtException', (err) => {
   writeLog('FATAL', 'uncaughtException:', err.stack || err.message);
+  // The process is in an undefined state past this point (Node's own
+  // guidance) — don't leave the Python engine (and its game-input actions)
+  // running unsupervised underneath a main process that might be about to
+  // become unresponsive. Fire-and-forget: we're already in a crash path,
+  // not waiting for confirmation here.
+  try { killEngine(); } catch (_) {}
   try {
     dialog.showErrorBox('MacroEngine — Erreur fatale', err.stack || err.message);
   } catch (_) {}
@@ -61,6 +67,11 @@ const ROOT_DIR      = BOT_DIR;
 const MAIN_PY       = path.join(BOT_DIR, 'main.py');
 const USERDATA_DIR  = app.getPath('userData');
 const MACROS_PATH   = path.join(USERDATA_DIR, 'macros.json');
+// Separate file for the "Macros 🧪" sandbox tab — same editor/runner code as
+// the real Macros page (see app.js's navigate() macros-beta remap), just a
+// different JSON file, so bidouiller in the sandbox never touches real
+// macros.json.
+const MACROS_PATH_BETA = path.join(USERDATA_DIR, 'macros_beta.json');
 const LICENSE_PATH  = path.join(USERDATA_DIR, 'license.json');
 const SETTINGS_PATH = path.join(USERDATA_DIR, 'settings.json');
 // Cible pip stable, hors de python-embed/ (qui, lui, est recree a chaque
@@ -181,9 +192,11 @@ function verifyLicenseOnline(key) {
         clearTimeout(timer);
         try {
           const data = JSON.parse(body);
-          resolve({ valid: !!data.valid, offline: false });
+          // data.result: raison précise renvoyée par LicenseGate — VALID, NOT_FOUND,
+          // NOT_ACTIVE, EXPIRED, LICENSE_SCOPE_FAILED, IP_LIMIT_EXCEEDED, RATE_LIMIT_EXCEEDED
+          resolve({ valid: !!data.valid, offline: false, result: data.result || null });
         } catch (_) {
-          resolve({ valid: false, offline: false });
+          resolve({ valid: false, offline: false, result: null });
         }
       });
     });
@@ -489,6 +502,16 @@ function startEngine() {
     env:         { ...process.env, PYTHONUNBUFFERED: '1', MACROENGINE_AI_DEPS_DIR: AI_DEPS_DIR, MACROENGINE_USERDATA_DIR: USERDATA_DIR },
   });
 
+  // Without these, a broken pipe (e.g. engineCmd writing to stdin the
+  // instant the Python process dies) emits an unhandled 'error' on that
+  // stream — Node treats an unhandled stream 'error' as fatal, surfacing as
+  // the top-level uncaughtException dialog for what should be a routine,
+  // locally-recoverable IPC failure (engineCmd's own try/catch already
+  // handles the write failing).
+  engineProc.stdin.on('error', err => writeLog('WARNING', 'Engine stdin error:', err.message));
+  engineProc.stdout.on('error', err => writeLog('WARNING', 'Engine stdout error:', err.message));
+  engineProc.stderr.on('error', err => writeLog('WARNING', 'Engine stderr error:', err.message));
+
   // Line-by-line stdout reader
   engineProc.stdout.on('data', chunk => {
     _msgBuf += chunk.toString();
@@ -540,14 +563,23 @@ function killEngine() {
   engineProc = null;
 }
 
+// Poll until engineProc.stdin is writable (or timeoutMs elapses) — shared
+// by every call site that needs the engine ready before writing to it, so
+// the three previously-separate copies (each with its own constants) can't
+// drift out of sync with each other.
+async function _waitForEngineReady(timeoutMs = 3000, stepMs = 10) {
+  const steps = Math.ceil(timeoutMs / stepMs);
+  for (let i = 0; i < steps; i++) {
+    if (engineProc?.stdin?.writable) return;
+    await new Promise(r => setTimeout(r, stepMs));
+  }
+}
+
 // Pousse la clé de licence locale vers le moteur Python — sert uniquement à
 // identifier l'install dans les rapports debug webhook (screenshot on
 // macro start/stop), jamais transmise ailleurs qu'au process Python local.
 async function _pushLicenseKeyToEngine() {
-  for (let i = 0; i < 300; i++) {
-    if (engineProc?.stdin?.writable) break;
-    await new Promise(r => setTimeout(r, 10));
-  }
+  await _waitForEngineReady();
   try { await engineCmd({ cmd: 'set_license_key', key: readLicense() || '', app_version: app.getVersion() }); } catch (_) {}
 }
 
@@ -633,8 +665,9 @@ for (const cmd of [
   'focus_window', 'get_screen_info', 'find_window_monitor',
   // Coords
   'validate_point', 'validate_region', 'scale_coords',
-  // Vision & OCR
-  'preview_region', 'pick_color', 'region_avg_color', 'save_template', 'check_ocr', 'ocr_text', 'test_template_score',
+  // Vision & OCR (check_ocr/ocr_text/test_template_score have their own
+  // longer-timeout handler below — see the comment there)
+  'preview_region', 'pick_color', 'region_avg_color', 'save_template',
   // Macros
   'macro_start', 'macro_stop', 'macro_pause', 'macro_resume', 'stop_all',
   // Conditions / Actions testing
@@ -644,7 +677,7 @@ for (const cmd of [
   // Webhook
   'set_webhook', 'send_webhook',
   // State / Stats
-  'get_stats', 'get_variables', 'set_variable', 'set_counter', 'clear_state',
+  'get_stats', 'get_macro_history', 'get_variables', 'set_variable', 'set_counter', 'clear_state',
   // Dead zones
   'set_dead_zones', 'get_dead_zones',
   // Pixel snapshot
@@ -667,10 +700,24 @@ for (const cmd of [
 async function _ensureEngineStarted() {
   if (engineProc) return;
   startEngine();
-  for (let _i = 0; _i < 300; _i++) {
-    if (engineProc?.stdin?.writable) break;
-    await new Promise(r => setTimeout(r, 10));
-  }
+  await _waitForEngineReady();
+}
+
+// ── IPC: OCR ──────────────────────────────────────────────────────────────────
+// Own handlers, not in the generic 15s forwarded-command loop above: per
+// CLAUDE.md the OCR cascade is EasyOCR (6 preprocessing variants, scored) →
+// WinRT → Tesseract, and a cold first call (model load) can legitimately
+// exceed 15s — that was surfacing as a spurious "Engine timeout" on
+// conditions used inside running macros, not an actual failure.
+for (const cmd of ['check_ocr', 'ocr_text', 'test_template_score']) {
+  ipcMain.handle(`engine:${cmd}`, async (_evt, params) => {
+    await _ensureEngineStarted();
+    try {
+      return await engineCmd({ cmd, ...params }, 60000);
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
 }
 
 // ── IPC: Auto Bouffe vision AI (Moondream Cloud) ─────────────────────────────
@@ -1020,8 +1067,8 @@ ipcMain.on('overlay:minimize', () => {
   mainWindow?.webContents.send('overlay:closed');
 });
 
-ipcMain.on('overlay:set-size', (_, { w, h }) => {
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
+ipcMain.on('overlay:set-size', (_, { w, h } = {}) => {
+  if (overlayWindow && !overlayWindow.isDestroyed() && Number.isFinite(w) && Number.isFinite(h)) {
     overlayWindow.setSize(Math.round(w), Math.round(h), true);
   }
 });
@@ -1037,29 +1084,28 @@ ipcMain.handle('overlay:get-shortcuts', () => {
   } catch (_) { return { ok: false, stop: '', pause: '' }; }
 });
 
-ipcMain.on('overlay:macro-start', async (_, { name }) => {
+ipcMain.on('overlay:macro-start', async (_, { name } = {}) => {
+  if (!name) return;
   try { await engineCmd({ cmd: 'macro_start', name }); } catch (_) {}
 });
 
-ipcMain.on('overlay:macro-stop', async (_, { name }) => {
+ipcMain.on('overlay:macro-stop', async (_, { name } = {}) => {
+  if (!name) return;
   try { await engineCmd({ cmd: 'macro_stop', name }); } catch (_) {}
 });
 
 // ── Overlay: Auto Clicker ─────────────────────────────────────────────────────
 let _overlayAcpRunning = false;
 
-ipcMain.on('overlay:acp-start', async (evt, { macro }) => {
-  if (_overlayAcpRunning) return;
+ipcMain.on('overlay:acp-start', async (_evt, { macro } = {}) => {
+  if (_overlayAcpRunning || !macro) return;
   _overlayAcpRunning = true;
   _sendToOverlay('overlay:acp-status', { running: true });
   try {
     // Ensure engine is alive before sending the macro
     if (!engineProc) {
       startEngine();
-      for (let _i = 0; _i < 30; _i++) {
-        if (engineProc?.stdin?.writable) break;
-        await new Promise(r => setTimeout(r, 100));
-      }
+      await _waitForEngineReady();
     }
     await engineCmd({ cmd: 'macro_start', macro, macro_id: '__auto_clicker__' });
   } catch (e) {
@@ -1100,21 +1146,23 @@ ipcMain.on('overlay:focus-main', () => {
 });
 
 // ── IPC: macros file (save/load JSON) ────────────────────────────────────────
-ipcMain.handle('macros:read', () => {
+ipcMain.handle('macros:read', (_evt, opts) => {
+  const macrosPath = opts?.beta ? MACROS_PATH_BETA : MACROS_PATH;
   try {
-    if (!fs.existsSync(MACROS_PATH)) return { ok: true, macros: [] };
-    const data = JSON.parse(fs.readFileSync(MACROS_PATH, 'utf-8'));
+    if (!fs.existsSync(macrosPath)) return { ok: true, macros: [] };
+    const data = JSON.parse(fs.readFileSync(macrosPath, 'utf-8'));
     return { ok: true, macros: Array.isArray(data) ? data : [] };
   } catch (e) {
     return { ok: false, error: e.message };
   }
 });
 
-ipcMain.handle('macros:write', (_evt, macros) => {
+ipcMain.handle('macros:write', (_evt, macros, opts) => {
+  const macrosPath = opts?.beta ? MACROS_PATH_BETA : MACROS_PATH;
   try {
-    fs.mkdirSync(path.dirname(MACROS_PATH), { recursive: true });
-    _atomicWrite(MACROS_PATH, JSON.stringify(macros, null, 2));
-    _sendToOverlay('overlay:macros-updated', {});
+    fs.mkdirSync(path.dirname(macrosPath), { recursive: true });
+    _atomicWrite(macrosPath, JSON.stringify(macros, null, 2));
+    if (!opts?.beta) _sendToOverlay('overlay:macros-updated', {});
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -1190,6 +1238,16 @@ function _onLicenseRevoked(reason) {
 }
 
 // ── IPC: license ─────────────────────────────────────────────────────────────
+// Pousse le statut live (valide/hors-ligne/jours restants) vers le moteur
+// Python à chaque license:check — s'ajoute à la clé seule déjà poussée au
+// démarrage (_pushLicenseKeyToEngine), pour que les rapports debug webhook
+// affichent l'état actuel, pas juste la clé brute.
+async function _pushLicenseStatusToEngine(key, valid, offline, daysLeft, resultCode) {
+  try {
+    await engineCmd({ cmd: 'set_license_key', key: key || '', valid: !!valid, offline: !!offline, days_left: daysLeft ?? null, result: resultCode || null });
+  } catch (_) {}
+}
+
 ipcMain.handle('license:check', async () => {
   writeLog('INFO', '[LIC] Appel license:check');
   const licData = readLicenseData();
@@ -1199,10 +1257,11 @@ ipcMain.handle('license:check', async () => {
   }
   writeLog('INFO', `[LIC] Vérification online pour ${licData.key}`);
   const result = await verifyLicenseOnline(licData.key);
-  writeLog('INFO', `[LIC] Résultat: valid=${result.valid} offline=${result.offline}`);
+  writeLog('INFO', `[LIC] Résultat: valid=${result.valid} offline=${result.offline} result=${result.result}`);
   if (result.valid) {
     writeLog('INFO', '[LIC] Licence valide, rafraîchissement validatedAt');
     saveLicense(licData.key);        // Rafraîchir validatedAt
+    _pushLicenseStatusToEngine(licData.key, true, false, null, result.result);
     return { valid: true };
   }
 
@@ -1212,12 +1271,15 @@ ipcMain.handle('license:check', async () => {
     if (daysSince <= LICENSE_GRACE_DAYS) {
       const daysLeft = Math.ceil(LICENSE_GRACE_DAYS - daysSince);
       writeLog('WARN', `[LIC] mode hors-ligne, ${daysLeft}j restants`);
+      _pushLicenseStatusToEngine(licData.key, true, true, daysLeft, result.result);
       return { valid: true, offline: true, daysLeft };
     }
     writeLog('WARN', '[LIC] Grace period expiré');
+    _pushLicenseStatusToEngine(licData.key, false, true, null, result.result);
     return { valid: false, reason: 'grace_expired' };
   }
   writeLog('WARN', `[LIC] Licence invalide ou réseau KO (offline=${result.offline})`);
+  _pushLicenseStatusToEngine(licData.key, false, result.offline, null, result.result);
   return { valid: false, reason: result.offline ? 'network' : 'invalid' };
 });
 

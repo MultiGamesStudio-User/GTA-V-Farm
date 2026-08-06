@@ -11,6 +11,8 @@ Contient :
 Tout est thread-safe. Les données persistent jusqu'à la fin du process.
 """
 from __future__ import annotations
+import json
+import os
 import threading
 import time
 
@@ -86,6 +88,16 @@ def pixel_snapshot_get(key: str) -> dict | None:
 def pixel_snapshot_clear(key: str) -> None:
     with _lock:
         _pixel_snapshots.pop(key, None)
+
+def clear_all() -> None:
+    """Remet à zéro variables, compteurs et snapshots de pixels — utilisé
+    par la commande IPC clear_state (bouton Reset de l'UI). Ne touche pas
+    aux stats de macro (voir stats_clear_all) ni aux dead zones, qui ont
+    leur propre mécanisme."""
+    with _lock:
+        _counters.clear()
+        _variables.clear()
+        _pixel_snapshots.clear()
 
 
 # ── Zones interdites (dead zones) ─────────────────────────────────────────────
@@ -177,6 +189,48 @@ def stats_clear(macro_id: str) -> None:
 def stats_clear_all() -> None:
     with _lock:
         _stats.clear()
+
+
+# ── Historique persistant des runs ──────────────────────────────────────────────
+# Un enregistrement par macro terminée (peu importe la raison : boucle finie,
+# stop manuel, stop_condition, timeout, max_iterations) — écrit sur disque pour
+# survivre au redémarrage de l'app, contrairement à _stats ci-dessus qui est
+# perdu à chaque relance du process Python.
+_HISTORY_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    'macro_history.json',
+)
+_HISTORY_MAX = 300  # entrées totales conservées, toutes macros confondues
+
+def history_append(record: dict) -> None:
+    """Best-effort : une erreur d'écriture ne doit jamais faire planter le runner."""
+    with _lock:
+        try:
+            data = []
+            if os.path.exists(_HISTORY_PATH):
+                with open(_HISTORY_PATH, 'r', encoding='utf-8') as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, list):
+                    data = loaded
+            data.append(record)
+            if len(data) > _HISTORY_MAX:
+                data = data[-_HISTORY_MAX:]
+            with open(_HISTORY_PATH, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+def history_get(limit: int = 100) -> list:
+    try:
+        if not os.path.exists(_HISTORY_PATH):
+            return []
+        with open(_HISTORY_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            return []
+        return data[-limit:][::-1]  # plus récent en premier
+    except Exception:
+        return []
 
 
 # ── Runner registry (partagé avec conditions.py, évite l'import lourd au démarrage) ──

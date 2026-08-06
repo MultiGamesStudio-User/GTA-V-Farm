@@ -22,9 +22,73 @@ function openMacroModal(idx) {
 
     // Render content — wrapped so errors don't prevent modal from being visible
     try { renderMacroEditor(); } catch (e) { console.error('[openMacroModal] renderMacroEditor error:', e); }
+    try { _initMacroUndo(); _updateUndoRedoButtons(); } catch (e) { console.error('[openMacroModal] undo init error:', e); }
   } catch (e) {
     console.error('[openMacroModal] critical error:', e);
   }
+}
+
+/* ── Undo / Redo (Ctrl+Z / Ctrl+Y) ────────────────────────────
+   Snapshots the whole macro's JSON on the modal's capture phase, BEFORE
+   the click/change/focusin that's about to mutate it — so by the time our
+   listener runs, macros[currentMacroIdx] still holds the pre-mutation
+   state. One history stack per modal session (reset every time a macro
+   is opened). */
+let _macroUndoStack = [];
+let _macroRedoStack = [];
+let _macroUndoReady = false;
+
+function _initMacroUndo() {
+  _macroUndoStack = macros[currentMacroIdx] ? [JSON.stringify(macros[currentMacroIdx])] : [];
+  _macroRedoStack = [];
+  if (_macroUndoReady) return;
+  _macroUndoReady = true;
+  const modal = document.getElementById('macro-modal');
+  if (!modal) return;
+  ['click', 'change', 'focusin'].forEach(evt => modal.addEventListener(evt, _captureMacroUndoSnapshot, true));
+  document.addEventListener('keydown', (e) => {
+    if (modal.style.display === 'none') return;
+    const z = e.key === 'z' || e.key === 'Z';
+    const y = e.key === 'y' || e.key === 'Y';
+    if ((e.ctrlKey || e.metaKey) && z && !e.shiftKey) { e.preventDefault(); undoMacroEdit(); }
+    else if ((e.ctrlKey || e.metaKey) && (y || (z && e.shiftKey))) { e.preventDefault(); redoMacroEdit(); }
+  });
+}
+
+function _captureMacroUndoSnapshot() {
+  if (currentMacroIdx < 0 || !macros[currentMacroIdx]) return;
+  const snap = JSON.stringify(macros[currentMacroIdx]);
+  if (_macroUndoStack.length && _macroUndoStack[_macroUndoStack.length - 1] === snap) return;
+  _macroUndoStack.push(snap);
+  if (_macroUndoStack.length > 50) _macroUndoStack.shift();
+  _macroRedoStack = [];
+  _updateUndoRedoButtons();
+}
+
+function undoMacroEdit() {
+  if (currentMacroIdx < 0 || _macroUndoStack.length < 2) return;
+  _macroRedoStack.push(_macroUndoStack.pop());
+  macros[currentMacroIdx] = JSON.parse(_macroUndoStack[_macroUndoStack.length - 1]);
+  try { renderMacroEditor(); } catch (e) { console.error('[undoMacroEdit] render error:', e); }
+  _updateUndoRedoButtons();
+  showToast?.('Annulé', 'info', 1000);
+}
+
+function redoMacroEdit() {
+  if (currentMacroIdx < 0 || !_macroRedoStack.length) return;
+  const snap = _macroRedoStack.pop();
+  _macroUndoStack.push(snap);
+  macros[currentMacroIdx] = JSON.parse(snap);
+  try { renderMacroEditor(); } catch (e) { console.error('[redoMacroEdit] render error:', e); }
+  _updateUndoRedoButtons();
+  showToast?.('Rétabli', 'info', 1000);
+}
+
+function _updateUndoRedoButtons() {
+  const undoBtn = document.getElementById('btn-macro-undo');
+  const redoBtn = document.getElementById('btn-macro-redo');
+  if (undoBtn) undoBtn.disabled = _macroUndoStack.length < 2;
+  if (redoBtn) redoBtn.disabled = _macroRedoStack.length === 0;
 }
 
 function closeMacroModal() {
@@ -59,15 +123,33 @@ async function saveMacroFromModal() {
 let _selectedRuleIdx = -1;
 let _selectedActIdx  = -1;
 
+function filterRuleNodes() {
+  const query = (document.getElementById('n8n-rule-search')?.value || '').toLowerCase().trim();
+  const macro = macros[currentMacroIdx];
+  if (!macro) return;
+  (macro.rules || []).forEach((rule, ri) => {
+    const node = document.getElementById('n8n-node-' + ri);
+    if (!node) return;
+    const match = !query || (rule.label || '').toLowerCase().includes(query);
+    node.style.display = match ? '' : 'none';
+    const connector = node.nextElementSibling;
+    if (connector && connector.classList.contains('n8n-connector')) connector.style.display = match ? '' : 'none';
+  });
+}
+
 /* Dispatch: macro-level or rule-level canvas */
 function renderN8nCanvas() {
   const canvas = document.getElementById('n8n-canvas');
   const macro  = macros[currentMacroIdx];
   if (!canvas || !macro) return;
+  const searchBar = document.getElementById('n8n-rule-search-bar');
   if (_selectedRuleIdx >= 0) {
+    if (searchBar) searchBar.style.display = 'none';
     _renderRuleCanvas(canvas, macro.rules[_selectedRuleIdx] || {}, _selectedRuleIdx);
   } else {
+    if (searchBar) searchBar.style.display = (macro.rules || []).length > 4 ? 'flex' : 'none';
     _renderMacroCanvas(canvas, macro);
+    filterRuleNodes();
   }
 }
 
@@ -258,6 +340,71 @@ function _actIconSVG(type) {
     autoclk: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M12 2a6 6 0 0 1 6 6v8a6 6 0 0 1-12 0V8a6 6 0 0 1 6-6z"/><line x1="12" y1="2" x2="12" y2="9"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`,
   };
   return icons[_actCategory(type)] || icons.sys;
+}
+
+/* Map condition type → category key (mirrors _actCategory; shares the
+   'kbd'/'var'/'sys' colors+icons with actions so the same concept reads as
+   the same color on both sides of a rule) */
+function _condCategory(type) {
+  if (['pixel_color','pixel_color_not','pixel_changed','pixel_not_changed','region_color_avg',
+       'text_contains','text_not_contains','text_regex','template_match','template_not_found'].includes(type)) return 'vis';
+  if (['window_focused','window_not_focused','window_exists','window_not_exists',
+       'process_running','process_not_running'].includes(type)) return 'win';
+  if (['macro_is_running','macro_not_running'].includes(type)) return 'macro';
+  if (['counter_eq','counter_not_eq','counter_gte','counter_lte','counter_gt','counter_lt','counter_between',
+       'variable_equals','variable_contains'].includes(type)) return 'var';
+  if (['time_between','random_chance'].includes(type)) return 'time';
+  if (['key_is_held','key_not_held','clipboard_contains'].includes(type)) return 'kbd';
+  return 'sys'; // always / never
+}
+
+/* SVG icon for each condition category */
+function _condIconSVG(type) {
+  const icons = {
+    vis:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>`,
+    win:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>`,
+    macro: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M19 11h-1V7a2 2 0 0 0-2-2h-4V4a2 2 0 0 0-4 0v1H4a2 2 0 0 0-2 2v4h1a2 2 0 0 1 0 4H2v4a2 2 0 0 0 2 2h4v-1a2 2 0 0 1 4 0v1h4a2 2 0 0 0 2-2v-4h1a2 2 0 0 0 0-4z"/></svg>`,
+    var:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    time:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    kbd:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M6 11h0M10 11h0M14 11h0M18 11h0M6 15h12"/></svg>`,
+    sys:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>`,
+  };
+  return icons[_condCategory(type)] || icons.sys;
+}
+
+/* Type <select> grouped by category (instead of one long flat list) —
+   shared by every condition/action row builder below */
+function _groupedTypeOptions(labels, categoryFn, groupLabels, current) {
+  const cats = {};
+  for (const [type, label] of Object.entries(labels)) {
+    const cat = categoryFn(type);
+    (cats[cat] = cats[cat] || []).push([type, label]);
+  }
+  return Object.entries(cats).map(([cat, entries]) => `
+    <optgroup label="${escHtml(groupLabels[cat] || cat)}">
+      ${entries.map(([type, label]) => `<option value="${type}" ${type === current ? 'selected' : ''}>${escHtml(label)}</option>`).join('')}
+    </optgroup>`).join('');
+}
+
+const COND_GROUP_LABELS = {
+  vis: 'Vision & OCR', win: 'Fenêtres & processus', macro: 'Macros',
+  var: 'Variables & compteurs', time: 'Temporel & aléatoire',
+  kbd: 'Clavier & presse-papier', sys: 'Constantes',
+};
+const ACT_GROUP_LABELS = {
+  kbd: 'Clavier', mouse: 'Souris', wait: 'Temporisation', ctrl: 'Contrôle de macros',
+  var: 'Variables & compteurs', notif: 'Notifications & logs', sys: 'Système', autoclk: 'Auto-clic',
+};
+
+/* Swaps a category-icon badge's color class + SVG after its <select> changes type.
+   colorPrefix must match whichever color classes the badge was first rendered with
+   ('item-cat-icon-' for conditions, 'n8n-act-icon-' for actions — the two class sets
+   aren't identical, e.g. mouse/wait/ctrl/notif/autoclk only exist under n8n-act-icon-). */
+function _refreshCatIcon(iconId, newType, categoryFn, iconFn, colorPrefix) {
+  const el = document.getElementById(iconId);
+  if (!el) return;
+  el.className = 'item-cat-icon ' + (colorPrefix || 'item-cat-icon-') + categoryFn(newType);
+  el.innerHTML = iconFn(newType);
 }
 
 /* Connector between action nodes (with insert button) */
@@ -534,9 +681,12 @@ function renderN8nActPanel(ri, ai) {
     </div>
     <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
       <label style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Type d'action</label>
-      <select style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:12px;color:var(--text-1)" onchange="setActType(${ri},${ai},this.value)">
-        ${Object.entries(ACT_LABELS).map(([k, v]) => `<option value="${k}" ${a.type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
-      </select>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="item-cat-icon n8n-act-icon-${_actCategory(a.type)}" id="actpanel-icon" style="width:26px;height:26px;border-radius:6px">${_actIconSVG(a.type)}</div>
+        <select style="flex:1;width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:12px;color:var(--text-1)" onchange="setActType(${ri},${ai},this.value);_refreshCatIcon('actpanel-icon',this.value,_actCategory,_actIconSVG,'n8n-act-icon-')">
+          ${_groupedTypeOptions(ACT_LABELS, _actCategory, ACT_GROUP_LABELS, a.type)}
+        </select>
+      </div>
     </div>
     <div class="n8n-act-fields-section">
       <div class="item-row" id="arow-${ri}-${ai}">
@@ -587,55 +737,55 @@ function moveRuleDown(ri) {
 
 const COND_LABELS = {
   // Vision
-  pixel_color: 'Pixel couleur', pixel_color_not: 'Pixel couleur ≠',
-  pixel_changed: 'Pixel a changé', pixel_not_changed: 'Pixel n\'a pas changé',
-  region_color_avg: 'Couleur moyenne zone',
-  text_contains: 'Texte contient', text_not_contains: 'Texte ≠',
-  text_regex: 'Texte regex',
-  template_match: 'Template match', template_not_found: 'Template absent',
+  pixel_color: '🎨 Pixel couleur', pixel_color_not: '🎨 Pixel couleur ≠',
+  pixel_changed: '👁️ Pixel a changé', pixel_not_changed: '👁️ Pixel n\'a pas changé',
+  region_color_avg: '🎨 Couleur moyenne zone',
+  text_contains: '🔤 Texte contient', text_not_contains: '🔤 Texte ≠',
+  text_regex: '🔤 Texte regex',
+  template_match: '🖼️ Template match', template_not_found: '🖼️ Template absent',
   // Fenêtres & processus
-  window_focused: 'Fenêtre active', window_not_focused: 'Fenêtre inactive',
-  window_exists: 'Fenêtre existe', window_not_exists: 'Fenêtre absente',
-  process_running: 'Processus actif', process_not_running: 'Processus inactif',
+  window_focused: '🪟 Fenêtre active', window_not_focused: '🪟 Fenêtre inactive',
+  window_exists: '🪟 Fenêtre existe', window_not_exists: '🪟 Fenêtre absente',
+  process_running: '⚙️ Processus actif', process_not_running: '⚙️ Processus inactif',
   // Macros
-  macro_is_running: 'Macro en cours', macro_not_running: 'Macro arrêtée',
+  macro_is_running: '🧩 Macro en cours', macro_not_running: '🧩 Macro arrêtée',
   // Variables & compteurs
-  counter_eq: 'Compteur =', counter_not_eq: 'Compteur ≠',
-  counter_gte: 'Compteur ≥', counter_lte: 'Compteur ≤',
-  counter_gt: 'Compteur >', counter_lt: 'Compteur <',
-  counter_between: 'Compteur entre',
-  variable_equals: 'Variable =', variable_contains: 'Variable contient',
+  counter_eq: '🔢 Compteur =', counter_not_eq: '🔢 Compteur ≠',
+  counter_gte: '🔢 Compteur ≥', counter_lte: '🔢 Compteur ≤',
+  counter_gt: '🔢 Compteur >', counter_lt: '🔢 Compteur <',
+  counter_between: '🔢 Compteur entre',
+  variable_equals: '🏷️ Variable =', variable_contains: '🏷️ Variable contient',
   // Temporel & aléatoire
-  time_between: 'Heure entre', random_chance: 'Chance aléatoire',
+  time_between: '🕒 Heure entre', random_chance: '🎲 Chance aléatoire',
   // Entrées
-  key_is_held: 'Touche enfoncée', key_not_held: 'Touche relâchée',
-  clipboard_contains: 'Presse-papier contient',
+  key_is_held: '⌨️ Touche enfoncée', key_not_held: '⌨️ Touche relâchée',
+  clipboard_contains: '📋 Presse-papier contient',
   // Universel
-  always: 'Toujours vrai', never: 'Toujours faux',
+  always: '♾️ Toujours vrai', never: '🚫 Toujours faux',
 };
 
 const ACT_LABELS = {
   // Clavier
-  key_tap: 'Appui touche', key_hold: 'Maintien touche', key_release: 'Relâcher touche',
-  key_combo: 'Combo touches', type_text: 'Taper du texte',
+  key_tap: '⌨️ Appui touche', key_hold: '⌨️ Maintien touche', key_release: '⌨️ Relâcher touche',
+  key_combo: '⌨️ Combo touches', type_text: '📝 Taper du texte',
   // Souris
-  mouse_move: 'Déplacer souris', mouse_click: 'Clic souris',
-  mouse_double_click: 'Double-clic souris', mouse_drag: 'Drag souris', scroll: 'Scroll',
+  mouse_move: '🖱️ Déplacer souris', mouse_click: '🖱️ Clic souris',
+  mouse_double_click: '🖱️ Double-clic souris', mouse_drag: '🖱️ Drag souris', scroll: '🖱️ Scroll',
   // Temporisation
-  wait: 'Attendre (fixe)', random_wait: 'Attendre (aléatoire)',
+  wait: '⏱️ Attendre (fixe)', random_wait: '⏱️ Attendre (aléatoire)',
   // Contrôle macro
-  macro_start: 'Lancer macro', macro_stop: 'Arrêter macro', stop_self: 'Arrêter cette macro',
+  macro_start: '▶️ Lancer macro', macro_stop: '⏹️ Arrêter macro', stop_self: '⏹️ Arrêter cette macro',
   // Variables & Compteurs
-  set_variable: 'Définir variable', counter_set: 'Définir compteur',
-  counter_inc: '++ Incrémenter', counter_dec: '-- Décrémenter', counter_reset: 'Reset compteur',
+  set_variable: '🏷️ Définir variable', counter_set: '🔢 Définir compteur',
+  counter_inc: '🔢 ++ Incrémenter', counter_dec: '🔢 -- Décrémenter', counter_reset: '🔢 Reset compteur',
   // Notifications
-  send_webhook: '🔔 Envoyer webhook', log_message: '📝 Log message',
+  send_webhook: '🪝 Envoyer webhook', log_message: '📜 Log message',
   notify_toast: '💬 Notification Windows', play_sound: '🔊 Jouer son',
   // Flux
   repeat: '🔁 Répéter bloc',
   // Système
-  focus_window: 'Focus fenêtre', screenshot_save: 'Sauvegarder screenshot',
-  clipboard_set: 'Copier presse-papier',
+  focus_window: '🪟 Focus fenêtre', screenshot_save: '📸 Sauvegarder screenshot',
+  clipboard_set: '📋 Copier presse-papier',
   // Auto-clic
   auto_clicker: '🖱️ Auto Clicker',
 };
@@ -687,7 +837,10 @@ function renderMacroEditor() {
   const panelName = document.getElementById('n8n-panel-macro-name');
   if (panelName) panelName.textContent = macro.name || 'Paramètres';
 
-  try { renderN8nCanvas(); }        catch (e) { console.error('[renderMacroEditor] canvas error:', e); }
+  // Beta sandbox reuses the exact same n8n canvas editor as production —
+  // the flat-accordion rule list that used to live here didn't land with
+  // the user, so it was removed; the canvas is the shared base instead.
+  try { renderN8nCanvas(); } catch (e) { console.error('[renderMacroEditor] canvas error:', e); }
   try { renderAdvancedSections(); } catch (e) { console.error('[renderMacroEditor] sections error:', e); }
   try { updateMacroRunButtons(); }  catch (e) {}
 }
@@ -754,154 +907,19 @@ function flushEditorToMacro() {
   macroFieldChanged();
 }
 
-/* ── Rule collapse state (by rule ID, persists across re-renders) */
-let _collapsedRules = new Set();
-
-function toggleRuleCollapse(ri) {
-  const macro = macros[currentMacroIdx];
-  if (!macro) return;
-  const ruleId = macro.rules[ri]?.id || String(ri);
-  if (_collapsedRules.has(ruleId)) {
-    _collapsedRules.delete(ruleId);
-  } else {
-    _collapsedRules.add(ruleId);
-  }
-  // Update DOM directly — no full re-render needed
-  const card = document.getElementById('rule-' + ri);
-  if (!card) return;
-  const isCollapsed = _collapsedRules.has(ruleId);
-  card.classList.toggle('collapsed', isCollapsed);
-  const chevron = card.querySelector('.rule-chevron');
-  if (chevron) chevron.style.transform = isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-}
-
-function collapseAllRules() {
-  const macro = macros[currentMacroIdx];
-  if (!macro) return;
-  macro.rules.forEach((r, ri) => _collapsedRules.add(r.id || String(ri)));
-  renderRules();
-}
-
-function expandAllRules() {
-  _collapsedRules.clear();
-  renderRules();
-}
-
 /* ── Rules ────────────────────────────────────────────────── */
 function renderRules() {
-  // N8N-aware: if the canvas is present we use it instead of the legacy rules-container
-  if (document.getElementById('n8n-canvas')) {
-    renderN8nCanvas();
-    if (_selectedRuleIdx >= 0) {
-      const rule = macros[currentMacroIdx]?.rules[_selectedRuleIdx];
-      if (_selectedActIdx >= 0 && rule) {
-        renderN8nActPanel(_selectedRuleIdx, _selectedActIdx);
-      } else if (rule) {
-        renderN8nRulePanel(_selectedRuleIdx);
-        const titleEl = document.getElementById('n8n-rule-panel-title');
-        if (titleEl) titleEl.textContent = rule.label || `Règle ${_selectedRuleIdx + 1}`;
-      }
+  renderN8nCanvas();
+  if (_selectedRuleIdx >= 0) {
+    const rule = macros[currentMacroIdx]?.rules[_selectedRuleIdx];
+    if (_selectedActIdx >= 0 && rule) {
+      renderN8nActPanel(_selectedRuleIdx, _selectedActIdx);
+    } else if (rule) {
+      renderN8nRulePanel(_selectedRuleIdx);
+      const titleEl = document.getElementById('n8n-rule-panel-title');
+      if (titleEl) titleEl.textContent = rule.label || `Règle ${_selectedRuleIdx + 1}`;
     }
-    return;
   }
-  // Legacy (non-n8n) fallback
-  const macro = macros[currentMacroIdx];
-  const container = document.getElementById('rules-container');
-  if (!macro || !container) return;
-  macro.rules = macro.rules || [];
-  if (macro.rules.length === 0) {
-    container.innerHTML = '<div class="empty-state" style="padding:1rem">Aucune règle. Cliquez "+ Règle"</div>';
-    return;
-  }
-  container.innerHTML = macro.rules.map((rule, ri) => renderRuleHTML(rule, ri)).join('');
-  _initRulesDnD();
-  _initItemsDnD();
-}
-
-function renderRuleHTML(rule, ri) {
-  rule.conditions = rule.conditions || [];
-  rule.actions    = rule.actions    || [];
-  const ruleId    = rule.id || String(ri);
-  const isCollapsed = _collapsedRules.has(ruleId);
-  const condCount = rule.conditions.length;
-  const actCount  = rule.actions.length;
-  const isDisabled = rule.enabled === false;
-
-  // Compact pills shown in collapsed mode
-  const condPill = condCount
-    ? `<span class="rule-pill rule-pill-cond">${condCount} cond.</span>`
-    : `<span class="rule-pill rule-pill-empty">∅ cond.</span>`;
-  const actPill  = actCount
-    ? `<span class="rule-pill rule-pill-act">${actCount} action${actCount !== 1 ? 's' : ''}</span>`
-    : `<span class="rule-pill rule-pill-empty">∅ action</span>`;
-
-  return `
-  <div class="rule-card${isCollapsed ? ' collapsed' : ''}${isDisabled ? ' rule-disabled' : ''}" id="rule-${ri}" draggable="true">
-    <div class="rule-header">
-      <div class="rule-drag-handle" title="Glisser pour réorganiser">
-        <svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11">
-          <circle cx="5" cy="3.5" r="1.3"/><circle cx="11" cy="3.5" r="1.3"/>
-          <circle cx="5" cy="8"   r="1.3"/><circle cx="11" cy="8"   r="1.3"/>
-          <circle cx="5" cy="12.5" r="1.3"/><circle cx="11" cy="12.5" r="1.3"/>
-        </svg>
-      </div>
-      <button class="icon-btn rule-collapse-btn" title="${isCollapsed ? 'Développer' : 'Réduire'}" onclick="toggleRuleCollapse(${ri})">
-        <svg class="rule-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12"
-          style="transition:transform .2s cubic-bezier(.4,0,.2,1);transform:rotate(${isCollapsed ? '-90' : '0'}deg)">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
-      <div class="rule-header-left">
-        <label class="toggle-label" title="${isDisabled ? 'Activer' : 'Désactiver'}">
-          <input type="checkbox" class="rule-enabled" ${rule.enabled !== false ? 'checked' : ''}
-            onchange="setRuleField(${ri},'enabled',this.checked);this.closest('.rule-card').classList.toggle('rule-disabled',!this.checked)">
-          <span class="toggle-track"></span>
-        </label>
-        <input type="text" class="rule-label-input" value="${escHtml(rule.label || 'Règle ' + (ri + 1))}"
-          placeholder="Nom de la règle" oninput="setRuleField(${ri},'label',this.value)">
-        <div class="rule-summary-pills">${condPill}${actPill}</div>
-      </div>
-      <div class="rule-header-right">
-        <select class="cond-mode-select" onchange="setRuleField(${ri},'condition_mode',this.value)">
-          <option value="all"  ${(rule.condition_mode||'all') === 'all'  ? 'selected' : ''}>Toutes les cond.</option>
-          <option value="any"  ${rule.condition_mode === 'any'           ? 'selected' : ''}>Au moins une</option>
-          <option value="none" ${rule.condition_mode === 'none'          ? 'selected' : ''}>Aucune (toujours)</option>
-        </select>
-        <label class="small-check-label">
-          <input type="checkbox" ${rule.stop_on_match ? 'checked' : ''} onchange="setRuleField(${ri},'stop_on_match',this.checked)">
-          Stop si match
-        </label>
-        <button class="icon-btn" title="Dupliquer règle" onclick="duplicateRule(${ri})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        </button>
-        <button class="icon-btn btn-danger-icon" title="Supprimer règle" onclick="deleteRule(${ri})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-        </button>
-      </div>
-    </div>
-    <div class="rule-body">
-      <div class="rule-col">
-        <div class="rule-col-header">
-          <span class="col-title cond-title">CONDITIONS</span>
-          <button class="btn btn-xs btn-secondary" onclick="addCondition(${ri})">+ Condition</button>
-        </div>
-        <div class="cond-list" id="cond-list-${ri}">
-          ${rule.conditions.map((c, ci) => renderConditionRowHTML(c, ri, ci, rule.conditions.length)).join('')}
-          ${rule.conditions.length === 0 ? '<div class="empty-mini">Pas de condition — règle active si "Aucune cond."</div>' : ''}
-        </div>
-      </div>
-      <div class="rule-col">
-        <div class="rule-col-header">
-          <span class="col-title act-title">ACTIONS</span>
-          <button class="btn btn-xs btn-secondary" onclick="addAction(${ri})">+ Action</button>
-        </div>
-        <div class="act-list" id="act-list-${ri}">
-          ${rule.actions.map((a, ai) => renderActionRowHTML(a, ri, ai, rule.actions.length)).join('')}
-          ${rule.actions.length === 0 ? '<div class="empty-mini">Aucune action configurée</div>' : ''}
-        </div>
-      </div>
-    </div>
-  </div>`;
 }
 
 function setRuleField(ri, field, value) {
@@ -917,19 +935,6 @@ function setRuleField(ri, field, value) {
     }
   }
   if (field === 'enabled') renderN8nCanvas();
-}
-
-function addRule() {
-  if (currentMacroIdx < 0) return;
-  const rules = macros[currentMacroIdx].rules;
-  const newIdx = rules.length;
-  rules.push({
-    id: 'rule_' + Date.now(),
-    label: 'Règle ' + (newIdx + 1),
-    enabled: true, condition_mode: 'all', conditions: [], actions: [], stop_on_match: false,
-  });
-  if (document.getElementById('n8n-canvas')) { n8nSelectRule(newIdx); return; }
-  renderRules();
 }
 
 function deleteRule(ri) {
@@ -966,154 +971,6 @@ function moveCondDown(ri, ci) {
   renderRules();
 }
 
-function moveActUp(ri, ai) {
-  if (currentMacroIdx < 0 || ai <= 0) return;
-  const acts = macros[currentMacroIdx].rules[ri].actions;
-  [acts[ai - 1], acts[ai]] = [acts[ai], acts[ai - 1]];
-  renderRules();
-}
-
-function moveActDown(ri, ai) {
-  if (currentMacroIdx < 0) return;
-  const acts = macros[currentMacroIdx].rules[ri].actions;
-  if (ai >= acts.length - 1) return;
-  [acts[ai], acts[ai + 1]] = [acts[ai + 1], acts[ai]];
-  renderRules();
-}
-
-/* ── Drag & Drop — rules ─────────────────────────────────── */
-let _dndRuleSrc = -1;
-function _initRulesDnD() {
-  const container = document.getElementById('rules-container');
-  if (!container || container._ruleDndReady) return;
-  container._ruleDndReady = true;
-
-  container.addEventListener('dragstart', e => {
-    const rh = e.target.closest('.rule-drag-handle');
-    if (!rh) return;
-    const card = rh.closest('.rule-card');
-    if (!card) return;
-    _dndRuleSrc = parseInt(card.id.split('-')[1]);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', String(_dndRuleSrc));
-    setTimeout(() => card.classList.add('dnd-dragging'), 0);
-  });
-
-  container.addEventListener('dragover', e => {
-    e.preventDefault();
-    const card = e.target.closest('.rule-card');
-    container.querySelectorAll('.rule-card').forEach(c => c.classList.remove('dnd-over-top', 'dnd-over-bot'));
-    if (card) {
-      const rect = card.getBoundingClientRect();
-      card.classList.add(e.clientY < rect.top + rect.height / 2 ? 'dnd-over-top' : 'dnd-over-bot');
-    }
-  });
-
-  container.addEventListener('dragleave', e => {
-    if (!container.contains(e.relatedTarget)) {
-      container.querySelectorAll('.rule-card').forEach(c => c.classList.remove('dnd-over-top', 'dnd-over-bot'));
-    }
-  });
-
-  container.addEventListener('drop', e => {
-    e.preventDefault();
-    const macro = macros[currentMacroIdx];
-    container.querySelectorAll('.rule-card').forEach(c => c.classList.remove('dnd-over-top', 'dnd-over-bot', 'dnd-dragging'));
-    const card = e.target.closest('.rule-card');
-    if (!card || !macro || _dndRuleSrc < 0) return;
-    const dropRi = parseInt(card.id.split('-')[1]);
-    if (_dndRuleSrc === dropRi) { _dndRuleSrc = -1; return; }
-    const rect = card.getBoundingClientRect();
-    const insertBefore = e.clientY < rect.top + rect.height / 2;
-    const [moved] = macro.rules.splice(_dndRuleSrc, 1);
-    let target = dropRi > _dndRuleSrc ? dropRi - 1 : dropRi;
-    if (!insertBefore) target++;
-    macro.rules.splice(target, 0, moved);
-    _dndRuleSrc = -1;
-    renderRules();
-  });
-
-  container.addEventListener('dragend', () => {
-    container.querySelectorAll('.rule-card').forEach(c => c.classList.remove('dnd-dragging', 'dnd-over-top', 'dnd-over-bot'));
-    _dndRuleSrc = -1;
-  });
-}
-
-/* ── Drag & Drop — condition / action items ──────────────── */
-let _dndItemSrc = null; // { type: 'cond'|'act', ri, idx }
-function _initItemsDnD() {
-  const container = document.getElementById('rules-container');
-  if (!container || container._itemDndReady) return;
-  container._itemDndReady = true;
-
-  container.addEventListener('dragstart', e => {
-    const ch = e.target.closest('.cond-drag-handle');
-    const ah = e.target.closest('.act-drag-handle');
-    if (!ch && !ah) return;
-    const row = (ch || ah).closest('.item-row');
-    if (!row) return;
-    const parts = row.id.split('-');
-    const ri = parseInt(parts[1]);
-    const idx = parseInt(parts[2]);
-    _dndItemSrc = { type: ch ? 'cond' : 'act', ri, idx };
-    e.dataTransfer.effectAllowed = 'move';
-    e.stopPropagation(); // prevent rule drag from triggering
-    setTimeout(() => row.classList.add('dnd-dragging'), 0);
-  }, true);
-
-  container.addEventListener('dragover', e => {
-    if (!_dndItemSrc) return;
-    const row = e.target.closest('.item-row');
-    if (!row) return;
-    const listType = _dndItemSrc.type === 'cond' ? 'cond-list' : 'act-list';
-    if (!row.closest('.' + listType)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const list = row.closest('.' + listType);
-    list.querySelectorAll('.item-row').forEach(r => r.classList.remove('dnd-over-top', 'dnd-over-bot'));
-    const rect = row.getBoundingClientRect();
-    row.classList.add(e.clientY < rect.top + rect.height / 2 ? 'dnd-over-top' : 'dnd-over-bot');
-  }, true);
-
-  container.addEventListener('dragleave', e => {
-    const row = e.target.closest('.item-row');
-    if (row) row.classList.remove('dnd-over-top', 'dnd-over-bot');
-  });
-
-  container.addEventListener('drop', e => {
-    if (!_dndItemSrc) return;
-    const row = e.target.closest('.item-row');
-    if (!row) return;
-    const listType = _dndItemSrc.type === 'cond' ? 'cond-list' : 'act-list';
-    if (!row.closest('.' + listType)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const parts = row.id.split('-');
-    const dropRi = parseInt(parts[1]);
-    const dropIdx = parseInt(parts[2]);
-    const { ri, idx } = _dndItemSrc;
-    if (ri !== dropRi) { _dndItemSrc = null; renderRules(); return; }
-    if (idx === dropIdx) { _dndItemSrc = null; renderRules(); return; }
-    const arr = _dndItemSrc.type === 'cond'
-      ? macros[currentMacroIdx]?.rules[ri]?.conditions
-      : macros[currentMacroIdx]?.rules[ri]?.actions;
-    if (!arr) { _dndItemSrc = null; return; }
-    const rect = row.getBoundingClientRect();
-    const insertBefore = e.clientY < rect.top + rect.height / 2;
-    const [moved] = arr.splice(idx, 1);
-    let target = dropIdx > idx ? dropIdx - 1 : dropIdx;
-    if (!insertBefore) target++;
-    arr.splice(target, 0, moved);
-    _dndItemSrc = null;
-    renderRules();
-  }, true);
-
-  container.addEventListener('dragend', () => {
-    container.querySelectorAll('.item-row').forEach(r => r.classList.remove('dnd-dragging', 'dnd-over-top', 'dnd-over-bot'));
-    _dndItemSrc = null;
-  });
-}
-
 /* ── Condition rows ───────────────────────────────────────── */
 function renderConditionRowHTML(c, ri, ci, total) {
   const type = c.type || 'pixel_color';
@@ -1127,8 +984,9 @@ function renderConditionRowHTML(c, ri, ci, total) {
           <circle cx="4.5" cy="12.5" r="1.1"/><circle cx="11.5" cy="12.5" r="1.1"/>
         </svg>
       </div>
-      <select class="item-type-select" onchange="setCondType(${ri},${ci},this.value)">
-        ${Object.entries(COND_LABELS).map(([k, v]) => `<option value="${k}" ${type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
+      <div class="item-cat-icon item-cat-icon-${_condCategory(type)}" id="cicon-${ri}-${ci}">${_condIconSVG(type)}</div>
+      <select class="item-type-select" onchange="setCondType(${ri},${ci},this.value);_refreshCatIcon('cicon-${ri}-${ci}',this.value,_condCategory,_condIconSVG)">
+        ${_groupedTypeOptions(COND_LABELS, _condCategory, COND_GROUP_LABELS, type)}
       </select>
       <div class="item-row-btns">
         <button class="icon-btn" title="Tester" onclick="testConditionInline(${ri},${ci})">
@@ -1419,41 +1277,6 @@ async function testConditionInline(ri, ci) {
     resultEl.className = 'inline-test-result test-fail';
     resultEl.textContent = 'Erreur: ' + e.message;
   }
-}
-
-/* ── Action rows ──────────────────────────────────────────── */
-function renderActionRowHTML(a, ri, ai, total) {
-  const type = a.type || 'key_tap';
-  return `
-  <div class="item-row" id="arow-${ri}-${ai}" draggable="true">
-    <div class="item-row-head">
-      <div class="item-drag-handle act-drag-handle" title="Glisser pour réorganiser">
-        <svg viewBox="0 0 16 16" fill="currentColor" width="9" height="9">
-          <circle cx="4.5" cy="3.5" r="1.1"/><circle cx="11.5" cy="3.5" r="1.1"/>
-          <circle cx="4.5" cy="8"   r="1.1"/><circle cx="11.5" cy="8"   r="1.1"/>
-          <circle cx="4.5" cy="12.5" r="1.1"/><circle cx="11.5" cy="12.5" r="1.1"/>
-        </svg>
-      </div>
-      <select class="item-type-select" onchange="setActType(${ri},${ai},this.value)">
-        ${Object.entries(ACT_LABELS).map(([k, v]) => `<option value="${k}" ${type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
-      </select>
-      <div class="item-row-btns">
-        <button class="icon-btn" title="Exécuter" onclick="execActionInline(${ri},${ai})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        </button>
-        <button class="icon-btn" title="Monter" onclick="moveActUp(${ri},${ai})" ${ai === 0 ? 'disabled' : ''}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><polyline points="18 15 12 9 6 15"/></svg>
-        </button>
-        <button class="icon-btn" title="Descendre" onclick="moveActDown(${ri},${ai})" ${ai === (total||0) - 1 ? 'disabled' : ''}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <button class="icon-btn btn-danger-icon" onclick="deleteAction(${ri},${ai})">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-    </div>
-    <div class="item-fields">${renderActionInlineFields(a)}</div>
-  </div>`;
 }
 
 function renderActionInlineFields(a) {
@@ -1818,17 +1641,6 @@ async function execActionInline(ri, ai) {
 }
 
 /* ── Screen picker helpers ─────────────────────────────── */
-function _refreshCoordSummaries(container, prefix) {
-  container.querySelectorAll('.coord-summary').forEach(span => {
-    const row = span.closest('.fields-row') || container;
-    const xs = row.querySelectorAll('.' + prefix + (span.dataset.pair === '2' ? 'x2' : 'x'));
-    const ys = row.querySelectorAll('.' + prefix + (span.dataset.pair === '2' ? 'y2' : 'y'));
-    // just re-render via parent
-  });
-  // simpler: re-render the whole macro editor
-  renderMacroEditor();
-}
-
 async function pickPointForCondField(btn) {
   try {
     const res = await window.api.pickPoint();
@@ -2023,8 +1835,9 @@ function renderSectionCondRow(c, idx, section, prefix) {
   return `
   <div class="item-row" id="${prefix}-${idx}" data-section="${section}" data-idx="${idx}">
     <div class="item-row-head">
-      <select class="item-type-select" onchange="setSectionCondType('${section}',${idx},this.value)">
-        ${Object.entries(COND_LABELS).map(([k, v]) => `<option value="${k}" ${type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
+      <div class="item-cat-icon item-cat-icon-${_condCategory(type)}" id="${prefix}-icon-${idx}">${_condIconSVG(type)}</div>
+      <select class="item-type-select" onchange="setSectionCondType('${section}',${idx},this.value);_refreshCatIcon('${prefix}-icon-${idx}',this.value,_condCategory,_condIconSVG)">
+        ${_groupedTypeOptions(COND_LABELS, _condCategory, COND_GROUP_LABELS, type)}
       </select>
       <div class="item-row-btns">
         <button class="icon-btn" title="Tester" onclick="testSectionCondInline('${section}',${idx})">
@@ -2045,8 +1858,9 @@ function renderSectionActRow(a, idx, section, prefix) {
   return `
   <div class="item-row" id="${prefix}-${idx}" data-section="${section}" data-idx="${idx}">
     <div class="item-row-head">
-      <select class="item-type-select" onchange="setSectionActType('${section}',${idx},this.value)">
-        ${Object.entries(ACT_LABELS).map(([k, v]) => `<option value="${k}" ${type === k ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}
+      <div class="item-cat-icon n8n-act-icon-${_actCategory(type)}" id="${prefix}-icon-${idx}">${_actIconSVG(type)}</div>
+      <select class="item-type-select" onchange="setSectionActType('${section}',${idx},this.value);_refreshCatIcon('${prefix}-icon-${idx}',this.value,_actCategory,_actIconSVG,'n8n-act-icon-')">
+        ${_groupedTypeOptions(ACT_LABELS, _actCategory, ACT_GROUP_LABELS, type)}
       </select>
       <div class="item-row-btns">
         <button class="icon-btn" title="Exécuter" onclick="execSectionActInline('${section}',${idx})">
