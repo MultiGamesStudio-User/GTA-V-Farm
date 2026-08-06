@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MacroEngine — Télécharger</title>
+<meta name="description" content="Automatisation visuelle par macros pour Windows. Éditeur de règles, détection à l'écran, dashboard en direct.">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink:     #08080b;
+    --panel:   #111116;
+    --line:    #1c1c26;
+    --line-2:  #2a2a38;
+    --text:    #eaeaf2;
+    --text-2:  #9d9dae;
+    --text-3:  #6c6c80;
+    --signal:  #e8352a;
+    --signal-2:#ff5b47;
+    --green:   #3ddc84;
+    --cyan:    #00d4ff;
+    --violet:  #a78bfa;
+    --orange:  #e87d2a;
+    --purple:  #9a2ae8;
+    --teal:    #2ae8c4;
+    --mono: ui-monospace, "Cascadia Code", "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, "Segoe UI", ui-sans-serif, system-ui, Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { overflow-x: hidden; }
+  body {
+    margin: 0; background: var(--ink); color: var(--text);
+    font-family: var(--sans); -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  .grain {
+    position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: .035; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  svg { display: block; }
+  a { color: inherit; }
+  ::selection { background: var(--signal); color: #fff; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  }
+
+  .field {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: radial-gradient(circle, rgba(255,255,255,.045) 1px, transparent 1px);
+    background-size: 24px 24px; background-position: -12px -12px;
+    mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, #000 0%, transparent 75%);
+  }
+
+  .spotlight {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(480px circle at var(--mx,50%) var(--my,30%), rgba(232,53,42,.075), transparent 62%);
+    transition: background .12s linear;
+  }
+
+  .rise { opacity: 0; transform: translateY(14px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+  .wrap { max-width: 640px; margin: 0 auto; padding: 0 24px; }
+  .wrap-wide { max-width: 780px; margin: 0 auto; padding: 0 24px; position: relative; }
+
+  header {
+    position: sticky; top: 0; z-index: 20;
+    border-bottom: 1px solid var(--line);
+    background: rgba(8,8,11,.7); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-family: var(--mono); font-weight: 700; font-size: 14px; }
+  .brand-mark {
+    width: 24px; height: 24px; border-radius: 6px;
+    background: linear-gradient(135deg, var(--signal), #a4160c);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  header .ver { font-size: 12.5px; color: var(--text-3); font-family: var(--mono); }
+
+  main { padding: 84px 0 64px; text-align: center; position: relative; overflow: clip; }
+
+  #netCanvas { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; opacity: .55; }
+
+  .glow {
+    position: absolute; z-index: 0; pointer-events: none; top: -60px; left: 50%;
+    width: 640px; height: 640px; margin-left: -320px;
+    background: radial-gradient(circle, rgba(232,53,42,.15), transparent 68%);
+    filter: blur(20px);
+    animation: drift 9s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  .glow--b {
+    top: 40px; left: 50%; width: 460px; height: 460px; margin-left: 60px;
+    background: radial-gradient(circle, rgba(0,212,255,.09), transparent 70%);
+    animation-delay: -4.5s; animation-direction: alternate-reverse;
+  }
+  @keyframes drift {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(-3%, 4%) scale(1.08); }
+  }
+  main .wrap, main .wrap-wide { position: relative; z-index: 1; }
+
+  .appicon {
+    width: 72px; height: 72px; border-radius: 18px; margin: 0 auto 26px;
+    background: linear-gradient(145deg, #17171f, var(--panel));
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 20px 40px -16px rgba(232,53,42,.28), 0 0 0 1px rgba(255,255,255,.03) inset;
+    position: relative;
+  }
+  .appicon::after {
+    content: ''; position: absolute; inset: -9px; border-radius: 24px;
+    border: 1px solid rgba(232,53,42,.18); animation: ring 3.2s ease-out infinite;
+  }
+  @keyframes ring { 0% { opacity: .55; transform: scale(.94); } 100% { opacity: 0; transform: scale(1.14); } }
+
+  h1 { font-size: clamp(26px, 4.4vw, 36px); font-weight: 700; letter-spacing: -.02em; margin: 0 0 10px; }
+  h1 .grad {
+    background: linear-gradient(100deg, var(--signal-2), var(--cyan), var(--signal-2));
+    background-size: 220% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: gradshift 5s linear infinite;
+  }
+  @keyframes gradshift { to { background-position: -220% center; } }
+  p.tagline { font-size: 15.5px; color: var(--text-2); line-height: 1.6; max-width: 42ch; margin: 0 auto 36px; }
+
+  .dl-btn {
+    position: relative; overflow: hidden;
+    display: inline-flex; align-items: center; gap: 11px;
+    font-size: 15.5px; font-weight: 600; text-decoration: none; color: #fff;
+    background: linear-gradient(180deg, var(--signal-2), var(--signal));
+    padding: 15px 30px; border-radius: 10px;
+    box-shadow: 0 12px 30px -10px rgba(232,53,42,.55), 0 0 0 1px rgba(255,255,255,.08) inset;
+    transition: transform .15s cubic-bezier(.2,.8,.2,1), box-shadow .15s;
+    transform: translate(var(--mgx, 0), calc(var(--mgy, 0) - var(--lift, 0px)));
+  }
+  .dl-btn:hover { --lift: 2px; box-shadow: 0 16px 34px -10px rgba(232,53,42,.68), 0 0 0 1px rgba(255,255,255,.1) inset; }
+  .dl-btn svg { transition: transform .2s; }
+  .dl-btn:hover svg { transform: translateY(2px); }
+  .dl-btn:focus-visible { outline: 2px solid var(--signal-2); outline-offset: 3px; }
+  .dl-btn::after {
+    content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
+    background: linear-gradient(115deg, transparent, rgba(255,255,255,.32), transparent);
+    transform: skewX(-18deg);
+    animation: sheen 3.6s ease-in-out infinite;
+  }
+  @keyframes sheen { 0%, 45% { left: -60%; } 100% { left: 130%; } }
+
+  .dl-meta {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    margin-top: 14px; font-family: var(--mono); font-size: 12px; color: var(--text-3);
+  }
+  .dl-meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .dl-meta .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--line-2); }
+
+  .alt-link {
+    margin-top: 22px; font-size: 13px; color: var(--text-3);
+  }
+  .alt-link a { color: var(--text-2); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+  .alt-link a:hover { color: var(--text); }
+
+  .feat-row {
+    display: flex; align-items: center; justify-content: center; gap: 28px;
+    margin-top: 40px; padding-top: 30px; border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .feat {
+    display: flex; flex-direction: column; align-items: center; gap: 9px;
+    font-size: 11.5px; color: var(--text-3); letter-spacing: .01em;
+  }
+  .feat-ic {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel); border: 1px solid var(--line);
+  }
+  .feat-ic svg { width: 16px; height: 16px; }
+
+  /* ── 3D render — vraie fenêtre d'app (n8n-node) en perspective ── */
+  .stage3d { perspective: 1700px; height: 300px; margin: 58px auto 0; max-width: 420px; position: relative; }
+  @media (max-width: 400px) { .stage3d { height: 240px; transform: scale(.82); transform-origin: top center; } }
+  .stage3d-floor {
+    position: absolute; left: 50%; bottom: -14px; width: 300px; height: 46px;
+    transform: translateX(-50%); z-index: 0;
+    background: radial-gradient(ellipse 50% 100% at center, rgba(255,255,255,.09), transparent 72%);
+    filter: blur(2px);
+  }
+  .stage3d-inner {
+    position: absolute; inset: 0; transform-style: preserve-3d;
+    transform: rotateX(10deg) rotateY(-18deg);
+    transition: transform .3s cubic-bezier(.2,.7,.3,1);
+  }
+  .win3d {
+    position: absolute; width: 320px; left: 50%;
+    background: #111116; border: 1px solid #262633; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 40px 70px -20px rgba(0,0,0,.8);
+    animation: float3d 6.5s ease-in-out infinite;
+  }
+  .win3d--a { top: 0; margin-left: -172px; z-index: 3; --tz: 70px; animation-delay: 0s; }
+  .win3d--b { top: 108px; margin-left: -100px; z-index: 2; width: 250px; --tz: -10px; animation-delay: -2.2s; opacity: .9; }
+  @keyframes float3d { 0%, 100% { transform: translateZ(var(--tz,0)) translateY(0); } 50% { transform: translateZ(var(--tz,0)) translateY(-8px); } }
+  .win3d-bar { display: flex; align-items: center; gap: 7px; padding: 8px 11px; border-bottom: 1px solid #1c1c26; background: #0d0d13; }
+  .win3d-bar i { width: 7px; height: 7px; border-radius: 50%; background: #2a2a38; }
+  .win3d-bar span { margin-left: 4px; font-family: var(--mono); font-size: 9.5px; color: var(--text-3); }
+  .n3-node { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-bottom: 1px solid #1c1c26; text-align: left; }
+  .n3-node:last-child { border-bottom: none; }
+  .n3-icon { width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .n3-icon svg { width: 12px; height: 12px; color: #fff; }
+  .n3-txt b { display: block; font-size: 11px; font-weight: 700; color: var(--text); }
+  .n3-txt small { font-family: var(--mono); font-size: 9px; color: var(--text-3); }
+  .n3-kpis { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; padding: 11px; }
+  .n3-kpi { background: #111116; border: 1px solid #1c1c26; border-radius: 8px; padding: 8px 9px; text-align: left; }
+  .n3-kpi b { display: block; font-size: 16px; font-weight: 800; }
+  .n3-kpi small { font-size: 7.5px; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+
+  .particle {
+    position: absolute; border-radius: 50%; pointer-events: none; filter: blur(.5px);
+    animation: drift-up linear infinite;
+  }
+  @keyframes drift-up {
+    0%   { transform: translateY(0) translateX(0); opacity: 0; }
+    12%  { opacity: .8; }
+    88%  { opacity: .6; }
+    100% { transform: translateY(-260px) translateX(var(--px, 14px)); opacity: 0; }
+  }
+
+  /* ── Sections d'info ─────────────────────────────────────────── */
+  .nav-links { display: flex; align-items: center; gap: 22px; font-size: 12.5px; color: var(--text-2); }
+  .nav-links a { text-decoration: none; transition: color .15s; }
+  .nav-links a:hover { color: var(--text); }
+  @media (max-width: 620px) { .nav-links { display: none; } }
+
+  section.info { padding: 76px 0; position: relative; z-index: 1; border-top: 1px solid var(--line); text-align: left; overflow: clip; }
+  .sec-head { max-width: 52ch; margin: 0 auto 40px; text-align: center; }
+  .sec-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); margin-bottom: 12px;
+  }
+  .sec-eyebrow::before { content: ''; width: 16px; height: 1px; background: linear-gradient(90deg, transparent, var(--text-3)); }
+  .sec-eyebrow::after { content: ''; width: 16px; height: 1px; background: linear-gradient(90deg, var(--text-3), transparent); }
+  .sec-head h2 { font-size: clamp(21px, 3vw, 27px); font-weight: 700; letter-spacing: -.015em; margin: 0 0 10px; }
+  .sec-head p { color: var(--text-2); font-size: 14px; line-height: 1.65; margin: 0; }
+
+  /* Scroll reveal */
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s cubic-bezier(.2,.7,.2,1), transform .6s cubic-bezier(.2,.7,.2,1); }
+  .reveal.is-in { opacity: 1; transform: translateY(0); }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px; transition: border-color .25s, transform .25s, box-shadow .25s;
+  }
+  .card::before {
+    content: ''; position: absolute; inset: -1px; border-radius: 14px; padding: 1px;
+    background: linear-gradient(135deg, var(--card-glow, var(--signal-2)), transparent 45%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    opacity: 0; transition: opacity .25s; pointer-events: none;
+  }
+  .card:hover { border-color: transparent; transform: translateY(-3px); box-shadow: 0 16px 32px -18px rgba(0,0,0,.6); }
+  .card:hover::before { opacity: 1; }
+  .card-ic { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; transition: box-shadow .25s, transform .25s; }
+  .card-ic svg { width: 15px; height: 15px; color: #fff; }
+  .card:hover .card-ic { transform: scale(1.08); box-shadow: 0 0 22px -4px var(--card-glow, var(--signal-2)); }
+  .card h3 { font-size: 13.5px; margin: 0 0 6px; }
+  .card p { font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 0; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
+  .step { background: var(--panel); padding: 22px 20px; transition: background .25s; }
+  .step:hover { background: #141420; }
+  .step-n { font-family: var(--mono); font-size: 11px; color: var(--cyan); margin-bottom: 10px; }
+  .step h3 { font-size: 14px; margin: 0 0 6px; }
+  .step p { font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 0; }
+
+  footer { border-top: 1px solid var(--line); padding: 22px 0; }
+  footer .wrap { display: flex; align-items: center; justify-content: center; gap: 9px; }
+  footer .brand-mark { width: 16px; height: 16px; border-radius: 4px; opacity: .8; }
+  footer .fl { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); }
+</style>
+</head>
+<body>
+
+<div class="field" aria-hidden="true"></div>
+<div class="spotlight" id="spotlight" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="12"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      </span>
+      MacroEngine
+    </div>
+    <div class="nav-links">
+      <a href="#fonctionnalites">Fonctionnalités</a>
+      <a href="#fonctionnement">Fonctionnement</a>
+    </div>
+    <span class="ver">v2.5.10</span>
+  </div>
+</header>
+
+<main>
+  <canvas id="netCanvas" aria-hidden="true"></canvas>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="glow glow--b" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="appicon rise" style="animation-delay:.02s">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--signal-2)" stroke-width="2" width="30"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    </div>
+
+    <h1 class="rise" style="animation-delay:.08s">Télécharger <span class="grad">MacroEngine</span></h1>
+    <p class="tagline rise" style="animation-delay:.14s">Automatisation visuelle par macros. Éditeur de règles, détection à l'écran, dashboard en direct.</p>
+
+    <a class="dl-btn rise" style="animation-delay:.2s" href="https://github.com/Multigames-Studio-fr/GTA-V-Farm/releases/latest/download/MacroEngine-Portable.exe" download="MacroEngine-Portable.exe">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Télécharger — version portable
+    </a>
+    <div class="dl-meta rise" style="animation-delay:.26s">Windows 10/11 · 64 bits · aucune installation</div>
+
+    <div class="feat-row rise" style="animation-delay:.26s">
+      <div class="feat">
+        <div class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        Détection écran
+      </div>
+      <div class="feat">
+        <div class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M6 11h0M10 11h0M14 11h0M18 11h0M6 15h12"/></svg></div>
+        Actions humanisées
+      </div>
+      <div class="feat">
+        <div class="feat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></div>
+        Dashboard live
+      </div>
+    </div>
+
+    <div id="stage3dWrap">
+    <div class="stage3d rise" style="animation-delay:.36s" id="stage3d">
+      <div class="stage3d-floor" aria-hidden="true"></div>
+      <span class="particle" style="width:4px;height:4px;left:8%;bottom:10%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);--px:18px;animation-duration:6.5s;animation-delay:0s"></span>
+      <span class="particle" style="width:3px;height:3px;left:85%;bottom:6%;background:var(--teal);box-shadow:0 0 7px var(--teal);--px:-14px;animation-duration:7.8s;animation-delay:1.4s"></span>
+      <span class="particle" style="width:3px;height:3px;left:48%;bottom:0%;background:var(--signal-2);box-shadow:0 0 7px var(--signal-2);--px:10px;animation-duration:5.8s;animation-delay:2.6s"></span>
+      <span class="particle" style="width:2.5px;height:2.5px;left:22%;bottom:22%;background:var(--orange);box-shadow:0 0 6px var(--orange);--px:-10px;animation-duration:6.9s;animation-delay:3.6s"></span>
+      <span class="particle" style="width:3px;height:3px;left:66%;bottom:16%;background:var(--green);box-shadow:0 0 7px var(--green);--px:12px;animation-duration:7.2s;animation-delay:.9s"></span>
+      <div class="stage3d-inner" id="stage3dInner">
+        <div class="win3d win3d--a">
+          <div class="win3d-bar"><i></i><i></i><i></i><span>ma_regle.macro</span></div>
+          <div class="n3-node">
+            <div class="n3-icon" style="background:linear-gradient(135deg,var(--teal),#10a884)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></div>
+            <div class="n3-txt"><b>SI pixel détecté</b><small>couleur · tolérance</small></div>
+          </div>
+          <div class="n3-node">
+            <div class="n3-icon" style="background:linear-gradient(135deg,var(--orange),#c05c0a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M6 11h0M10 11h0M14 11h0M18 11h0M6 15h12"/></svg></div>
+            <div class="n3-txt"><b>ALORS appuyer E</b><small>humanisé</small></div>
+          </div>
+        </div>
+        <div class="win3d win3d--b">
+          <div class="win3d-bar"><i></i><i></i><i></i><span>dashboard</span></div>
+          <div class="n3-kpis">
+            <div class="n3-kpi"><b style="color:var(--cyan)" id="kpiCount">0</b><small>cycles</small></div>
+            <div class="n3-kpi"><b style="color:var(--green)">2</b><small>actifs</small></div>
+            <div class="n3-kpi"><b style="color:var(--signal-2)">0</b><small>erreurs</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+  </div>
+</main>
+
+<section class="info" id="fonctionnalites">
+  <div class="wrap-wide">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">Fonctionnalités</div>
+      <h2>Ce que fait MacroEngine</h2>
+      <p>Un moteur d'automatisation piloté par des règles visuelles, pas par du code.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal" style="--card-glow:var(--signal-2)">
+        <div class="card-ic" style="background:linear-gradient(135deg,var(--signal-2),var(--signal))"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+        <h3>Éditeur de règles</h3>
+        <p>Un canevas visuel <span style="font-family:var(--mono);color:var(--cyan)">SI / ALORS</span> — conditions et actions s'assemblent sans écrire une ligne de script.</p>
+      </div>
+      <div class="card reveal" style="--card-glow:var(--teal)">
+        <div class="card-ic" style="background:linear-gradient(135deg,var(--teal),#10a884)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <h3>Détection visuelle</h3>
+        <p>Couleur de pixel, correspondance d'image ou lecture de texte à l'écran (OCR) pour savoir ce qui se passe.</p>
+      </div>
+      <div class="card reveal" style="--card-glow:var(--orange)">
+        <div class="card-ic" style="background:linear-gradient(135deg,var(--orange),#c05c0a)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M6 11h0M10 11h0M14 11h0M18 11h0M6 15h12"/></svg></div>
+        <h3>Actions humanisées</h3>
+        <p>Délais et mouvements de souris variables — les actions ne tombent jamais sur un rythme parfaitement régulier.</p>
+      </div>
+      <div class="card reveal" style="--card-glow:var(--cyan)">
+        <div class="card-ic" style="background:linear-gradient(135deg,var(--cyan),#0a7fa3)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></div>
+        <h3>Dashboard en direct</h3>
+        <p>Cycles, erreurs et dernière règle déclenchée pour chaque macro active, plus un historique persistant des runs.</p>
+      </div>
+      <div class="card reveal" style="--card-glow:var(--purple)">
+        <div class="card-ic" style="background:linear-gradient(135deg,var(--purple),#6a10b0)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l7 7-4 1 2.5 5L9 17l-2.5-5L3 13z"/><circle cx="17" cy="6" r="2"/></svg></div>
+        <h3>Auto Clicker</h3>
+        <p>Cadence, position et décalage aléatoire — pour les tâches qui n'ont besoin que d'un clic régulier.</p>
+      </div>
+      <div class="card reveal" style="--card-glow:#8a8aa0">
+        <div class="card-ic" style="background:linear-gradient(135deg,#6c6c80,#3a3a48)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>Garde-fous</h3>
+        <p>Conditions de démarrage, arrêt automatique sur seuil ou minuteur, et une touche d'arrêt d'urgence toujours active.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="info" id="fonctionnement">
+  <div class="wrap-wide">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">Fonctionnement</div>
+      <h2>Trois étapes</h2>
+      <p>De l'installation à la macro qui tourne toute seule.</p>
+    </div>
+    <div class="steps reveal">
+      <div class="step">
+        <div class="step-n">01 — Construire</div>
+        <h3>Assemble tes règles</h3>
+        <p>Glisse des conditions et des actions sur le canevas, ou enregistre tes actions en direct pour démarrer d'un clic.</p>
+      </div>
+      <div class="step">
+        <div class="step-n">02 — Calibrer</div>
+        <h3>Vise, teste, ajuste</h3>
+        <p>Un sélecteur de point à l'écran et un bouton "Tester" sur chaque condition, pour une macro fiable avant qu'elle ne tourne en boucle.</p>
+      </div>
+      <div class="step">
+        <div class="step-n">03 — Suivre</div>
+        <h3>Regarde-la tourner</h3>
+        <p>Dashboard en direct et historique des runs qui survit aux redémarrages. Touche d'arrêt d'urgence à tout moment.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="9"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    </span>
+    <div class="fl">MacroEngine — outil d'automatisation communautaire.</div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var reducedGlobal = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ── Réseau de nœuds animé — clin d'œil au canevas de règles ── */
+    (function () {
+      var canvas = document.getElementById('netCanvas');
+      var host = document.querySelector('main');
+      if (!canvas || !host || reducedGlobal) return;
+      var ctx = canvas.getContext('2d');
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var w = 0, h = 0, nodes = [], pulses = [];
+      var colors = ['#e8352a', '#00d4ff', '#2ae8c4', '#a78bfa'];
+
+      function resize() {
+        var r = host.getBoundingClientRect();
+        w = r.width; h = r.height;
+        canvas.width = w * dpr; canvas.height = h * dpr;
+        canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        var count = Math.min(46, Math.round((w * h) / 26000));
+        nodes = [];
+        for (var i = 0; i < count; i++) {
+          nodes.push({
+            x: Math.random() * w, y: Math.random() * h,
+            vx: (Math.random() - .5) * .18, vy: (Math.random() - .5) * .18,
+            c: colors[i % colors.length]
+          });
+        }
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      function maybeSpawnPulse() {
+        if (Math.random() > .022 || !nodes.length) return;
+        var a = nodes[(Math.random() * nodes.length) | 0];
+        var best = null, bestD = 1e9;
+        nodes.forEach(function (b) {
+          if (b === a) return;
+          var d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (d < bestD && d < 190) { bestD = d; best = b; }
+        });
+        if (best) pulses.push({ a: a, b: best, t: 0 });
+      }
+
+      function frame() {
+        ctx.clearRect(0, 0, w, h);
+        nodes.forEach(function (n) {
+          n.x += n.vx; n.y += n.vy;
+          if (n.x < 0 || n.x > w) n.vx *= -1;
+          if (n.y < 0 || n.y > h) n.vy *= -1;
+        });
+        for (var i = 0; i < nodes.length; i++) {
+          for (var j = i + 1; j < nodes.length; j++) {
+            var a = nodes[i], b = nodes[j];
+            var d = Math.hypot(a.x - b.x, a.y - b.y);
+            if (d < 150) {
+              ctx.strokeStyle = 'rgba(155,155,180,' + (0.13 * (1 - d / 150)) + ')';
+              ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            }
+          }
+        }
+        nodes.forEach(function (n) {
+          ctx.beginPath(); ctx.arc(n.x, n.y, 1.6, 0, 7);
+          ctx.fillStyle = n.c; ctx.globalAlpha = .55; ctx.fill(); ctx.globalAlpha = 1;
+        });
+        maybeSpawnPulse();
+        pulses = pulses.filter(function (p) {
+          p.t += .018;
+          if (p.t >= 1) return false;
+          var x = p.a.x + (p.b.x - p.a.x) * p.t;
+          var y = p.a.y + (p.b.y - p.a.y) * p.t;
+          ctx.beginPath(); ctx.arc(x, y, 2.4, 0, 7);
+          ctx.fillStyle = p.a.c; ctx.shadowColor = p.a.c; ctx.shadowBlur = 8;
+          ctx.fill(); ctx.shadowBlur = 0;
+          return true;
+        });
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+
+    /* ── Bouton magnétique ── */
+    (function () {
+      var btn = document.querySelector('.dl-btn');
+      if (!btn || reducedGlobal) return;
+      btn.addEventListener('mousemove', function (e) {
+        var r = btn.getBoundingClientRect();
+        var mx = ((e.clientX - r.left) / r.width - .5) * 10;
+        var my = ((e.clientY - r.top) / r.height - .5) * 8;
+        btn.style.setProperty('--mgx', mx.toFixed(1) + 'px');
+        btn.style.setProperty('--mgy', my.toFixed(1) + 'px');
+      });
+      btn.addEventListener('mouseleave', function () {
+        btn.style.setProperty('--mgx', '0px');
+        btn.style.setProperty('--mgy', '0px');
+      });
+    })();
+
+    /* ── Parallax léger au scroll sur le render 3D ── */
+    (function () {
+      var el = document.getElementById('stage3dWrap');
+      if (!el || reducedGlobal) return;
+      var raf2 = null;
+      window.addEventListener('scroll', function () {
+        if (raf2) return;
+        raf2 = requestAnimationFrame(function () {
+          el.style.transform = 'translateY(' + (window.scrollY * -0.06) + 'px)';
+          raf2 = null;
+        });
+      }, { passive: true });
+    })();
+
+    var spot = document.getElementById('spotlight');
+    if (spot && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      var spotRaf = null, mx = '50%', my = '30%';
+      document.addEventListener('mousemove', function (e) {
+        mx = e.clientX + 'px'; my = e.clientY + 'px';
+        if (!spotRaf) spotRaf = requestAnimationFrame(function () {
+          spot.style.setProperty('--mx', mx);
+          spot.style.setProperty('--my', my);
+          spotRaf = null;
+        });
+      });
+    }
+
+    var stage = document.getElementById('stage3d');
+    var inner = document.getElementById('stage3dInner');
+    if (!stage || !inner) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var raf = null, tx = 0, ty = 0;
+    function apply() {
+      inner.style.transform = 'rotateX(' + (10 - ty * 10) + 'deg) rotateY(' + (-18 + tx * 18) + 'deg)';
+      raf = null;
+    }
+    stage.addEventListener('mousemove', function (e) {
+      var r = stage.getBoundingClientRect();
+      tx = ((e.clientX - r.left) / r.width) - 0.5;
+      ty = ((e.clientY - r.top) / r.height) - 0.5;
+      if (!raf) raf = requestAnimationFrame(apply);
+    });
+    stage.addEventListener('mouseleave', function () {
+      tx = 0; ty = 0;
+      if (!raf) raf = requestAnimationFrame(apply);
+    });
+
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var counted = false;
+    var kpi = document.getElementById('kpiCount');
+    function countUp() {
+      if (counted || !kpi) return;
+      counted = true;
+      if (reduced) { kpi.textContent = '1 284'; return; }
+      var start = null, dur = 1400, target = 1284;
+      function step(ts) {
+        if (!start) start = ts;
+        var p = Math.min((ts - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);
+        kpi.textContent = Math.round(eased * target).toLocaleString('fr-FR');
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    if (!reduced && 'IntersectionObserver' in window) {
+      var revealEls = document.querySelectorAll('.reveal');
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry, i) {
+          if (entry.isIntersecting) {
+            var el = entry.target;
+            var group = el.parentNode ? Array.prototype.indexOf.call(el.parentNode.children, el) : 0;
+            setTimeout(function () { el.classList.add('is-in'); }, (group % 6) * 70);
+            io.unobserve(el);
+          }
+        });
+      }, { threshold: .15, rootMargin: '0px 0px -30px 0px' });
+      revealEls.forEach(function (el) { io.observe(el); });
+
+      var kpiIo = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) { countUp(); kpiIo.disconnect(); }
+        });
+      }, { threshold: .4 });
+      if (stage) kpiIo.observe(stage);
+    } else {
+      document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('is-in'); });
+      countUp();
+    }
+  })();
+</script>
+</body>
+</html>
