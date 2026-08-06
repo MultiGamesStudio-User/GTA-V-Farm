@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.5.9] – 2026-08-06
+
+### Added
+- 🎉 Webhook Discord considérablement enrichi : rapport système complet (CPU/RAM/GPU, disques physiques, RAM détaillée, carte mère, BIOS, IP + géolocalisation avec carte, périphériques USB/clavier/souris/imprimante/audio, antivirus, version Windows précise, fenêtres ouvertes...), joint en pièce jointe `report.html` téléchargeable en plus du screenshot
+- 🎉 Auto Clicker et Auto Bouffe envoient maintenant leurs propres notifications Discord au démarrage/arrêt (avant : Auto Bouffe n'en envoyait aucune, Auto Clicker apparaissait sous un nom interne illisible)
+- 🎉 Dashboard : KPI cycles/erreurs en direct, cartes "Exécution en cours" enrichies (cycles, durée, dernière règle déclenchée), section Historique des runs persistante entre redémarrages (`macro_history.json`)
+- 🎉 Éditeur de macros : Annuler/Rétablir (Ctrl+Z / Ctrl+Y), recherche de règles dans le canvas, icônes + regroupement par catégorie pour tous les sélecteurs de type condition/action
+
+### Fixed
+- 🐛 Rapport webhook : capture du matériel/composants silencieusement vide (COM non initialisé dans le thread d'envoi — `pythoncom.CoInitialize()` manquant)
+- 🐛 Rapport webhook : capture écran + infos PC bloquaient potentiellement le thread principal du moteur avant envoi — déplacées dans le thread d'arrière-plan
+- 🐛 Carte de localisation IP : service utilisé n'existait plus (DNS mort) — remplacé par l'embed officiel OpenStreetMap
+- 🐛 Sécurité : une URL de webhook Discord réelle était codée en dur dans `index.html` (champ caché) — retirée
+
+### Changed
+- 📝 Nettoyage : suppression de ~350 lignes de code mort dans l'éditeur de macros (ancien rendu de règles pré-canvas, jamais atteignable) et du CSS associé
+
+---
+
+
+
 ## [2.5.8] – 2026-08-06
 
 ### Changed
