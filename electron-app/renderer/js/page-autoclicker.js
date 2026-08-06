@@ -49,9 +49,18 @@ function _acpLoad() {
     if (f.type === 'bool') { el.checked = val === true || val === 'true'; }
     else                   { el.value = val; }
   });
-  // Restore hotkey map
-  _acpHotkeys['acp-key-start'] = data['acp-key-start'] || 'F6';
-  _acpHotkeys['acp-key-stop']  = data['acp-key-stop']  || 'F7';
+  // Restore hotkey map — a bare modifier saved before this was guarded
+  // against (Control/Shift/Alt/Meta) can't register as a global shortcut,
+  // so fall back to the default instead of repeating the failure forever.
+  const _isBareModifier = (k) => ['Control', 'Shift', 'Alt', 'Meta'].includes(k);
+  const savedStart = data['acp-key-start'];
+  const savedStop  = data['acp-key-stop'];
+  _acpHotkeys['acp-key-start'] = (savedStart && !_isBareModifier(savedStart)) ? savedStart : 'F6';
+  _acpHotkeys['acp-key-stop']  = (savedStop  && !_isBareModifier(savedStop))  ? savedStop  : 'F7';
+  const startEl = document.getElementById('acp-key-start');
+  const stopEl  = document.getElementById('acp-key-stop');
+  if (startEl) startEl.value = _acpHotkeys['acp-key-start'];
+  if (stopEl)  stopEl.value  = _acpHotkeys['acp-key-stop'];
   /* restore toggle states after loading */
   const offChk = document.getElementById('acp-rand-offset');
   if (offChk) _acpToggleOffset(offChk);
@@ -290,6 +299,14 @@ function _acpRegisterHotkeys() {
 
 function _acpCaptureHandler(e) {
   if (!_acpCapturing) return;
+  // A bare modifier press (Control/Shift/Alt/Meta) isn't a valid Electron
+  // accelerator on its own — globalShortcut.register() throws. Ignore it
+  // and keep listening for the actual key.
+  if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   const key = e.key === ' ' ? 'Space' : e.key;
   e.preventDefault();
   e.stopPropagation();
