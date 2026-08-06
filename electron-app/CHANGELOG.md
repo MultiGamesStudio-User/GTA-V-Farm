@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.5.11] – 2026-08-06
+
+### Fixed
+- 🐛 Sécurité : `macros.json` (macros de dev) était suivi par git malgré son entrée dans `.gitignore` — désindexé (`git rm --cached`), ne sera plus commité à l'avenir
+
+### Changed
+- 📝 Auto Bouffe : intervalle par défaut 1 min → 2h
+- 📝 Auto Clicker : réglages par défaut clic gauche/100ms → clic droit/15s
+
+---
+
+
+
 ## [2.5.10] – 2026-08-06
 
 ### Changed
