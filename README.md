@@ -1,188 +1,178 @@
-# 🎮 MacroEngine – Automation System
+# 🎮 MacroEngine
 
-> Professional macro automation platform for GTA V with visual macro editor, OCR detection, and advanced conditions system.
-
----
-
-## ⚠️ Legal Disclaimer
-
-**This tool is for single-player use only.** Using this in GTA Online violates Rockstar Games' Terms of Service and may result in:
-- Account suspension
-- Permanent ban
-- Loss of progress
-
-**Use at your own risk.**
+> Automatisation visuelle par macros pour GTA V Solo & serveurs FiveM — éditeur de règles SI/ALORS, détection à l'écran, dashboard en direct.
 
 ---
 
-## 🚀 Features
+## ⚠️ Avertissement légal
 
-- 🎨 **Visual Macro Editor** – Build macros without code
-- 🔍 **OCR Detection** – Real-time text recognition using Tesseract
-- ⚙️ **Advanced Conditions** – IF/THEN logic, loops, waits
-- 🖱️ **Input Automation** – Mouse, keyboard, controller inputs
-- 💾 **Persistent Config** – Save and load macro profiles
-- 🎯 **Accuracy** – High-precision object detection via OpenCV
-- 🖥️ **Cross-resolution** – Auto-scales to any screen resolution
-- 📊 **Monitoring** – Real-time logs and performance metrics
+**Cet outil est prévu pour le jeu solo et les serveurs FiveM uniquement.** L'utiliser sur GTA Online enfreint les conditions d'utilisation de Rockstar Games et peut entraîner :
+- Suspension du compte
+- Bannissement définitif
+- Perte de progression
+
+**Utilisation à tes risques et périls.**
 
 ---
 
-## 📋 System Requirements
+## 🚀 Fonctionnalités
 
-- **Windows 10/11** (x64)
-- **2GB RAM** minimum
-- **100MB disk space**
-- No additional installations required (everything is portable)
+- 🎨 **Éditeur visuel** – Canevas de règles `SI / ALORS` (conditions → actions), sans écrire une ligne de script
+- 🔍 **Détection à l'écran** – Couleur de pixel, correspondance d'image (OpenCV) ou lecture de texte (OCR : EasyOCR → WinRT → Tesseract en repli)
+- ⚙️ **Conditions avancées** – État de macro/fenêtre/processus, compteurs, variables, minuteurs, aléatoire, clavier, presse-papiers
+- 🖱️ **Actions humanisées** – Délais gaussiens et mouvements de souris en courbe de Bézier, pour éviter un rythme parfaitement régulier
+- 🖱️ **Auto Clicker** – Cadence, bouton, position et décalage aléatoire configurables, indépendant de l'éditeur de macros
+- 🍽️ **Auto Bouffe** – Cycle manger/boire automatique à intervalle configurable, détection de l'état de l'inventaire par IA (Moondream Cloud, clé API gratuite à fournir)
+- 📊 **Dashboard en direct** – Cycles, erreurs, dernière règle déclenchée par macro active, plus un historique des runs qui persiste entre les redémarrages
+- 🎙️ **Enregistreur** – Capture tes actions en direct pour générer une macro sans tout construire à la main
+- 🛡️ **Garde-fous** – Conditions de démarrage, arrêt automatique sur seuil/minuteur, zones interdites, actions de nettoyage, touche d'arrêt d'urgence toujours active
+- 🖥️ **Auto-scaling** – Coordonnées calibrées sur une résolution, converties automatiquement pour la résolution réelle de l'écran
+
+---
+
+## 📋 Prérequis système
+
+- **Windows 10/11** (x64) — uniquement, l'app utilise des API Windows natives
+- Clavier **AZERTY** (raccourcis par défaut)
+- Aucune autre installation requise (Python et dépendances sont embarqués)
 
 ---
 
 ## 🔧 Installation
 
-### Method 1: Installer (Recommended)
+### Méthode 1 : Installeur (recommandé)
 
-1. Download `MacroEngine-Setup.exe` from [Releases](https://github.com/Multigames-Studio-fr/GTA-V-Farm/releases)
-2. Run the installer
-3. Launch from Start Menu or Desktop shortcut
-4. ✅ Done! Auto-updates are enabled
+1. Télécharge `MacroEngine-Setup.exe` depuis les [Releases](https://github.com/Multigames-Studio-fr/GTA-V-Farm/releases)
+2. Lance l'installeur
+3. Ouvre depuis le menu Démarrer ou le raccourci Bureau
 
-### Method 2: Portable (No Installation)
+### Méthode 2 : Portable (sans installation)
 
-1. Download `MacroEngine-Portable.exe` from [Releases](https://github.com/Multigames-Studio-fr/GTA-V-Farm/releases)
-2. Run it directly – no installation needed
-3. First run will extract dependencies (~200MB)
-
----
-
-## 🎯 Quick Start
-
-1. **Open MacroEngine**
-2. **Create a new macro** in the Visual Editor
-3. **Add actions:**
-   - Drive forward/backward
-   - Turn left/right
-   - Collect items (hold E)
-   - Enter/exit vehicles
-   - Custom conditions (IF health < 50, THEN...)
-4. **Test** with F12 (Emergency Stop)
-5. **Run** – Press the Play button
-
-### Controls
-
-| Key | Action |
-|-----|--------|
-| **F12** | Emergency Stop |
-| **F11** | Pause / Resume |
-| **F10** | Reload Macros |
+1. Télécharge `MacroEngine-Portable.exe` depuis les [Releases](https://github.com/Multigames-Studio-fr/GTA-V-Farm/releases)
+2. Lance-le directement — aucune installation nécessaire
+3. Le premier lancement extrait les dépendances une seule fois (mise en cache par version, pas de réextraction aux lancements suivants)
 
 ---
 
-## 📸 Advanced: Custom Image Detection
+## 🎯 Démarrage rapide
 
-1. Open **Tools → Image Capture**
-2. Press SPACE to capture a region
-3. Save as `template_name.png`
-4. Use in macros: `If image "template_name" detected → ...`
+1. **Ouvre MacroEngine**
+2. **Crée une macro** dans l'éditeur visuel
+3. **Assemble des règles** : conditions (pixel, image, OCR, minuteur...) → actions (touche, clic, souris, variable...)
+4. **Teste** chaque condition individuellement avant de lancer la boucle
+5. **Lance** la macro et suis-la depuis le Dashboard
+
+### Raccourcis
+
+| Touche | Action |
+|--------|--------|
+| **F12** | Arrêt d'urgence |
+| **F11** | Pause / Reprise |
+| **F10** | Recharger les macros |
+
+---
+
+## 📸 Détection d'image personnalisée
+
+1. Ouvre **Outils → Capture d'image**
+2. Sélectionne une région, ESPACE pour capturer
+3. Enregistre le template
+4. Utilise-le dans une règle : condition « Image détectée »
 
 ---
 
 ## 🔌 Configuration
 
-All settings are in the UI:
-- **Game Settings** – GTA keybinds (QWERTY/AZERTY), resolution
-- **Detection Sensitivity** – Adjust OCR/image matching thresholds
-- **Performance** – RAM monitor, logging level
-
-No need to edit config files!
+Tout se règle depuis l'interface — pas besoin d'éditer de fichier :
+- **Paramètres jeu** – Touches, résolution, profils de farm
+- **Sensibilité de détection** – Seuils OCR / correspondance d'image
+- **Performance** – Suivi RAM, niveau de logs
 
 ---
 
-## 🛠️ Development
+## 🛠️ Développement
 
-### Prerequisites
+### Prérequis
 
-- Node.js 16+ (bundled in installer)
-- Python 3.11+ (bundled in installer)
+- Node.js 18
+- Python 3.11
 
-### Build from Source
+### Build depuis les sources
 
 ```bash
 cd electron-app
 npm install
-npm run dev              # Run in dev mode
-npm run build-nsis       # Build installer
-npm run build-portable   # Build portable exe
-npm run release          # Release with auto-update
+npm run dev              # Mode dev (Electron + Python, DevTools)
+npm run build-nsis       # Build installeur
+npm run build-portable   # Build portable
+npm run build            # Installeur + portable
 ```
 
-### Project Structure
+### Structure du projet
 
 ```
 GTA V FARM/
-├── electron-app/       ← UI (Electron)
-│   ├── main.js        ← App entry point
-│   ├── preload.js     ← IPC security layer
-│   ├── renderer/      ← Frontend (HTML/CSS/JS)
-│   └── assets/        ← Icons & images
-├── modules/           ← Python engine
-│   ├── screen_reader.py   ← Screenshot capture
-│   ├── ocr_engine.py      ← Text detection
-│   └── state_machine.py   ← Action executor
-├── main.py            ← Python entry point
-├── requirements.txt    ← Python dependencies
-└── templates/         ← Image templates for detection
+├── main.py                    ← Serveur IPC Python — commandes stdin/stdout
+├── config.py                  ← Résolution, touches, profils de farm, templates
+├── modules/engine/
+│   ├── macro_runner.py        ← Boucle d'exécution d'une macro
+│   ├── actions.py             ← Types d'actions (clavier/souris/variables/intégrations)
+│   ├── conditions.py          ← Types de conditions (visuel/état/compteurs/clavier...)
+│   ├── ocr_engine.py          ← Cascade OCR (EasyOCR → WinRT → Tesseract)
+│   ├── screen_reader.py       ← Capture d'écran (mss)
+│   ├── recorder.py            ← Enregistreur d'actions
+│   ├── coord_utils.py         ← Validation/scaling des coordonnées
+│   ├── humanizer.py           ← Délais gaussiens, courbes de Bézier
+│   └── state.py               ← Compteurs, variables, stats, historique
+├── electron-app/
+│   ├── main.js                ← Process principal Electron
+│   ├── preload.js             ← Passerelle IPC sécurisée
+│   ├── renderer/js/           ← Une page = un module (dashboard, éditeur, autoclicker...)
+│   └── updater.js             ← Auto-update
+└── templates/                 ← Images de référence pour la détection
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## 🐛 Dépannage
 
-### Macro doesn't execute
-1. Check if GTA V is in focus
-2. Verify templates exist (`Tools → Manage Templates`)
-3. Check logs: **View → Logs**
+### La macro ne s'exécute pas
+1. Vérifie que la fenêtre du jeu est au premier plan
+2. Vérifie que les templates existent (**Outils → Gérer les templates**)
+3. Consulte les logs : **Affichage → Logs**
 
-### Poor detection accuracy
-1. Recapture templates in-game (not menus)
-2. Increase sensitivity in **Settings → Detection**
-3. Use better lighting/contrast
+### Détection peu fiable
+1. Recapture les templates en conditions réelles
+2. Augmente la sensibilité dans **Paramètres → Détection**
+3. Vérifie contraste/luminosité
 
-### Crash on startup
-1. Run: `MacroEngine-Setup.exe --reset`
-2. Reinstall if issue persists
-3. Check [Issues](https://github.com/Multigames-Studio-fr/GTA-V-Farm/issues)
-
----
-
-## 📦 Updates
-
-Auto-update checks every 24h. To manually update:
-1. **Menu → Check for Updates**
-2. Or download fresh from [Releases](https://github.com/Multigames-Studio-fr/GTA-V-Farm/releases)
+### Plantage au démarrage
+1. Consulte `app.log` (racine du dossier d'installation)
+2. Réinstalle si le problème persiste
+3. Signale le sur [Issues](https://github.com/Multigames-Studio-fr/GTA-V-Farm/issues)
 
 ---
 
-## 📝 License
+## 📦 Mises à jour
 
-MIT License – See [LICENSE](./LICENSE)
+Vérification au lancement de l'app, ou manuellement via **Menu → Vérifier les mises à jour**. Tu peux aussi télécharger la dernière version depuis les [Releases](https://github.com/Multigames-Studio-fr/GTA-V-Farm/releases).
 
 ---
 
-## 🤝 Contributing
+## 📝 Licence
 
-Found a bug? Have ideas?
-- 🐛 [Report Issues](https://github.com/Multigames-Studio-fr/GTA-V-Farm/issues)
-- 💡 [Suggest Features](https://github.com/Multigames-Studio-fr/GTA-V-Farm/discussions)
+MIT License – voir [LICENSE](./LICENSE)
+
+---
+
+## 🤝 Contribuer
+
+Un bug ? Une idée ?
+- 🐛 [Signaler un problème](https://github.com/Multigames-Studio-fr/GTA-V-Farm/issues)
 - 🍴 [Fork & PR](https://github.com/Multigames-Studio-fr/GTA-V-Farm)
 
 ---
 
-## 👨‍💻 Author
+## 👨‍💻 Auteur
 
 **Multigames Studio** – [GitHub](https://github.com/Multigames-Studio-fr)
-
----
-
-Made with ❤️ for GTA V fans
-
-**Build Status:** Automated via GitHub Actions ✨
