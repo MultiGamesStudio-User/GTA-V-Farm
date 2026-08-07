@@ -1,6 +1,6 @@
 {
-  "version": "2.5.11",
-  "date": "2026-08-06",
+  "version": "2.5.12",
+  "date": "2026-08-07",
   "files": {
     "main.py": "01e46abdb27c5bbbbb8309ede0a75d89bc1ccd707710fb3b6c01cfb78ab8c7a2",
     "config.py": "7e68e06d8acc15a9eae3f0222a8d4e8efce4f6e7ffea075f84f6d1ed6982d298",
@@ -27,7 +27,7 @@
     "electron-app/renderer/js/macros-runner.js": "4317d7b5dbdd225caafb585b347017ef9d8cda21511e6e6a08485fa8ad6f23d8",
     "electron-app/renderer/js/page-actions.js": "1baf0bc4897243666b4878a9c0c6fc6b82e92715ff879cd295ff524deb59fb29",
     "electron-app/renderer/js/page-autobouffe.js": "f156ba98e7a81ddd5bb3c7b58a8483a7c282e22b12784655e51b56ff41e1879e",
-    "electron-app/renderer/js/page-autoclicker.js": "4b1865fa835ec46c6321915b02338e582bf25eaac8f58dc51fa15ced627bf38a",
+    "electron-app/renderer/js/page-autoclicker.js": "566c7ec7e4558f831211bf13f6717a63dc5b0959c56add708621aadd8a899b3d",
     "electron-app/renderer/js/page-conditions.js": "a10d428694fe0191a2a978405c3999636063353cf76a032341dae376e033157f",
     "electron-app/renderer/js/page-dashboard.js": "e2065623307485bf26a7f2b7617fb028af8cfef59b0e827617f07b3215559864",
     "electron-app/renderer/js/page-windows.js": "d0efe777ea4a7a9984f880e7c73de91d3f4df6d6897982f249c0e3345a24eded",
@@ -35,6 +35,6 @@
     "electron-app/renderer/overlay.html": "f74be1051d2d85758c0ab6eab1fff75ac85ad180e0099b467d73ca8429264c28",
     "electron-app/renderer/picker.html": "69564167c04a19670b19276fe0528bd9a4febbcdc8143aa0f7046a1112192466",
     "electron-app/renderer/styles.css": "474a895a70da12872a53b81e7c4c792c28f15a23bda8da2933a7640be3eef059",
-    "electron-app/package.json": "3dae47b2fb16a234f129da66671f387cdb5a5dec24be98ba955af917893a9440"
+    "electron-app/package.json": "5fc4a24f86e303a8b6a882d369a94f4d32c3dac002f64152f43a703a5bf9da42"
   }
 }
