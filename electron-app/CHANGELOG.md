@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.5.12] – 2026-08-07
+
+### Fixed
+- 🐛 Auto Clicker : capturer un modificateur seul (Ctrl/Maj/Alt) comme raccourci démarrage/arrêt faisait échouer son enregistrement global (Electron exige une touche non-modificatrice) — capture ignore désormais les modificateurs seuls, et une valeur déjà sauvegardée invalide revient au défaut (F6/F7)
+
+### Changed
+- 📝 Landing page (`docs/index.html`) : le bouton de téléchargement suggère un nom de fichier versionné (`MacroEngine-X.X.X.exe`), récupéré depuis la dernière release GitHub
+
+---
+
+
+
 ## [2.5.11] – 2026-08-06
 
 ### Fixed
