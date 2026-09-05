@@ -1,8 +1,8 @@
 {
   "version": "2.5.12",
-  "date": "2026-08-07",
+  "date": "2026-09-05",
   "files": {
-    "main.py": "01e46abdb27c5bbbbb8309ede0a75d89bc1ccd707710fb3b6c01cfb78ab8c7a2",
+    "main.py": "8cc994e97f564a407ab55a640f20d80eda9520065bdd5628e4c88a5d369ffd6e",
     "config.py": "7e68e06d8acc15a9eae3f0222a8d4e8efce4f6e7ffea075f84f6d1ed6982d298",
     "requirements.txt": "040374fb15e0f4887cf40ccb5387f7045ee5ab1a3acb5afc7e42b726b9f63a93",
     "modules/engine/actions.py": "bccbab67a4850bc60218fac5ace9833ac87b4167214a5ca3dfe4acb01a992628",
@@ -24,9 +24,9 @@
     "electron-app/renderer/js/engine.js": "bca5097f69c8be9e1475eb6c7b2db5d811aea0102521a171d8be2ad181664fcf",
     "electron-app/renderer/js/macros-data.js": "4d3dc297839699387bc0680ea0776e770eb979cfa37c1ac8ce4e81e7f0b9c286",
     "electron-app/renderer/js/macros-editor.js": "26ad1138d3309a35acc62b6e953db4f2e31100ab8d850b7f399e771c2d12cf37",
-    "electron-app/renderer/js/macros-runner.js": "4317d7b5dbdd225caafb585b347017ef9d8cda21511e6e6a08485fa8ad6f23d8",
+    "electron-app/renderer/js/macros-runner.js": "639274600deabb11f7e1905465e8a2313d5e9cdcc6a2c9962f5ebbc9a99a0d9d",
     "electron-app/renderer/js/page-actions.js": "1baf0bc4897243666b4878a9c0c6fc6b82e92715ff879cd295ff524deb59fb29",
-    "electron-app/renderer/js/page-autobouffe.js": "f156ba98e7a81ddd5bb3c7b58a8483a7c282e22b12784655e51b56ff41e1879e",
+    "electron-app/renderer/js/page-autobouffe.js": "2ee66d33d859c75707cc3f8e3259a69109058655346bec1bafe1af509c27dd07",
     "electron-app/renderer/js/page-autoclicker.js": "566c7ec7e4558f831211bf13f6717a63dc5b0959c56add708621aadd8a899b3d",
     "electron-app/renderer/js/page-conditions.js": "a10d428694fe0191a2a978405c3999636063353cf76a032341dae376e033157f",
     "electron-app/renderer/js/page-dashboard.js": "e2065623307485bf26a7f2b7617fb028af8cfef59b0e827617f07b3215559864",
