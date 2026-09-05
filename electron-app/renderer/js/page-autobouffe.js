@@ -3,6 +3,13 @@ let _abfRunning  = false;
 let _abfBound    = false;      // guard against duplicate event listener registration
 let _abfCapturing = null;      // { el, fieldId } while waiting for key press
 
+// Incremented on every start. _abfIntervalLoop captures its value and bails out
+// as soon as it no longer matches, so a loop left over from a previous run can
+// never resurrect itself: Stop → Start used to leave the OLD loop sleeping in a
+// timer that resolved true, saw _abfRunning back at true, and resumed alongside
+// the new one (two loops eating on offset schedules, double the API spend).
+let _abfLoopGen = 0;
+
 const _ABF_STORAGE_KEY = 'abf_settings';
 
 const _ABF_MIN_INTERVAL_S = 30;
@@ -36,11 +43,6 @@ let _abfStateZoneRel   = null; // { relX, relY, relW, relH } — fractions 0..1 
 const _ABF_MAX_CLOSE_RETRIES = 3;
 const _ABF_UI_DELAY_MS       = 500; // wait for inventory open/close animation
 
-// Leftover from the local-model era (moondream2 VRAM warmup/unload) — now a
-// no-op round-trip against Moondream Cloud, kept only so the call sites below
-// don't need touching. Harmless either way.
-const _ABF_VLM_WARMUP_LEAD_MS = 10000;
-
 // Fraction of the calibrated zone's width checked on each side (own title on
 // the far left, 3rd-party title on the far right) — deliberately less than
 // 50% so the middle (action button column, always present) is never read.
@@ -68,23 +70,54 @@ async function initAutoBouffe() {
   _abfEnforceMinInterval();
 }
 
+/* Every precondition a cycle needs, checked in one place. Returns an error
+   message, or null when the config is usable. Previously these checks were
+   duplicated (and had already drifted apart) between _abfIntervalLoop and
+   _abfForceCycle, and neither validated the two settings whose absence is
+   silent and fatal: the Moondream API key and the calibrated zone. Without
+   them _abfDetectState returns 'unknown' forever and the cycle degenerates
+   into tapping the inventory key open once per interval. */
+function _abfValidateConfig() {
+  if (!document.getElementById('abf-key-inventory').value) return 'touche inventaire non configurée';
+  if (!_abfWindowTitle)   return 'fenêtre du jeu non choisie — clique "Choisir fenêtre"';
+  if (!_abfStateZoneRel)  return 'zone de détection non calibrée — clique "Bande titre"';
+  if (!document.getElementById('abf-moondream-key')?.value.trim()) {
+    return 'clé API Moondream Cloud manquante — colle-la dans "Détection IA"';
+  }
+  const eatX = parseInt(document.getElementById('abf-eat-x').value) || 0;
+  const eatY = parseInt(document.getElementById('abf-eat-y').value) || 0;
+  if (eatX === 0 && eatY === 0) return 'point Manger non configuré (0,0)';
+  const drinkX = parseInt(document.getElementById('abf-drink-x').value) || 0;
+  const drinkY = parseInt(document.getElementById('abf-drink-y').value) || 0;
+  if (drinkX === 0 && drinkY === 0) return 'point Boire non configuré (0,0)';
+  return null;
+}
+
 function startAutoBouffe() {
   if (_abfRunning) return;
+  // Validate BEFORE flipping the status to "En cours" — otherwise the UI
+  // claimed to be running for a whole interval before the loop noticed.
+  const err = _abfValidateConfig();
+  if (err) {
+    appendLog('WARNING', 'Auto Bouffe: démarrage impossible — ' + err + '.');
+    return;
+  }
   _abfRunning = true;
   document.getElementById('abf-btn-start').disabled = true;
   document.getElementById('abf-btn-stop').disabled  = false;
   document.getElementById('abf-status').textContent = '🟢 En cours…';
   _abfNotifyWebhook('autobouffe_start');
-  _abfIntervalLoop();
+  _abfIntervalLoop(++_abfLoopGen);
 }
 
 function stopAutoBouffe() {
   _abfRunning = false;
+  _abfLoopGen++;      // invalidate any loop still in flight
+  _abfCancelWaits();  // wake it now instead of up to `intervalMs` from now
   document.getElementById('abf-btn-start').disabled = false;
   document.getElementById('abf-btn-stop').disabled  = true;
   document.getElementById('abf-status').textContent = 'Arrêté';
   _abfNotifyWebhook('autobouffe_stop');
-  _abfVlmUnload(); // no reason to keep VRAM reserved once stopped
 }
 
 /* Auto Bouffe never touches the engine's macro registry (pure JS interval
@@ -102,13 +135,31 @@ async function _abfNotifyWebhook(event) {
 }
 
 /* ── Low-level helpers (single action/wait, checked against _abfRunning) ── */
+// Every _abfWait currently sleeping, so Stop can resolve them immediately.
+// The previous implementation only sampled _abfRunning ONCE, before the sleep,
+// then resolved true unconditionally — so Stop during the (typically hours
+// long) inter-meal wait was not noticed until the timer finally fired.
+const _abfPendingWaits = new Set();
+
+function _abfCancelWaits() {
+  for (const w of _abfPendingWaits) {
+    clearTimeout(w.timer);
+    w.resolve(false);
+  }
+  _abfPendingWaits.clear();
+}
+
+/* Resolves true if the full delay elapsed while still running, false if Stop
+   interrupted it (callers treat false as "abort the cycle immediately"). */
 function _abfWait(ms) {
+  if (!_abfRunning) return Promise.resolve(false);
   return new Promise(resolve => {
-    const check = () => {
-      if (!_abfRunning) { resolve(false); return; }
-      setTimeout(() => resolve(true), ms);
-    };
-    check();
+    const entry = { resolve };
+    entry.timer = setTimeout(() => {
+      _abfPendingWaits.delete(entry);
+      resolve(_abfRunning);
+    }, ms);
+    _abfPendingWaits.add(entry);
   });
 }
 
@@ -140,30 +191,27 @@ function _abfNoTitleDetected(raw) {
   return !norm || /\bnone\b/.test(norm) || norm.includes('no discernible') || norm.includes('no text');
 }
 
-async function _abfVlmWarmup() {
-  try {
-    appendLog('INFO', 'Auto Bouffe: préchauffage IA…');
-    const res = await window.api.vlmWarmup();
-    if (!res?.ok) appendLog('WARNING', 'Auto Bouffe: préchauffage IA échoué: ' + (res?.error || '?'));
-  } catch (e) { appendLog('WARNING', 'Auto Bouffe: préchauffage IA indisponible: ' + (e.message || e)); }
-}
+/* The moondream2-era VRAM warmup/unload helpers used to be called around every
+   scan. They are no-ops on both sides now (Moondream Cloud holds no local
+   model — see main.py _cmd_vlm_warmup) and only produced two extra IPC
+   round-trips per cycle plus log lines that lied to the user about
+   "préchauffage IA" and freeing VRAM. Removed with the interval rewrite; the
+   vlm_warmup/vlm_unload IPC commands still exist for interface compatibility. */
 
-async function _abfVlmUnload() {
-  try {
-    const res = await window.api.vlmUnload();
-    if (!res?.ok) appendLog('WARNING', 'Auto Bouffe: déchargement IA échoué: ' + (res?.error || '?'));
-  } catch (e) { appendLog('WARNING', 'Auto Bouffe: déchargement IA indisponible: ' + (e.message || e)); }
-}
-
+/* `debug` gates only the verbose per-crop transcript, which is noise outside
+   the Tester button. Failures are ALWAYS logged: they used to be gated too,
+   and since the real cycle never passed debug, a missing API key or a 401 was
+   completely silent — the run just degraded into "unknown" forever with a
+   misleading "inventaire refermé" message as the only clue. */
 async function _abfAskTitle(zone, debug, label) {
   const apiKey = document.getElementById('abf-moondream-key')?.value.trim() || '';
   if (!apiKey) {
-    if (debug) appendLog('WARNING', 'Auto Bouffe IA: clé API Moondream Cloud manquante — configure-la ci-dessus.');
+    appendLog('WARNING', 'Auto Bouffe IA: clé API Moondream Cloud manquante — configure-la dans "Détection IA".');
     return null;
   }
   const res = await window.api.vlmAsk({ ...zone, question: _ABF_TITLE_QUESTION, api_key: apiKey });
   if (!res?.ok) {
-    if (debug) appendLog('WARNING', `Auto Bouffe IA (${label}) erreur: ` + (res?.error || 'réponse invalide'));
+    appendLog('WARNING', `Auto Bouffe IA (${label}) erreur: ` + (res?.error || 'réponse invalide'));
     return null;
   }
   const raw = String(res?.answer || '').trim();
@@ -278,10 +326,13 @@ function _abfUpdateWindowLabel() {
 }
 
 async function _abfDetectState(debug) {
-  if (!_abfStateZoneRel) return 'unknown'; // not calibrated
+  if (!_abfStateZoneRel) {
+    appendLog('WARNING', 'Auto Bouffe IA: zone de détection non calibrée — clique "Bande titre".');
+    return 'unknown';
+  }
   const rect = await _abfResolveWindowRect();
   if (!rect) {
-    if (debug) appendLog('WARNING', 'Auto Bouffe IA: fenêtre du jeu introuvable — reclique "Choisir fenêtre" et sélectionne-la.');
+    appendLog('WARNING', 'Auto Bouffe IA: fenêtre du jeu introuvable — reclique "Choisir fenêtre" et sélectionne-la.');
     return 'unknown';
   }
   const winW = rect.right - rect.left;
@@ -311,7 +362,7 @@ async function _abfDetectState(debug) {
     if (ownVisible)   return 'own';
     return 'closed';
   } catch (e) {
-    if (debug) appendLog('WARNING', 'Auto Bouffe IA erreur: ' + (e.message || e));
+    appendLog('WARNING', 'Auto Bouffe IA erreur: ' + (e.message || e));
     return 'unknown';
   }
 }
@@ -386,6 +437,13 @@ async function _abfRunCycle(wait) {
   if (state === 'third') {
     appendLog('WARNING', 'Auto Bouffe: panneau tiers toujours ouvert après plusieurs tentatives — cycle passé.');
     outcome = 'panneau tiers toujours ouvert — repas sauté';
+  } else if (state === 'unknown') {
+    // Kept distinct from 'closed': the two used to share one message that
+    // blamed the inventory, hiding the real cause (no API key, HTTP error,
+    // game window gone). _abfAskTitle/_abfDetectState have now logged the
+    // actual reason just above this line.
+    appendLog('WARNING', 'Auto Bouffe: état de l\'inventaire indéterminé (l\'IA n\'a pas répondu) — cycle passé, voir l\'erreur ci-dessus.');
+    outcome = 'état indéterminé — repas sauté';
   } else if (state !== 'own') {
     appendLog('WARNING', 'Auto Bouffe: inventaire fermé après les tentatives de réouverture — cycle passé.');
     outcome = 'inventaire refermé avant de pouvoir manger';
@@ -415,24 +473,41 @@ async function _abfRunCycle(wait) {
     outcome = `mangé ${eatClicks}×, bu ${drinkClicks}×`;
   }
 
-  // 4. Close inventory — unconditional tap, not gated on the AI check: we
-  //    just used items from it in step 3 so it must be open, and the
-  //    trunk key (step 4b) only opens the trunk correctly from a fully
-  //    closed menu state.
-  appendLog('INFO', 'Auto Bouffe: ferme l\'inventaire…');
-  await _abfKeyTap(invKey);
-  if (!(await wait(_ABF_UI_DELAY_MS))) return { ok: false };
-  state = await _abfDetectStateLogged();
-  if (state !== 'closed') {
-    appendLog('WARNING', 'Auto Bouffe: l\'inventaire semble toujours ouvert après fermeture.');
+  // 4. Close the inventory — ONLY when something is actually open. The key is
+  //    a toggle, so tapping it on a 'closed'/'unknown' state OPENS the menu
+  //    instead of closing it. This used to be unconditional (justified by "we
+  //    just ate, so it must be open"), but it also ran on the failure branches
+  //    above where nothing was eaten — so a run without an API key left the
+  //    player's inventory forced open in game, every single cycle.
+  if (state === 'own' || state === 'third') {
+    appendLog('INFO', 'Auto Bouffe: ferme l\'inventaire…');
+    await _abfKeyTap(invKey);
+    if (!(await wait(_ABF_UI_DELAY_MS))) return { ok: false };
+    state = await _abfDetectStateLogged();
+    if (state !== 'closed') {
+      appendLog('WARNING', 'Auto Bouffe: l\'inventaire semble toujours ouvert après fermeture.');
+      closeUncertain = true;
+    }
+  } else if (state === 'closed') {
+    // Already closed and we know it — nothing to do, and the trunk restore
+    // below is still safe to run.
+    appendLog('INFO', 'Auto Bouffe: inventaire déjà fermé — touche non envoyée.');
+  } else {
+    // 'unknown': the menu state is genuinely unknown, so neither closing nor
+    // reopening the trunk can be done safely.
+    appendLog('INFO', 'Auto Bouffe: état inconnu — touche inventaire non envoyée (elle ouvrirait le menu).');
     closeUncertain = true;
   }
 
   // 4b. A trunk/vehicle/crate was open before we ate — reopen it with its
   //     own key (separate from the inventory toggle) to restore the state
-  //     the player was in. Inventory is now confirmed closed (step 4).
+  //     the player was in. Only when step 4 actually confirmed a closed menu:
+  //     the trunk key only opens correctly from a fully closed state, and
+  //     firing it blind on top of a still-open menu makes things worse.
   if (hadThirdPanel) {
-    if (!trunkKey) {
+    if (closeUncertain) {
+      appendLog('WARNING', 'Auto Bouffe: fermeture non confirmée — réouverture du coffre annulée (elle ne fonctionne que menu fermé).');
+    } else if (!trunkKey) {
       appendLog('WARNING', 'Auto Bouffe: panneau tiers refermé mais touche coffre non configurée — pas de réouverture.');
     } else {
       appendLog('INFO', 'Auto Bouffe: réouverture du coffre/véhicule…');
@@ -444,30 +519,20 @@ async function _abfRunCycle(wait) {
 }
 
 /* ── Main interval-mode cycle ─────────────────────────────── */
-async function _abfIntervalLoop() {
+/* `gen` is the generation token this loop was started with — any mismatch
+   means a newer Start (or a Stop) has superseded it and it must exit. */
+async function _abfIntervalLoop(gen) {
   try { await ensureEngine(); } catch (e) {
     appendLog('ERROR', 'Auto Bouffe: ' + e.message);
     stopAutoBouffe();
     return;
   }
-  while (_abfRunning) {
-    const invKey = document.getElementById('abf-key-inventory').value;
-    if (!invKey) {
-      appendLog('WARNING', 'Auto Bouffe: touche inventaire non configurée — arrêt.');
-      stopAutoBouffe();
-      return;
-    }
-    const eatX0 = parseInt(document.getElementById('abf-eat-x').value) || 0;
-    const eatY0 = parseInt(document.getElementById('abf-eat-y').value) || 0;
-    const drinkX0 = parseInt(document.getElementById('abf-drink-x').value) || 0;
-    const drinkY0 = parseInt(document.getElementById('abf-drink-y').value) || 0;
-    if (eatX0 === 0 && eatY0 === 0) {
-      appendLog('WARNING', 'Auto Bouffe: point Manger non configuré (0,0) — arrêt.');
-      stopAutoBouffe();
-      return;
-    }
-    if (drinkX0 === 0 && drinkY0 === 0) {
-      appendLog('WARNING', 'Auto Bouffe: point Boire non configuré (0,0) — arrêt.');
+  while (_abfRunning && gen === _abfLoopGen) {
+    // Re-checked every iteration, not just at Start: the fields stay editable
+    // while running, so a point can be cleared mid-session.
+    const err = _abfValidateConfig();
+    if (err) {
+      appendLog('WARNING', 'Auto Bouffe: ' + err + ' — arrêt.');
       stopAutoBouffe();
       return;
     }
@@ -477,19 +542,11 @@ async function _abfIntervalLoop() {
     const intervalMs = Math.max(_ABF_MIN_INTERVAL_S, h * 3600 + m * 60 + s) * 1000;
 
     const result = await _abfRunCycleExclusive(_abfWait);
-    if (!result.ok) return;
+    if (!result.ok || gen !== _abfLoopGen) return;
 
-    // 5. Free the model's VRAM until shortly before the next scan — Auto
-    //    Bouffe's interval is typically hours, no reason to hold ~4 Go of
-    //    VRAM reserved (and briefly competing with the game's own GPU use)
-    //    the whole time between scans.
-    await _abfVlmUnload();
-    const leadMs = Math.min(_ABF_VLM_WARMUP_LEAD_MS, intervalMs);
-    appendLog('INFO', `Auto Bouffe: cycle terminé (${result.outcome}) — prochain dans ${Math.round(intervalMs / 1000)}s ` +
-      `(IA relancée ${Math.round(leadMs / 1000)}s avant).`);
-    if (!(await _abfWait(intervalMs - leadMs))) return;
-    await _abfVlmWarmup();
-    if (!(await _abfWait(leadMs))) return;
+    appendLog('INFO', `Auto Bouffe: cycle terminé (${result.outcome}) — ` +
+      `prochain dans ${Math.round(intervalMs / 1000)}s.`);
+    if (!(await _abfWait(intervalMs))) return;
   }
 }
 
@@ -525,20 +582,16 @@ async function _abfForceCycle() {
     appendLog('WARNING', 'Auto Bouffe: cycle forcé déjà en cours.');
     return;
   }
-  const invKey = document.getElementById('abf-key-inventory').value;
-  if (!invKey) {
-    appendLog('WARNING', 'Auto Bouffe: touche inventaire non configurée.');
-    return;
-  }
-  const eatX = parseInt(document.getElementById('abf-eat-x').value) || 0;
-  const eatY = parseInt(document.getElementById('abf-eat-y').value) || 0;
-  const drinkX = parseInt(document.getElementById('abf-drink-x').value) || 0;
-  const drinkY = parseInt(document.getElementById('abf-drink-y').value) || 0;
-  if ((eatX === 0 && eatY === 0) || (drinkX === 0 && drinkY === 0)) {
-    appendLog('WARNING', 'Auto Bouffe: point Manger/Boire non configuré (0,0).');
-    return;
-  }
   const resultEl = document.getElementById('abf-force-cycle-result');
+  // Same preconditions as a scheduled run — this used to check a narrower
+  // (and diverging) subset, so a forced cycle could start without an API key
+  // or a calibrated zone and fail in a way nothing explained.
+  const err = _abfValidateConfig();
+  if (err) {
+    appendLog('WARNING', 'Auto Bouffe: cycle forcé impossible — ' + err + '.');
+    if (resultEl) { resultEl.textContent = '❌ ' + err; resultEl.style.color = 'var(--accent)'; }
+    return;
+  }
   if (resultEl) { resultEl.textContent = '⏳ Cycle forcé en cours…'; resultEl.style.color = 'var(--text-2)'; }
   _abfForcing = true;
   try {

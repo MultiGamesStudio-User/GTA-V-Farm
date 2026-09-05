@@ -65,7 +65,21 @@ async function stopCurrentMacro() {
   } catch (e) { appendLog('ERROR', e.message); }
 }
 
+/* Auto Bouffe ne s'enregistre jamais dans le registre _runners de l'engine
+   (boucle JS pure côté renderer, voir page-autobouffe.js) — `stop_all` ne peut
+   donc pas l'atteindre. Sans cet appel, F12, le bouton stop de l'overlay et la
+   révocation de licence (les trois convergent ici) arrêtaient les macros en
+   annonçant "Toutes les macros arrêtées" pendant qu'Auto Bouffe continuait à
+   forcer le focus et à taper dans le jeu. */
+function _stopRendererLoops() {
+  if (typeof stopAutoBouffe === 'function' && typeof _abfRunning !== 'undefined' && _abfRunning) {
+    stopAutoBouffe();
+    appendLog('INFO', 'Auto Bouffe arrêté');
+  }
+}
+
 async function stopAllMacros() {
+  _stopRendererLoops();
   try {
     await ensureEngine();
     await window.api.stopAll();

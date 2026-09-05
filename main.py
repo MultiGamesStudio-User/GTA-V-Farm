@@ -955,6 +955,18 @@ def _cmd_vlm_ask(cmd, rid):
             _reply(rid, True, answer=answer)
         except Exception as e:
             _reply(rid, False, error=str(e))
+        finally:
+            # ask_region capture l'écran via screen_reader, qui garde une
+            # instance mss THREAD-LOCALE. Ce thread est jetable (un par appel,
+            # jusqu'à ~12 par cycle Auto Bouffe) : sans ça chaque appel laisse
+            # un DC/DIB GDI derrière lui et une session de farm de plusieurs
+            # heures épuise les handles du process. Même motif que
+            # macro_runner._run() en fin de thread.
+            try:
+                from modules.engine.screen_reader import release_thread_sct
+                release_thread_sct()
+            except Exception:
+                pass
     threading.Thread(target=_run, daemon=True, name='vlm-ask').start()
 
 def _cmd_vlm_warmup(cmd, rid):
